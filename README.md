@@ -57,6 +57,10 @@ loader = DataLoader(config)
 # Load and process data
 data = loader.load_data()  # Load raw data
 merged_data = loader.load_and_merge()  # Load and merge with features
+
+output_path = Path("data/processed/RB_22/unlabeled_all_cows.csv") # Designate a location to save the merged data set
+output_path.parent.mkdir(exist_ok=True) # Create the directory if needed
+merged_df.to_csv(output_path, index=False) # Save the merged data set to the output file path 
 ```
 
 ### Configuration
@@ -67,26 +71,49 @@ format: "multiple_files"
 gps_directory: "data/raw/RB_22/gps"
 accelerometer_directory: "data/raw/RB_22/accelerometer"
 labeled_data_path: "data/raw/RB_22/labeled/gps_observations_2022.csv"
+file_pattern: "*.csv"
+
+
+device_id: 824  # Test with single cow
 
 validation:
   timezone: "America/Denver"
   start_datetime: "2022-01-15 00:00:00"
   end_datetime: "2022-03-22 23:59:59"
-  lat_min: 45.0
-  lat_max: 47.0
-  lon_min: -111.5
-  lon_max: -110.5
-  excluded_devices: [841, 1005]
+  lat_min: -90
+  lat_max: 90
+  lon_min: -180
+  lon_max: 180
+  accel_min: -41
+  accel_max: 41
+  temp_min: -99
+  temp_max: 99
+  min_satellites: 0
+  max_dop: 10.0
+  excluded_devices: [841, 1005] 
 
 features:
-  enable_axis_features: true
-  enable_magnitude_features: true
+  enable_axis_features: true        # Compute features for each axes
+  enable_magnitude_features: true   # Compute features for the magnitudes
   feature_types:
-    - "BASIC_STATS"
-    - "PEAK_FEATURES"
-    - "CORRELATION"
-  window_size: 300
-```
+    - "BASIC_STATS"                 # Mean, variance of the window
+    - "ZERO_CROSSINGS"              # Count of transitions from - to + or + to -
+    - "PEAK_FEATURES"               # Statistics covering the peaks of the window
+    - "ENTROPY"                     # Compute signal entropy features
+    - "CORRELATION"                 # Compute correlation between axes
+    - "SPECTRAL"                    # Compute frequency domain features
+
+
+  # Figure out how to move these to DataSourceConfig and still be used everywhere else
+  gps_sample_interval: 300          # Expected seconds between GPS
+  gps_sample_interval: 60           # Expected seconds between Accelerometer 
+  
+labels:
+  labeled_agg_method:
+    # - "MODE"                        # The most frequent activity in the window
+    - "RAW"                         # The activity at the end of the window
+    # - "PERCENTILE"                  # A weighted choice of activity
+
 
 ### Data Processing Pipeline
 
@@ -124,6 +151,11 @@ features:
 - UTM coordinates
 - Quality indicators (DOP, satellite count)
 - Time-aligned with accelerometer data
+
+### Label Aggregation Methods
+- Raw: Use the last activity in the window as the window label 
+- Mode: Use the most common activity in the window as the window label (NOT IMPLEMENTED)
+- Percentile: Use a custom hierarchical strategy to determine the window label (NOT IMPLEMENTED)
 
 ## Development
 
