@@ -148,7 +148,7 @@ flake8 .
 ## Project Structure
 
 ### dev
-
+```
 ├── .github/
 │   ├── workflows/
 │   │   ├── ci.yml
@@ -183,7 +183,7 @@ flake8 .
 ├── pyproject.toml
 ├── README.md
 ├── show-tree.ps1
-
+```
 ## Contributing
 
 1. Fork the repository
