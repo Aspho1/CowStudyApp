@@ -1,0 +1,52 @@
+# Common settings that can be referenced across sections
+common:
+  excluded_devices: [841, 1005]
+  intervals:
+    gps: 300    # seconds
+    acc: 60     # seconds
+  timezone: "America/Denver"
+
+# Data source paths
+paths:
+  format: "multiple_files"
+  gps_directory: "data/raw/RB_22/gps"
+  accelerometer_directory: "data/raw/RB_22/accelerometer"
+  file_pattern: "*.csv"
+  labeled_data_path: "data/raw/RB_22/labeled/gps_observations_2022.csv"
+
+device_id: 824  # Test with single cow
+
+validation:
+  timezone: !ref common.timezone
+  start_datetime: "2022-01-15 00:00:00"
+  end_datetime: "2022-03-22 23:59:59"
+  lat_min: -90
+  lat_max: 90
+  lon_min: -180
+  lon_max: 180
+  accel_min: -41
+  accel_max: 41
+  temp_min: -99
+  temp_max: 99
+  min_satellites: 0
+  max_dop: 10.0
+  excluded_devices: !ref common.excluded_devices
+
+features:
+  enable_axis_features: true
+  enable_magnitude_features: true
+  feature_types:
+    - "BASIC_STATS"
+    - "ZERO_CROSSINGS"
+    - "PEAK_FEATURES"
+    - "ENTROPY"
+    - "CORRELATION"
+    - "SPECTRAL"
+  gps_sample_interval: !ref common.intervals.gps
+  acc_sample_interval: !ref common.intervals.acc
+  
+labels:
+  labeled_agg_method:
+    - "MODE"
+    - "RAW"
+    - "PERCENTILE"
