@@ -4,8 +4,8 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from datetime import datetime
-from cowstudyapp.io import DataLoader
-from cowstudyapp.config import DataSourceConfig, DataValidationConfig, DataFormat
+from cowstudyapp.dataset_building.io import DataLoader
+from cowstudyapp.config import IoConfig, DataValidationConfig, DataFormat
 
 # tests/test_io.py
 import pytest
@@ -13,8 +13,8 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from datetime import datetime
-from cowstudyapp.io import DataLoader
-from cowstudyapp.config import DataSourceConfig, DataValidationConfig, DataFormat
+from cowstudyapp.dataset_building.io import DataLoader
+from cowstudyapp.config import IoConfig, DataValidationConfig, DataFormat
 
 # Constants
 DATEFORMAT = '%m/%d/%Y %I:%M:%S %p'
@@ -96,7 +96,7 @@ def sample_accelerometer_data(tmp_path):
 @pytest.fixture
 def test_config(tmp_path):
     """Create test configuration"""
-    return DataSourceConfig(
+    return IoConfig(
         format=DataFormat.MULTIPLE_FILES,
         gps_directory=tmp_path / "gps",
         accelerometer_directory=tmp_path / "accelerometer",

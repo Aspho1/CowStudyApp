@@ -1,25 +1,26 @@
 from pathlib import Path
-from cowstudyapp.io import DataLoader
+from cowstudyapp.dataset_building.io import DataLoader
 # from cowstudyapp.features import aggregate_accelerometer_data
 # from cowstudyapp.config import DataSourceConfig
 from cowstudyapp.utils import from_posix
-from cowstudyapp.config_old import AppConfig
-from cowstudyapp.config import load_config
-from cowstudyapp.merge import DataMerger
+from cowstudyapp.config import ConfigManager
+# from cowstudyapp.config import load_config
+from cowstudyapp.dataset_building.merge import DataMerger
+from typing import Optional
 
-def process_sensor_data(config_path: Path = None):
+def process_sensor_data(config_path: Optional[Path] = None):
     """
     Main processing pipeline to create feature dataset
     """
-    config_path = Path("config/default_old.yaml")   
-    config = AppConfig.load(config_path)
+    config_path = Path("config/default.yaml")   
+    config = ConfigManager.load(config_path)
     # config = load_config(config_path)
 
     # Load raw data
     loader = DataLoader(config)
     data = loader.load_data()
     
-    print(data['label'].head())
+    # print(data['label'].head())
 
     for key, df in data.items():
         print(f"\n{key.upper()} Data:")
@@ -32,7 +33,7 @@ def process_sensor_data(config_path: Path = None):
     merged_df = merger.merge_sensor_data(data)
     
     # Save results
-    output_path = Path("data/processed/RB_22/unlabeled_all_cows.csv")
+    output_path = Path("data/processed/RB_22/all_cows_labeled.csv")
     output_path.parent.mkdir(exist_ok=True)
     merged_df.to_csv(output_path, index=False)
     

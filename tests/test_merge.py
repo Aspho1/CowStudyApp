@@ -1,15 +1,15 @@
 # scripts/test_merge.py
 from pathlib import Path
 import pandas as pd
-from cowstudyapp.config import AppConfig
-from cowstudyapp.io import DataLoader
-from cowstudyapp.merge import DataMerger
+from cowstudyapp.config import ConfigManager
+from cowstudyapp.dataset_building.io import DataLoader
+from cowstudyapp.dataset_building.merge import DataMerger
 from cowstudyapp.utils import from_posix
 
 def main():
     # Load config
     config_path = Path("config/default.yaml")
-    config = AppConfig.load(config_path)
+    config = ConfigManager.load(config_path)
     
     # Initialize loader
     loader = DataLoader(config)

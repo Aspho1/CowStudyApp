@@ -1,8 +1,8 @@
 # src/cowstudyapp/main.py
 from pathlib import Path
 import argparse
-from .config import DataSourceConfig, DataFormat
-from .io import DataLoader
+from .config import IoConfig, DataFormat
+from .dataset_building.io import DataLoader
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Process cow study data')
@@ -17,7 +17,7 @@ def parse_args():
 def main():
     args = parse_args()
     
-    config = DataSourceConfig(
+    config = IoConfig(
         gps_directory=args.gps_dir,
         accelerometer_directory=args.accel_dir
     )

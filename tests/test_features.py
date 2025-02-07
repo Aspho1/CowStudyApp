@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from cowstudyapp.features import GPSFeatures, AccelerometerFeatures, FeatureComputation, FeatureValidationError, apply_feature_extraction
+from cowstudyapp.dataset_building.features import GPSFeatures, AccelerometerFeatures, FeatureComputation, FeatureValidationError, apply_feature_extraction
 from cowstudyapp.config import FeatureConfig, FeatureType
 
 @pytest.fixture

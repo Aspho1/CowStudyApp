@@ -1,26 +1,39 @@
 # src/cowstudyapp/io.py
 from pathlib import Path
 import pandas as pd
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional
 import logging
 
-from .utils import add_posix_column, round_timestamps, process_time_column  # Add this import
-from .features import AccelerometerFeatures, GPSFeatures, apply_feature_extraction
+from ..utils import add_posix_column, round_timestamps, process_time_column  # Add this import
+from .features import GPSFeatures, FeatureComputation #apply_feature_extraction
 
-from .config_old import DataSourceConfig, LabelAggTypeType 
-# from .config import DataSourceConfig 
+from .labels import LabelAggregation
+from ..config import ConfigManager
+from ..validation import DataValidator
 
-from .validation import DataValidator
-from cowstudyapp.merge import DataMerger
 
 class DataLoader:
 
     DATEFORMAT = '%m/%d/%Y %I:%M:%S %p'
 
-    def __init__(self, config: DataSourceConfig):
-        self.config = config
+    def __init__(self, config: ConfigManager):
+
+        if config.io is None:
+            raise ValueError("IO configuration is required")
+        if config.validation is None:
+            raise ValueError("Validation configuration is required")
+        if config.labels is None:
+            raise ValueError("Label configuration is required")
+        if config.features is None:
+            raise ValueError("Feature configuration is required")
+        
+
+        self.config = config.io
         self.validator = DataValidator(config.validation)  # Pass validation config
-        self.merger = DataMerger()  # DataMerger doesn't need config anymore
+        self.labeler = LabelAggregation(config.labels)
+        self.feature = FeatureComputation(config.features)
+        # self.merger = DataMerger() 
+
 
     def load_data(self) -> Dict[str, pd.DataFrame]:
         """
@@ -32,15 +45,15 @@ class DataLoader:
         data = self._load_multiple_files()
         return data
 
-    def load_and_merge(self) -> pd.DataFrame:
-        """
-        Load and merge sensor data.
+    # def load_and_merge(self) -> pd.DataFrame:
+    #     """
+    #     Load and merge sensor data.
         
-        Returns:
-            Merged DataFrame with all features
-        """
-        data = self.load_data()
-        return self.merger.merge_sensor_data(data)
+    #     Returns:
+    #         Merged DataFrame with all features
+    #     """
+    #     data = self.load_data()
+    #     return self.merger.merge_sensor_data(data)
 
 
 
@@ -79,10 +92,11 @@ class DataLoader:
         # Convert accelerometer readings to m/s^2
         df[['x', 'y', 'z']] *= 0.3138128
         
-
+        # Validate data
         df = self.validator.validate_accelerometer(df)
-        # df = apply_feature_extraction(df,self.config.features)
-        df = apply_feature_extraction(df,self.config.features)
+        
+        # Compute features
+        df = self.feature.compute_features(df)
 
         return df
 
@@ -109,7 +123,7 @@ class DataLoader:
         
         df = GPSFeatures.add_utm_coordinates(df)
 
-        df = round_timestamps(df, col='posix_time', interval=self.config.features.gps_sample_interval)
+        df = round_timestamps(df, col='posix_time', interval=self.config.gps_sample_interval)
         # Ensure columns are in a consistent order
         desired_columns = [
             # 'gmt_time', 
@@ -130,9 +144,7 @@ class DataLoader:
         ]
         df = df[desired_columns]
         
-        df = self.validator.validate_gps(df)
-        
-        return df
+        return self.validator.validate_gps(df)
 
     def _process_labeled_data(self,file_path: Path) -> pd.DataFrame:
         df = pd.read_csv(
@@ -201,18 +213,14 @@ class DataLoader:
 
         df['posix_time_5min'] = (df['posix_time'] // self.config.gps_sample_interval) * self.config.gps_sample_interval
         
-        # Group and get last values of specified columns
-        grouped_df = df.groupby('posix_time_5min').agg({
-            'activity': 'last',
-            'collar_id': 'last',
-            'observer': 'last'
-        }).reset_index()
+        df = self.labeler.compute_labels(df)
 
-        grouped_df.rename(columns={'posix_time_5min': 'posix_time', 'collar_id': 'device_id'}, inplace=True)
+        # Make a validate function here
+        # How do we handle NA in labeled data?
+        # Currently we just get lucky the RAW aggreagation doesnt land on them. 
+        # df = 
 
-        print(grouped_df.head())
-
-        return grouped_df
+        return df
 
     def _process_csv_file(self, file_path: Path) -> pd.DataFrame:
         """

@@ -3,8 +3,8 @@ from datetime import datetime
 from typing import Optional, Tuple
 import numpy as np
 import pandas as pd
-import pytz
-from .config_old import DataValidationConfig
+
+from .config import DataValidationConfig
 # from .config import DataValidationConfig
 
 class DataValidator:
@@ -18,8 +18,7 @@ class DataValidator:
     def __init__(self, config: DataValidationConfig):
         self.config = config
 
-
-    def validate_gps(self, df: pd.DataFrame) -> pd.DataFrame:
+    def validate_gps(self, df: pd.DataFrame) -> Optional[pd.DataFrame]:
         """Validate GPS data and return cleaned DataFrame"""
         df = df.copy()
         initial_records = len(df)
@@ -94,7 +93,8 @@ class DataValidator:
             print(f"Coverage: {coverage_pct:.1f}%")
 
             # Is atleast 30% of the data is missing, skip this data. 
-            if coverage_pct < 70:
+            if coverage_pct < self.config.COVERAGE_THRESHOLD:
+                print(f"Coverage: {coverage_pct:.1f}%")
                 return None
             
             # Optional: create full time range with NaN for missing values

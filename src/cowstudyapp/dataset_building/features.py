@@ -1,19 +1,19 @@
 # src/cowstudyapp/features.py
 import numpy as np
 import pandas as pd
-from typing import List, Dict, Optional, Set
+from typing import Any, List, Dict, Optional, Set
 from pyproj import Transformer
-from dataclasses import dataclass
-from enum import Enum, auto
-from .config_old import FeatureType, FeatureConfig  # Import from config instead
+# from dataclasses import dataclass
+# from enum import Enum, auto
+from ..config import FeatureType, FeatureConfig  # Import from config instead
 # from .config import FeatureType, FeatureConfig  # Import from config instead
 
-@dataclass
-class TimeDomainFeature:
-    """Base class for time domain features with LaTeX equations"""
-    name: str
-    description: str
-    equation: str
+# @dataclass
+# class TimeDomainFeature:
+#     """Base class for time domain features with LaTeX equations"""
+#     name: str
+#     description: str
+#     equation: str
 
 
 class FeatureValidationError(Exception):
@@ -335,52 +335,78 @@ class GPSFeatures:
         return df
 
 class FeatureComputation:
-    """
-    Handles the computation and aggregation of features based on configuration.
-    """
+    """Handles feature computation based on configuration"""
     def __init__(self, config: FeatureConfig):
         self.config = config
-        self.validate_config()
-        
-    def validate_config(self) -> None:
-        """Validate configuration settings"""
+        self._validate_config()
+
+    def _validate_config(self) -> None:
+        """Validate feature configuration"""
+        if not (self.config.enable_axis_features or self.config.enable_magnitude_features):
+            raise FeatureValidationError("Must enable either axis or magnitude features")
         if FeatureType.CORRELATION in self.config.feature_types and not self.config.enable_axis_features:
-            raise FeatureValidationError("Correlation features require axis features to be enabled")
-        
-        if FeatureType.SPECTRAL in self.config.feature_types and not hasattr(self.config, 'acc_sample_rate'):
-            raise FeatureValidationError("Spectral features require sample_rate in config")
+            raise FeatureValidationError("Correlation features require axis features")
         
 
-    def compute_window_features(self, window_data: pd.DataFrame) -> pd.Series:
+    def compute_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Main entry point for feature computation"""
+        # Validate input
+        required_cols = ['device_id', 'posix_time']
+        if self.config.enable_axis_features:
+            required_cols.extend(['x', 'y', 'z'])
+        
+        missing_cols = [col for col in required_cols if col not in df.columns]
+        if missing_cols:
+            raise FeatureValidationError(f"Missing columns: {missing_cols}")
+
+        # Group by time windows
+        window_size = self.config.gps_sample_interval
+        df['window'] = (df['posix_time'] // window_size) * window_size
+        
+        # Process each window
+        results = []
+        for (device_id, window), group in df.groupby(['device_id', 'window']):
+            try:
+                features = self._compute_window_features(group)
+                features['device_id'] = device_id
+                features['posix_time'] = window
+                results.append(features)
+            except Exception as e:
+                print(f"Warning: Failed window for device {device_id}: {str(e)}")
+                continue
+
+        if not results:
+            raise FeatureValidationError("No features could be computed")
+        
+        return pd.DataFrame(results)
+
+
+    def _compute_window_features(self, window: pd.DataFrame) -> pd.Series:
         """
         Compute all enabled features for a window of data.
         """
+        features: dict[str,Any] = {}
         try:
-            # Validate input data
-            required_cols = ['x', 'y', 'z'] if self.config.enable_axis_features else []
-            missing_cols = [col for col in required_cols if col not in window_data.columns]
-            if missing_cols:
-                raise FeatureValidationError(f"Missing required columns: {missing_cols}")
+            # # Validate input data
+            # required_cols = ['x', 'y', 'z'] if self.config.enable_axis_features else []
+            # missing_cols = [col for col in required_cols if col not in window_data.columns]
+            # if missing_cols:
+            #     raise FeatureValidationError(f"Missing required columns: {missing_cols}")
 
             # Prepare signals dictionary
             signals = {}
             if self.config.enable_axis_features:
                 signals.update({
-                    'x': window_data['x'].values,
-                    'y': window_data['y'].values,
-                    'z': window_data['z'].values
+                    'x': window['x'].values,
+                    'y': window['y'].values,
+                    'z': window['z'].values
                 })
                 
-                # Validate signals before processing
-                AccelerometerFeatures.validate_signals(signals)
-
-            # Compute magnitude if enabled
             if self.config.enable_magnitude_features:
-                magnitude = AccelerometerFeatures.compute_magnitude(signals)
-                signals['magnitude'] = magnitude
+                signals['magnitude'] = AccelerometerFeatures.compute_magnitude(signals)
 
-            # Initialize features dictionary
-            features = {}
+            # Validate signals before processing
+            AccelerometerFeatures.validate_signals(signals)
 
             # Compute enabled features
             for feature_type in self.config.feature_types:
@@ -407,7 +433,7 @@ class FeatureComputation:
                 elif feature_type == FeatureType.SPECTRAL:
                     spectral = AccelerometerFeatures.compute_spectral_features(
                         signals, 
-                        sample_rate=self.config.acc_sample_rate
+                        sample_rate=(1/self.config.acc_sample_interval)
                     )
                     features.update(spectral)
 
@@ -418,84 +444,85 @@ class FeatureComputation:
                 raise
             raise FeatureValidationError(f"Feature computation failed: {str(e)}")
 
-def apply_feature_extraction(df: pd.DataFrame, config: FeatureConfig) -> pd.DataFrame:
-    """
-    Apply feature extraction to grouped accelerometer data.
-    
-    Args:
-        df: DataFrame with columns including 'x', 'y', 'z', 'device_id', 'posix_time'
-        config: Feature configuration object
+    # def apply_feature_extraction(self, df: pd.DataFrame) -> pd.DataFrame:
+    #     """
+    #     Apply feature extraction to grouped accelerometer data.
         
-    Returns:
-        DataFrame with computed features
-        
-    Example:
-        >>> config = FeatureConfig(
-        ...     enable_axis_features=True,
-        ...     enable_magnitude_features=True,
-        ...     feature_types={FeatureType.BASIC_STATS, FeatureType.PEAK_FEATURES}
-        ... )
-        >>> features_df = apply_feature_extraction(acc_df, config)
-    """
-    try:
-        # Validate input DataFrame
-        required_cols = ['device_id', 'posix_time']
-        if config.enable_axis_features:
-            required_cols.extend(['x', 'y', 'z'])
+    #     Args:
+    #         df: DataFrame with columns including 'x', 'y', 'z', 'device_id', 'posix_time'
+    #         config: Feature configuration object
+            
+    #     Returns:
+    #         DataFrame with computed features
+            
+    #     Example:
+    #         >>> config = FeatureConfig(
+    #         ...     enable_axis_features=True,
+    #         ...     enable_magnitude_features=True,
+    #         ...     feature_types={FeatureType.BASIC_STATS, FeatureType.PEAK_FEATURES}
+    #         ... )
+    #         >>> features_df = apply_feature_extraction(acc_df, config)
+    #     """
+    #     try:
+    #         # Validate input DataFrame
+    #         required_cols = ['device_id', 'posix_time']
+    #         if self.config.enable_axis_features:
+    #             required_cols.extend(['x', 'y', 'z'])
 
-        # if config.enable_magnitude_features:
-        #     required_cols.append("magnitude")
+    #         # if config.enable_magnitude_features:
+    #         #     required_cols.append("magnitude")
 
-        missing_cols = [col for col in required_cols if col not in df.columns]
-        if missing_cols:
-            raise FeatureValidationError(f"Missing required columns: {missing_cols}")
+    #         missing_cols = [col for col in required_cols if col not in df.columns]
+    #         if missing_cols:
+    #             raise FeatureValidationError(f"Missing required columns: {missing_cols}")
 
-        # Create feature computer
-        computer = FeatureComputation(config)
+    #         # Create feature computer
+    #         # computer = FeatureComputation(config)
 
-        # Group by device and time window
-        df['window'] = (df['posix_time'] // config.gps_sample_interval) * config.gps_sample_interval
+    #         # Group by device and time window
+    #         df['window'] = (df['posix_time'] // self.config.gps_sample_interval) * self.config.gps_sample_interval
 
-        # Compute features for each group
-        features_list = []
-        total_groups = len(df.groupby(['device_id', 'window']))
-        failed_groups = 0
-        
-        for (device_id, window), group in df.groupby(['device_id', 'window']):
-            try:
-                features = computer.compute_window_features(group)
-                features['device_id'] = device_id
-                features['posix_time'] = window
-                features_list.append(features)
-            except Exception as e:
-                failed_groups += 1
-                print(f"Warning: Failed to compute features for device {device_id} "
-                      f"at window {window}: {str(e)}")
-                continue
+    #         # Compute features for each group
+    #         features_list = []
+    #         total_groups = len(df.groupby(['device_id', 'window']))
+    #         failed_groups = 0
+            
+    #         for (device_id, window), group in df.groupby(['device_id', 'window']):
+    #             try:
+    #                 # features = computer.compute_window_features(group)
+    #                 features = self.compute_window_features(group)
+    #                 features['device_id'] = device_id
+    #                 features['posix_time'] = window
+    #                 features_list.append(features)
+    #             except Exception as e:
+    #                 failed_groups += 1
+    #                 print(f"Warning: Failed to compute features for device {device_id} "
+    #                     f"at window {window}: {str(e)}")
+    #                 continue
 
-        # Combine all features
-        if not features_list:
-            raise FeatureValidationError(
-                f"No features could be computed for any window. "
-                f"Failed {failed_groups}/{total_groups} groups."
-            )
+    #         # Combine all features
+    #         if not features_list:
+    #             raise FeatureValidationError(
+    #                 f"No features could be computed for any window. "
+    #                 f"Failed {failed_groups}/{total_groups} groups."
+    #             )
 
-        if failed_groups > 0:
-            print(f"\nFeature computation summary:")
-            print(f"Successfully processed: {len(features_list)}/{total_groups} groups")
-            print(f"Failed: {failed_groups}/{total_groups} groups")
+    #         if failed_groups > 0:
+    #             print(f"\nFeature computation summary:")
+    #             print(f"Successfully processed: {len(features_list)}/{total_groups} groups")
+    #             print(f"Failed: {failed_groups}/{total_groups} groups")
 
-        features_df = pd.DataFrame(features_list)
+    #         features_df = pd.DataFrame(features_list)
 
-        # Add computation metadata
-        features_df.attrs['computed_features'] = [ft.name for ft in config.feature_types]
-        features_df.attrs['window_size'] = config.gps_sample_interval
+    #         # Add computation metadata
+    #         features_df.attrs['computed_features'] = [ft.name for ft in self.feature_types]
+    #         features_df.attrs['window_size'] = self.gps_sample_interval
 
-        return features_df
+    #         return features_df
 
-    except Exception as e:
-        print("\nInput DataFrame preview:")
-        print(df.head())
-        print("\nConfiguration:")
-        print(config)
-        raise FeatureValidationError(f"Feature extraction failed: {str(e)}")
+    #     except Exception as e:
+    #         print("\nInput DataFrame preview:")
+    #         print(df.head())
+    #         print("\nConfiguration:")
+    #         print(config)
+    #         raise FeatureValidationError(f"Feature extraction failed: {str(e)}")

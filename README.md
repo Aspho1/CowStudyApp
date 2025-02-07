@@ -13,12 +13,15 @@ The package handles data loading, validation, feature extraction, and merging of
 
 ## Todo
 
-* Clean up the merging of data sources
-* Unify configurations through inheritance 
+* Clean up the merging of data sources, should not process any data from excluded_devices. 
+* Handle NA labels safely
 * Build in the analysis section of the code
 * Save logs to a file
 * Documentation for changing sources
-* Pass specific features to the analyzer
+* Spectral features do not work
+* Test tests
+* Fix src/main.py
+
 
 ## Installation
 
@@ -43,41 +46,59 @@ pip install -e ".[dev]"
 ## Usage
 
 ### Basic Usage
+
+* Example `src/build_processed_data.py`
+
 ```python
 from pathlib import Path
-from cowstudyapp.config import AppConfig
 from cowstudyapp.io import DataLoader
+from cowstudyapp.utils import from_posix
+from cowstudyapp.config import ConfigManager
+from cowstudyapp.merge import DataMerger
 
-# Load configuration
-config = AppConfig.load("config/default.yaml")
 
-# Initialize loader
+config_path = Path("config/default.yaml")   
+config = ConfigManager.load(config_path)
+
+# Load raw Acceelerometer, GPS, and label data
 loader = DataLoader(config)
+data = loader.load_data()
 
-# Load and process data
-data = loader.load_data()  # Load raw data
-merged_data = loader.load_and_merge()  # Load and merge with features
+for key, df in data.items():
+    print(f"\n{key.upper()} Data:")
+    print(f"Total records: {len(df)}")
+    print(f"Time range: {from_posix(df['posix_time'].min())} to {from_posix(df['posix_time'].max())}")
+    print(f"Unique devices: {df['device_id'].unique()}")
 
-output_path = Path("data/processed/RB_22/unlabeled_all_cows.csv") # Designate a location to save the merged data set
-output_path.parent.mkdir(exist_ok=True) # Create the directory if needed
-merged_df.to_csv(output_path, index=False) # Save the merged data set to the output file path 
+# Combine the three datasources. 
+merger = DataMerger()
+merged_df = merger.merge_sensor_data(data)
+
+# Save results
+output_path = Path("data/processed/RB_22/all_cows_labeled.csv")
+output_path.parent.mkdir(exist_ok=True)
+merged_df.to_csv(output_path, index=False)
+
 ```
 
 ### Configuration
 
 Create a `config/default.yaml` file:
 ```yaml
-format: "multiple_files"
-gps_directory: "data/raw/RB_22/gps"
-accelerometer_directory: "data/raw/RB_22/accelerometer"
-labeled_data_path: "data/raw/RB_22/labeled/gps_observations_2022.csv"
-file_pattern: "*.csv"
+common:
+  timezone: "America/Denver"
+  gps_sample_interval: 300          # Expected seconds between GPS
+  gps_sample_interval: 60           # Expected seconds between Accelerometer 
+  excluded_devices: [841, 1005] 
 
-
-device_id: 824  # Test with single cow
+io:
+  format: "multiple_files"
+  gps_directory: "data/raw/RB_22/gps"
+  accelerometer_directory: "data/raw/RB_22/accelerometer"
+  labeled_data_path: "data/raw/RB_22/labeled/gps_observations_2022.csv"
+  file_pattern: "*.csv"
 
 validation:
-  timezone: "America/Denver"
   start_datetime: "2022-01-15 00:00:00"
   end_datetime: "2022-03-22 23:59:59"
   lat_min: -90
@@ -90,7 +111,7 @@ validation:
   temp_max: 99
   min_satellites: 0
   max_dop: 10.0
-  excluded_devices: [841, 1005] 
+  COVERAGE_THRESHOLD: 70            # Minimum ratio of (actual / expected) GPS data needed to include the device
 
 features:
   enable_axis_features: true        # Compute features for each axes
@@ -102,19 +123,25 @@ features:
     - "ENTROPY"                     # Compute signal entropy features
     - "CORRELATION"                 # Compute correlation between axes
     - "SPECTRAL"                    # Compute frequency domain features
-
-
-  # Figure out how to move these to DataSourceConfig and still be used everywhere else
-  gps_sample_interval: 300          # Expected seconds between GPS
-  gps_sample_interval: 60           # Expected seconds between Accelerometer 
-  
+ 
 labels:
-  labeled_agg_method:
-    # - "MODE"                        # The most frequent activity in the window
-    - "RAW"                         # The activity at the end of the window
-    # - "PERCENTILE"                  # A weighted choice of activity
+  # labeled_agg_method: "MODE"          # The most frequent activity in the window
+  labeled_agg_method: "RAW"           # The activity at the end of the window
+  # labeled_agg_method: "PERCENTILE"    # A weighted choice of activity
 
+  valid_activities:
+    - "Resting"
+    - "Grazing"
+    - "Traveling"
+    - "Fighting"
+    - "Scratching"
+    - "Drinking"
+    - "Mineral"
 
+testing:
+  device_id: 824  # Test with single cow 
+
+```
 ### Data Processing Pipeline
 
 1. **Data Loading**
