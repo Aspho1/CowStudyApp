@@ -4,7 +4,7 @@ from enum import Enum, auto
 import os
 from pathlib import Path
 import platform
-from typing import Optional, Dict, List, Set, Union
+from typing import Literal, Optional, Dict, List, Set, Union
 from pydantic import BaseModel, DirectoryPath, FilePath, Field, field_validator, ValidationInfo, computed_field
 import pytz
 import yaml
@@ -31,6 +31,16 @@ class LabelAggTypeType(str, Enum):
     MODE = "MODE"
     RAW = "RAW"
     PERCENTILE = "PERCENTILE"  
+
+
+class DistributionTypes(str, Enum):
+    """Types of distributions to fit"""
+    LOGNORMAL = "LOGNORMAL"
+    GAMMA = "GAMMA"
+    WEIBULL = "WEIBULL"
+    NORMAL = "NORMAL"
+    EXPONENTIAL = "EXPONENTIAL" 
+    VONMISES = "VONMISES"
 
 
 ##################################### Shared Configuations #####################################
@@ -173,35 +183,13 @@ class LabelConfig(CommonConfig):
             default=LabelAggTypeType.RAW
         )
 
-# class ValidationConfig(CommonConfig):
-#     """Configuration for data validation"""
-#     start_datetime: str
-#     end_datetime: str
-#     lat_min: float = Field(-90.0, ge=-90.0, le=90.0)
-#     lat_max: float = Field(90.0, ge=-90.0, le=90.0)
-#     lon_min: float = Field(-180.0, ge=-180.0, le=180.0)
-#     lon_max: float = Field(180.0, ge=-180.0, le=180.0)
-#     accel_min: float = Field(-41.0)
-#     accel_max: float = Field(41.0)
-#     temp_min: float = Field(-99.0)
-#     temp_max: float = Field(99.0)
-#     min_satellites: int = Field(0, ge=0)
-#     max_dop: float = Field(10.0, gt=0)
     
-
 class IoConfig(CommonConfig):
     format: DataFormat = DataFormat.MULTIPLE_FILES
     gps_directory: Path
     accelerometer_directory: Path
     labeled_data_path: Path
     file_pattern: str = "*.csv"
-    # excluded_devices: List[int] = Field(default_factory=list)
-    # validation: DataValidationConfig
-    # features: FeatureConfig = FeatureConfig
-    # labels: LabelConfig = LabelConfig
-    # features: FeatureConfig = Field(default_factory=FeatureConfig)
-    # labels: LabelConfig = Field(default_factory=LabelConfig)
-
 
     @field_validator('labeled_data_path')
     @classmethod
@@ -228,6 +216,82 @@ class IoConfig(CommonConfig):
                 raise ValueError("Both GPS and accelerometer directories required for multiple_files format")
     
 
+########################## Analysis ##############################################
+
+class HMMFeatureConfig(BaseModel):
+    name: str
+    dist: Optional[str] = None
+
+class HMMConfig(BaseModel):
+    enabled: bool = True
+    states: List[str]
+    features: List[HMMFeatureConfig]
+    options: dict = Field(default_factory=lambda: {
+        "show_dist_plots": True,
+        "remove_outliers": True,
+        "show_full_range": True,
+        "show_correlation": True,
+        "distributions": {
+            "regular": [
+                DistributionTypes.LOGNORMAL.value,
+                DistributionTypes.GAMMA.value,
+                DistributionTypes.WEIBULL.value,
+                DistributionTypes.NORMAL.value,
+                DistributionTypes.EXPONENTIAL.value
+            ],
+            "circular": [
+                DistributionTypes.VONMISES.value
+            ]
+        }
+    })
+
+    @field_validator('options')
+    def validate_distributions(cls, v):
+        if 'distributions' not in v:
+            v['distributions'] = {
+                'regular': [dist.value for dist in DistributionTypes if dist != DistributionTypes.VONMISES],
+                'circular': [DistributionTypes.VONMISES.value]
+            }
+        else:
+            # Convert string values to enum if they aren't already
+            if 'regular' in v['distributions']:
+                v['distributions']['regular'] = [
+                    dist if isinstance(dist, DistributionTypes) else DistributionTypes(dist)
+                    for dist in v['distributions']['regular']
+                ]
+            if 'circular' in v['distributions']:
+                v['distributions']['circular'] = [
+                    dist if isinstance(dist, DistributionTypes) else DistributionTypes(dist)
+                    for dist in v['distributions']['circular']
+                ]
+        return v
+
+class AnalysisConfig(CommonConfig):
+    enabled_analyses: List[Literal["hmm"]] = ["hmm"]
+    data_path: Path
+    r_executable: Optional[Path] = None
+    output_dir: Path = Field(default=Path("data/analysis_results"))
+    hmm: Optional[HMMConfig] = None
+
+    @field_validator('data_path')
+    @classmethod
+    def validate_data_path(cls, v: Path) -> Path:
+        if not v.exists():
+            raise ValueError(f"Data file does not exist: {v}")
+        return v
+
+    @field_validator('output_dir')
+    @classmethod
+    def validate_output_dir(cls, v: Path) -> Path:
+        v.mkdir(parents=True, exist_ok=True)
+        return v
+
+    def validate_config(self) -> None:
+        """Validate analysis configuration"""
+
+
+
+
 ##################################### Configuration Manager #####################################
 
 class ConfigManager:
@@ -237,6 +301,9 @@ class ConfigManager:
         self.features: Optional[FeatureConfig] = None
         self.labels: Optional[LabelConfig] = None
         self.io: Optional[IoConfig] = None
+        self.analysis: Optional[AnalysisConfig] = None  # Add analysis config
+
+
 
     # @classmethod
     def load_from_file(self, path: Path) -> 'ConfigManager':
@@ -258,6 +325,8 @@ class ConfigManager:
         if 'io' in config_dict:
             self.io = IoConfig(**config_dict.get('io', {}))
 
+        if 'analysis' in config_dict:
+            self.analysis = AnalysisConfig(**config_dict.get('analysis', {}))
         # Validate cross-component dependencies
         self.validate()
         
@@ -277,6 +346,12 @@ class ConfigManager:
         }
         if len(timezones) > 1:
             raise ValueError(f"Inconsistent timezones across components: {timezones}")
+   
+
+        if self.analysis:
+            if "hmm" in self.analysis.enabled_analyses:
+                if not self.analysis.data_path.exists():
+                    raise ValueError(f"HMM analysis data file not found: {self.analysis.data_path}")
         
         
     @classmethod
@@ -297,52 +372,13 @@ class ConfigManager:
         raise FileNotFoundError("No config file found in any standard location")
     
 
-# class AppConfig(BaseModel):
-#     """Main application configuration"""
-#     format: str = "multiple_files"
-#     gps_directory: Path
-#     accelerometer_directory: Path
-#     file_pattern: str = "*.csv"
-#     device_id: Optional[int] = None
-#     validation: ValidationConfig
-#     features: FeatureConfig
 
-#     @staticmethod
-#     def load(config_path: Optional[Path] = None) -> DataSourceConfig:
-#         """
-#         Load configuration from file.
-        
-#         Args:
-#             config_path: Optional explicit path to config file
-            
-#         Returns:
-#             Loaded configuration
-            
-#         Raises:
-#             FileNotFoundError: If no config file found
-#         """
-#         if config_path:
-#             if not config_path.exists():
-#                 raise FileNotFoundError(f"Config file not found: {config_path}")
-#             return AppConfig._load_from_file(config_path)
-            
-#         # Try all possible locations
-#         for path in ConfigLocator.get_config_paths():
-#             if path.exists():
-#                 return AppConfig._load_from_file(path)
-                
-#         raise FileNotFoundError("No config file found in any standard location")
 
-#     @staticmethod
-#     def _load_from_file(path: Path) -> DataSourceConfig:
-#         """Load configuration from specific file"""
-#         with open(path) as f:
-#             config_dict = yaml.safe_load(f)
-#         return DataSourceConfig(**config_dict)
 
-#     @staticmethod
-#     def save(config: DataSourceConfig, config_path: Path) -> None:
-#         """Save configuration to YAML file"""
-#         config_dict = config.model_dump()
-#         with open(config_path, 'w') as f:
-#             yaml.dump(config_dict, f)
+
+
+
+
+
+
+

@@ -54,3 +54,42 @@ labels:
 
 testing:
   device_id: 824  # Test with single cow  
+
+
+# This is the section where options for the momentuHMM can we defined.
+# Ideally, the LSTM config will also live here
+analysis:
+  r_executable: "C:/Program Files/R/R-4.3.0/bin/Rscript.exe"
+  enabled_analyses: ["hmm"]
+  data_path: "data/processed/RB_22/all_cows_labeled.csv"
+  output_dir: "data/analysis_results"
+  
+  hmm:
+    enabled: true
+    states: 
+      - "Grazing"
+      - "Resting"
+      - "Traveling"
+    features:
+      - name: "step"
+        dist: null
+      - name: "angle"
+        dist: null
+      - name: "mag_mean"
+        dist: null
+      - name: "mag_var"
+        dist: null
+    options:
+      show_dist_plots: true
+      remove_outliers: true
+      show_full_range: true
+      show_correlation: true
+      distributions:
+        regular:
+          - "LOGNORMAL"
+          - "GAMMA"
+          - "WEIBULL"
+          - "NORMAL"
+          - "EXPONENTIAL"
+        circular:
+          - "VONMISES"
