@@ -58,38 +58,74 @@ testing:
 
 # This is the section where options for the momentuHMM can we defined.
 # Ideally, the LSTM config will also live here
+# analysis:
+#   mode: "LOOCV" # Create models where each cow is used as the test cow once. Collect results and print performance statistics.
+#   mode: "PRODUCT" # Create one model based on all available labeled data. Apply the model to the unlabeled data, save the model, and save the labels. 
+
 analysis:
+  # mode: "LOOCV"     # Do LOOCV on the target dataset. 
+  mode: "PRODUCT"   # predict activity labels for a full dataset
+  target_dataset: "data/processed/RB_22/all_cows_labeled.csv"  # Required The dataset to make predictions on
+  
+  # Optional, only for PRODUCT mode. The reference training information. Either `dataset` or `model`
+  training_info:     
+    # training_info_type: "dataset" # A dataset to create a trained model from
+    # path: "cowstudyapp/data/processed/dataset2.csv"
+    training_info_type: "model"   # A saved trained model  
+    training_info_path: "data/analysis_results/hmm/PRODUCT/20250212_005053/trained_model.rds"
+
+
   r_executable: "C:/Program Files/R/R-4.3.0/bin/Rscript.exe"
   enabled_analyses: ["hmm"]
-  data_path: "data/processed/RB_22/all_cows_labeled.csv"
+  #DELETE data_path: "data/processed/RB_22/all_cows_labeled.csv"
   output_dir: "data/analysis_results"
   
   hmm:
     enabled: true
-    states: 
+    states: # The states to use i the HMM
       - "Grazing"
       - "Resting"
       - "Traveling"
     features:
-      - name: "step"
+
+    # Improve this? while it is kinda nice we could make this cleaner. 
+      - name: "step" # Powerful
         dist: null
-      - name: "angle"
+        dist_type: "regular"
+      - name: "angle" # Ok
         dist: null
-      - name: "mag_mean"
+        dist_type: "circular"
+      - name: "magnitude_mean" # Powerful
+        dist: null 
+        dist_type: "regular"
+      # - name: "x_crest_factor" # OK
+      #   dist: null
+      #   dist_type: "regular"
+      # - name: "x_peak_to_peak" # not impressed
+      #   dist: null
+      #   dist_type: "regular"
+      # - name: "y_peak_to_peak" # Pretty good
+      #   dist: null
+      #   dist_type: "regular"
+      # - name: "x_impulse_factor" # Not Impressive
+      #   dist: null
+      #   dist_type: "regular"
+      - name: "magnitude_var" # Ok
         dist: null
-      - name: "mag_var"
-        dist: null
+        dist_type: "regular"
     options:
       show_dist_plots: true
       remove_outliers: true
       show_full_range: true
       show_correlation: true
+      number_of_retry_fits: 1 # 1
       distributions:
         regular:
           - "LOGNORMAL"
           - "GAMMA"
-          - "WEIBULL"
+          # - "WEIBULL" # This does not work. Needs To be debugged.
           - "NORMAL"
           - "EXPONENTIAL"
         circular:
           - "VONMISES"
+          - "WRAPPEDCAUCHY"

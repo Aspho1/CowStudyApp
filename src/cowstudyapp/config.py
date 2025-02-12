@@ -32,16 +32,22 @@ class LabelAggTypeType(str, Enum):
     RAW = "RAW"
     PERCENTILE = "PERCENTILE"  
 
-
 class DistributionTypes(str, Enum):
     """Types of distributions to fit"""
     LOGNORMAL = "LOGNORMAL"
     GAMMA = "GAMMA"
-    WEIBULL = "WEIBULL"
+    WEIBULL = "WEIBULL" # DOES NOT WORK
     NORMAL = "NORMAL"
     EXPONENTIAL = "EXPONENTIAL" 
     VONMISES = "VONMISES"
+    WRAPPEDCAUCHY = "WRAPPEDCAUCHY"
 
+class AnalysisModes(str, Enum):
+    """Types of distributions to fit"""
+    PRODUCT = "PRODUCT"
+    LOOCV = "LOOCV"
+    # BOTH = "BOTH"
+    
 
 ##################################### Shared Configuations #####################################
 
@@ -220,7 +226,9 @@ class IoConfig(CommonConfig):
 
 class HMMFeatureConfig(BaseModel):
     name: str
-    dist: Optional[str] = None
+    dist: Optional[str] = Field(None)
+    dist_type: Optional[str] = Field("regular")
+
 
 class HMMConfig(BaseModel):
     enabled: bool = True
@@ -231,6 +239,7 @@ class HMMConfig(BaseModel):
         "remove_outliers": True,
         "show_full_range": True,
         "show_correlation": True,
+        "number_of_retry_fits": 1,
         "distributions": {
             "regular": [
                 DistributionTypes.LOGNORMAL.value,
@@ -240,7 +249,8 @@ class HMMConfig(BaseModel):
                 DistributionTypes.EXPONENTIAL.value
             ],
             "circular": [
-                DistributionTypes.VONMISES.value
+                DistributionTypes.VONMISES.value,
+                DistributionTypes.WRAPPEDCAUCHY.value
             ]
         }
     })
@@ -266,14 +276,24 @@ class HMMConfig(BaseModel):
                 ]
         return v
 
-class AnalysisConfig(CommonConfig):
-    enabled_analyses: List[Literal["hmm"]] = ["hmm"]
-    data_path: Path
-    r_executable: Optional[Path] = None
-    output_dir: Path = Field(default=Path("data/analysis_results"))
-    hmm: Optional[HMMConfig] = None
+class TrainingInfo(BaseModel):
+    training_info_type : str = Field('dataset')
+    training_info_path : Optional[str] = None
 
-    @field_validator('data_path')
+
+class AnalysisConfig(CommonConfig):
+    mode: AnalysisModes = AnalysisModes.LOOCV
+    target_dataset: Path
+
+    training_info:Optional[TrainingInfo] = None
+
+    r_executable: Optional[Path] = None
+    hmm: Optional[HMMConfig] = None
+    output_dir: Path = Field(default=Path("data/analysis_results"))
+
+    enabled_analyses: List[Literal["hmm"]] = ["hmm"]
+
+    @field_validator('target_dataset')
     @classmethod
     def validate_data_path(cls, v: Path) -> Path:
         if not v.exists():
@@ -347,12 +367,6 @@ class ConfigManager:
         if len(timezones) > 1:
             raise ValueError(f"Inconsistent timezones across components: {timezones}")
    
-
-        if self.analysis:
-            if "hmm" in self.analysis.enabled_analyses:
-                if not self.analysis.data_path.exists():
-                    raise ValueError(f"HMM analysis data file not found: {self.analysis.data_path}")
-        
         
     @classmethod
     def load(cls, config_path: Optional[Path] = None) -> 'ConfigManager':

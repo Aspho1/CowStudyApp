@@ -1,4 +1,5 @@
 # src/run_analysis.py
+from datetime import datetime
 from cowstudyapp.config import ConfigManager, AnalysisConfig, HMMConfig, DistributionTypes
 from pathlib import Path
 import subprocess
@@ -70,9 +71,9 @@ def install_r_packages(packages):
 def check_r_packages(r_executable):
     """Check if required R packages are installed"""
     # List of required packages
-    required_packages = [
-        'momentuHMM', 'dplyr', 'ggplot2', 'caret', 
-        'circular', 'CircStats', 'rmarkdown'
+    required_packages = ["momentuHMM", "dplyr", "ggplot2", "caret", "fitdistrplus",
+                 "circular", "CircStats", "lubridate", 'grid', 'gridExtra',
+                 "movMF"
     ]
     
     # Step 1: Just get installed packages
@@ -161,11 +162,53 @@ def get_r_dist_name(dist_type: DistributionTypes) -> str:
         DistributionTypes.WEIBULL: "weibull",
         DistributionTypes.NORMAL: "norm",
         DistributionTypes.EXPONENTIAL: "exp",
-        DistributionTypes.VONMISES: "vm"
+        DistributionTypes.VONMISES: "vm",
+        DistributionTypes.WRAPPEDCAUCHY: "wrpcauchy"
     }
     return mapping[dist_type]
 
-def run_hmm_analysis(config: AnalysisConfig, data_path: Path, output_dir: Path):
+
+def create_analysis_directories(base_dir: Path, features: list, analysis_type: str) -> dict:
+    """
+    Create directory structure for HMM analysis outputs
+    
+    Args:
+        base_dir: Base output directory (data/analysis_results/hmm)
+        features: List of features being used
+        analysis_type: Either 'LOOCV' or 'Product'
+    
+    Returns:
+        Dictionary containing paths to different output directories
+    """
+    # Create timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # Create feature identifier
+    feature_names = sorted([f.name for f in features])
+    feature_id = "-".join(feature_names)
+    if len(feature_id) > 50:  # Limit length
+        feature_id = feature_id[:50]
+    
+    # Create directory structure
+    analysis_dir = base_dir / analysis_type / timestamp
+    
+    # Create subdirectories
+    plots_dir = analysis_dir / "plots"
+    dist_plots_dir = plots_dir / "distributions"
+    models_dir = analysis_dir / "models"  # New directory for saved models
+    
+    # Create all directories
+    for directory in [analysis_dir, plots_dir, dist_plots_dir, models_dir]:
+        directory.mkdir(parents=True, exist_ok=True)
+    
+    return {
+        "base_dir": analysis_dir,
+        "plots_dir": plots_dir,
+        "dist_plots_dir": dist_plots_dir,
+        "models_dir": models_dir
+    }
+
+def run_hmm_analysis_old(config: AnalysisConfig, data_path: Path, output_dir: Path):
     """Run the HMM analysis using R scripts"""
     
     r_executable = config.r_executable or find_r_executable()
@@ -183,6 +226,11 @@ def run_hmm_analysis(config: AnalysisConfig, data_path: Path, output_dir: Path):
     r_config = {
         "states": config.hmm.states,
         "features": [feature.model_dump() for feature in config.hmm.features],
+        "mode": config.mode,
+        "training_info":{
+            "training_info_type": config.training_info.training_info_type,
+            "training_info_path": config.training_info.training_info_path,
+        },
         "options": {
             **config.hmm.options,
             "distributions": {
@@ -242,41 +290,111 @@ def run_hmm_analysis(config: AnalysisConfig, data_path: Path, output_dir: Path):
         raise
 
 
-    # try:
-    #     logging.info("Starting HMM analysis...")
-    #     logging.info(f"Running command: {' '.join(cmd)}")  # Log the command
-    #     process = subprocess.Popen(
-    #         cmd,
-    #         stdout=subprocess.PIPE,
-    #         stderr=subprocess.PIPE,
-    #         text=True,
-    #         bufsize=1,
-    #         universal_newlines=True
-    #     )
+
+def run_hmm_analysis(config: AnalysisConfig, target_data_path: Path, output_dir: Path):
+    """Run the HMM analysis using R scripts"""
+    
+    r_executable = config.r_executable or find_r_executable()
+    check_r_packages(r_executable)
+    
+    # Ensure R script directory exists
+    r_script_dir = Path("src/cowstudyapp/analysis/HMM")
+    if not r_script_dir.exists():
+        raise FileNotFoundError(f"R script directory not found: {r_script_dir}")
+    
+
+
+    # analysis_type = config.mode if hasattr(config, 'mode') else "LOOCV"
+
+    dirs = create_analysis_directories(
+        base_dir=output_dir,
+        features=config.hmm.features,
+        analysis_type=config.mode
+    )
+
+    r_script_path = Path(__file__).parent / "cowstudyapp" / "analysis" / "HMM" / "run_hmm.r"
+    util_path = r_script_path.parent / "util.r"
+
+
+    # Create output directory
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Convert Python config to R format
+    r_config = {
+        "states": config.hmm.states,
+        "features": [feature.model_dump() for feature in config.hmm.features],
+        "mode": config.mode,
+        "training_info":{
+            "training_info_type": config.training_info.training_info_type,
+            "training_info_path": config.training_info.training_info_path,
+        },
+        "options": {
+            **config.hmm.options,
+            "distributions": {
+                "regular": [get_r_dist_name(DistributionTypes(d)) 
+                        for d in config.hmm.options["distributions"]["regular"]],
+                "circular": [get_r_dist_name(DistributionTypes(d)) 
+                            for d in config.hmm.options["distributions"]["circular"]]
+            }
+        }
+    }
+
+    config_path: Path = dirs["base_dir"] / "hmm_config.json"
+    with open(config_path, 'w') as f:
+        json.dump(r_config, f, indent=2)
+    
+    
+    # Convert paths to absolute paths
+    # paths = {
+    #     'script': r_script_dir / "run_hmm.r",
+    #     'util': r_script_dir / "util.r",  # Add util.r path
+    #     'config': config_path.absolute(),
+    #     'data': data_path.absolute(),
+    #     'output': output_dir.absolute()
+    # }
+    
+    # Build R command
+    cmd = [
+        str(config.r_executable or "Rscript"),
+        str(r_script_path),
+        str(util_path),
+        str(config_path),
+        str(target_data_path),
+        str(dirs["base_dir"])
+    ]
+    
+    try:
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1
+        )
         
-    #     # Stream output in real-time
-    #     while True:
-    #         output = process.stdout.readline()
-    #         if output == '' and process.poll() is not None:
-    #             break
-    #         if output:
-    #             logging.info(f"R: {output.strip()}")
+        stream_r_output(process)
+
+        process.wait()
         
-    #     # Check for errors
-    #     stderr = process.stderr.read()
-    #     if stderr:
-    #         logging.error(f"R Error: {stderr}")
-        
-    #     retcode = process.poll()
-    #     if retcode:
-    #         raise subprocess.CalledProcessError(retcode, cmd)
-            
-    # except subprocess.CalledProcessError as e:
-    #     logging.error(f"HMM analysis failed with return code {e.returncode}")
-    #     raise
-    # except Exception as e:
-    #     logging.error(f"Unexpected error during HMM analysis: {e}")
-    #     raise
+        if process.returncode != 0:
+            raise RuntimeError(f"R script failed with return code {process.returncode}")
+
+        logging.info("HMM analysis completed successfully")
+                
+    except Exception as e:
+        logging.error(f"Error running HMM analysis: {e}")
+        raise
+
+    except KeyboardInterrupt:
+        logging.info("Received interrupt signal, terminating R process...")
+        if process.poll() is None:  # If process is still running
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                logging.warning("R process didn't terminate, forcing kill...")
+                process.kill()
+        raise
 
 
 
@@ -303,7 +421,7 @@ def main():
         logging.info("Running HMM analysis...")
         run_hmm_analysis(
             config=config.analysis,
-            data_path=Path(config.analysis.data_path),
+            target_data_path=Path(config.analysis.target_dataset),
             output_dir=output_dir / "hmm"
         )
         

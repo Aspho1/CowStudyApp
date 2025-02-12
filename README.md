@@ -13,15 +13,14 @@ The package handles data loading, validation, feature extraction, and merging of
 
 ## Todo
 
-* Clean up the merging of data sources, should not process any data from excluded_devices. 
-* Handle NA labels safely
-* Build in the analysis section of the code
+* Handle when analysis.PRODUCT dataset doesn't have an activity column in hmm (no labels)
+* Generate ALL_ACTIVITIES instead of hardcoding it in the r scripts
+* Figure out what is happening with reading csv's in R (what becomes NA)
 * Save logs to a file
 * Documentation for changing sources
-* Spectral features do not work
 * Test tests
 * Fix src/main.py
-
+* Can we plot the distributions fits of the untrained model to see how much the model changes the parameters?
 
 ## Installation
 

@@ -108,35 +108,33 @@ save_plot <- function(plot, filename, directory, width = 10, height = 8) {
 
 
 
-calculate_parameters <- function(data_by_state, feature_name, dist_type, nbStates, feature_has_zeros) {
+calculate_parameters <- function(data_by_state, feature_name, dist_type, nbStates,feature_has_zeros) {
   validate_numeric <- function(values, name) {
     if (!is.numeric(values)) {
       stop(sprintf("Non-numeric values found in %s", name))
     }
     return(values)
   }
-  # print(1)
-  calculate_zero_mass <- function(x, feature_name) {
-      if (!feature_has_zeros) {
-          return(c())
-      }
-      values <- validate_numeric(x[[feature_name]], feature_name)
-      zero_count <- sum(values == 0, na.rm = TRUE)
-      total_count <- sum(!is.na(values))
-      cat("Zeros (", feature_name, "):", zero_count, "\n")
-      if (zero_count > 0) {
-          return(rep(zero_count/total_count, nbStates))
-      }
-      return(rep(0.0001, nbStates))  # Small non-zero value when needed
-  }
   
-  # print(2)
-  zero_mass <- if (dist_type %in% c("gamma", "weibull", "exp", "lnorm") && feature_has_zeros) {
-      calculate_zero_mass(do.call(rbind, data_by_state), feature_name)
-  } else {
-      c()
-  }
-  # print(3)
+    calculate_zero_mass <- function(x, feature_name) {
+        if (!feature_has_zeros) {
+            return(c())
+        }
+        values <- validate_numeric(x[[feature_name]], feature_name)
+        zero_count <- sum(values == 0, na.rm = TRUE)
+        total_count <- sum(!is.na(values))
+        cat("Zeros (", feature_name, "):", zero_count, "\n")
+        if (zero_count > 0) {
+            return(rep(zero_count/total_count, nbStates))
+        }
+        return(rep(0.0001, nbStates))  # Small non-zero value when needed
+    }
+    
+    zero_mass <- if (dist_type %in% c("gamma", "weibull", "exp", "lnorm") && feature_has_zeros) {
+        calculate_zero_mass(do.call(rbind, data_by_state), feature_name)
+    } else {
+        c()
+    }
 
   n_states <- length(data_by_state)
   
@@ -225,7 +223,6 @@ calculate_parameters <- function(data_by_state, feature_name, dist_type, nbState
           },
           stop(sprintf("Unsupported distribution type: %s", dist_type))
   )
-  # print(4)
   
   return(params)
 }
