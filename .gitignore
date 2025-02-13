@@ -39,9 +39,9 @@ ENV/
 output/
 
 # Ignore local config files but keep defaults
-config/*.yaml
-!config/default.yaml
+# config/*.yaml
+# !config/default.yaml
 
-data/*
+# data/*
 
-.workspace
+# .workspace

@@ -39,8 +39,8 @@ features:
     # - "SPECTRAL"                    # Compute frequency domain features
  
 labels:
-  # labeled_agg_method: "MODE"        # The most frequent activity in the window
-  labeled_agg_method: "RAW"           # The activity at the end of the window
+  labeled_agg_method: "MODE"        # The most frequent activity in the window
+  # labeled_agg_method: "RAW"           # The activity at the end of the window
   # labeled_agg_method: "PERCENTILE"  # A weighted choice of activity
 
   valid_activities:
@@ -52,8 +52,8 @@ labels:
     - "Drinking"
     - "Mineral"
 
-testing:
-  device_id: 824  # Test with single cow  
+# testing:
+#   device_id: 824  # Test with single cow  
 
 
 # This is the section where options for the momentuHMM can we defined.
@@ -70,7 +70,7 @@ analysis:
   # Optional, only for PRODUCT mode. The reference training information. Either `dataset` or `model`
   training_info:     
     # training_info_type: "dataset" # A dataset to create a trained model from
-    # path: "cowstudyapp/data/processed/dataset2.csv"
+    # training_info_path: "cowstudyapp/data/processed/dataset2.csv"
     training_info_type: "model"   # A saved trained model  
     training_info_path: "data/analysis_results/hmm/PRODUCT/20250212_005053/trained_model.rds"
 
@@ -115,7 +115,7 @@ analysis:
         dist_type: "regular"
     options:
       show_dist_plots: true
-      remove_outliers: true
+      remove_outliers: true   # From the plots
       show_full_range: true
       show_correlation: true
       number_of_retry_fits: 1 # 1

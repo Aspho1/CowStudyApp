@@ -61,6 +61,8 @@ class AccelerometerFeatures:
             })
         return results
 
+
+
     @staticmethod
     def compute_entropy(signals: Dict[str, np.ndarray], 
                        bins: int = 20) -> Dict[str, float]:
@@ -69,7 +71,7 @@ class AccelerometerFeatures:
 
         Args:
             signals: Dictionary of signal arrays
-            bins: Number of bins for histogram
+            bins: Number of bins for histogram (will be adjusted for small windows)
 
         Returns:
             Dictionary of entropy values per axis
@@ -80,13 +82,22 @@ class AccelerometerFeatures:
         """
         results = {}
         for axis, signal in signals.items():
-            hist, _ = np.histogram(signal, bins=bins, density=True)
+            # Adjust bins for small windows
+            n_samples = len(signal)
+            actual_bins = min(bins, n_samples)
+            if actual_bins < 2:  # Need at least 2 bins for entropy
+                results[f'{axis}_entropy'] = 0.0
+                continue
+                
+            hist, _ = np.histogram(signal, bins=actual_bins, density=True)
             # Add small constant to avoid log(0)
             hist = hist + np.finfo(float).eps
             hist = hist / hist.sum()
             entropy = float(-np.sum(hist * np.log2(hist)))
             results[f'{axis}_entropy'] = entropy
         return results
+
+
 
     @staticmethod
     def compute_correlation_features(signals: Dict[str, np.ndarray]) -> Dict[str, float]:
@@ -363,10 +374,16 @@ class FeatureComputation:
         window_size = self.config.gps_sample_interval
         df['window'] = (df['posix_time'] // window_size) * window_size
         
+
+        # print("window added to the df")
+        # print(df.head())
         # Process each window
         results = []
         for (device_id, window), group in df.groupby(['device_id', 'window']):
             try:
+                # print("WINDOW")
+                # print(window)
+                # print("Trying _compute_window_features")
                 features = self._compute_window_features(group)
                 features['device_id'] = device_id
                 features['posix_time'] = window

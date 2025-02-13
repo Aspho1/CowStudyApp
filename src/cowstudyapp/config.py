@@ -46,7 +46,7 @@ class AnalysisModes(str, Enum):
     """Types of distributions to fit"""
     PRODUCT = "PRODUCT"
     LOOCV = "LOOCV"
-    # BOTH = "BOTH"
+
     
 
 ##################################### Shared Configuations #####################################
@@ -196,6 +196,10 @@ class IoConfig(CommonConfig):
     accelerometer_directory: Path
     labeled_data_path: Path
     file_pattern: str = "*.csv"
+    tag_to_device: Optional[Dict[str, str]] = Field(default=None, description="Mapping of tag IDs to device IDs")
+    label_to_value: Optional[Dict[str, str]] = Field(default=None, description="Mapping of shorthand activity labels to words")
+    processed_data_path: Path
+
 
     @field_validator('labeled_data_path')
     @classmethod
@@ -203,6 +207,34 @@ class IoConfig(CommonConfig):
         if not v.exists():
             raise ValueError(f"Labeled data file `{v}` does not exist.")
         return v
+
+    @field_validator('tag_to_device')
+    @classmethod
+    def validate_tag_to_device(cls, v: Optional[Dict[str, str]]) -> Optional[Dict[str, str]]:
+        if v is not None:
+            # Ensure all keys and values are strings
+            validated = {}
+            for tag, device in v.items():
+                # Convert both to strings and strip any whitespace
+                tag_str = str(tag).strip()
+                device_str = str(device).strip()
+                validated[tag_str] = device_str
+            return validated
+        return None
+
+    @field_validator('label_to_value')
+    @classmethod
+    def validate_label_to_value(cls, v: Optional[Dict[str, str]]) -> Optional[Dict[str, str]]:
+        if v is not None:
+            # Ensure all keys and values are strings
+            validated = {}
+            for label, value in v.items():
+                # Convert both to strings and strip any whitespace
+                label_str = str(label).strip()
+                value_str = str(value).strip()
+                validated[label_str] = value_str
+            return validated
+        return None
 
     @field_validator('gps_directory', 'accelerometer_directory')
     @classmethod
@@ -323,7 +355,13 @@ class ConfigManager:
         self.io: Optional[IoConfig] = None
         self.analysis: Optional[AnalysisConfig] = None  # Add analysis config
 
-
+    def to_dict(self):
+        return {
+            'validation': self.validation.__dict__,
+            'io': self.io.__dict__, 
+            'labels': self.labels.__dict__,
+            'features': self.features.__dict__
+        }
 
     # @classmethod
     def load_from_file(self, path: Path) -> 'ConfigManager':
@@ -348,7 +386,7 @@ class ConfigManager:
         if 'analysis' in config_dict:
             self.analysis = AnalysisConfig(**config_dict.get('analysis', {}))
         # Validate cross-component dependencies
-        self.validate()
+        # self.validate()
         
         return self
 

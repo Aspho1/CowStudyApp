@@ -1,0 +1,165 @@
+common:
+  timezone: "America/Denver"
+  gps_sample_interval: 300          # Expected seconds between GPS
+  gps_sample_interval: 60           # Expected seconds between Accelerometer 
+  excluded_devices: [] 
+
+
+io:
+  format: "multiple_files"
+  gps_directory: "data/raw/RB_19/gps"
+  accelerometer_directory: "data/raw/RB_19/accelerometer"
+  labeled_data_path: "data/raw/RB_19/labeled/rb_2018_activity_observ.csv"
+  file_pattern: "*.csv"
+
+  processed_data_path: "data/processed/RB_19/all_cows_labeled_mode.csv"
+
+
+
+validation:
+  start_datetime: "2018-11-16 00:00:00" #"2022-01-15 00:00:00"  
+  end_datetime: "2019-02-08 23:55:00" #"2022-03-22 23:59:59"
+  lat_min: -90
+  lat_max: 90
+  lon_min: -180
+  lon_max: 180
+  accel_min: -41
+  accel_max: 41
+  temp_min: -99
+  temp_max: 99
+  min_satellites: 0
+  max_dop: 10.0
+  COVERAGE_THRESHOLD: 70            # Minimum ratio of (actual / expected) GPS data needed to include the device
+
+features:
+  enable_axis_features: true        # Compute features for each axes
+  enable_magnitude_features: true   # Compute features for the magnitudes
+  feature_types:
+    - "BASIC_STATS"                 # Mean, variance of the window
+    - "ZERO_CROSSINGS"              # Count of transitions from - to + or + to -
+    - "PEAK_FEATURES"               # Statistics covering the peaks of the window
+    # - "ENTROPY"                     # Compute signal entropy features
+    - "CORRELATION"                 # Compute correlation between axes
+    # - "SPECTRAL"                    # Compute frequency domain features
+ 
+labels:
+  labeled_agg_method: "MODE"        # The most frequent activity in the window
+  # labeled_agg_method: "RAW"           # The activity at the end of the window
+  # labeled_agg_method: "PERCENTILE"  # A weighted choice of activity
+
+  tag_to_device:
+    '6082': '609'
+    '6085': '610'
+    '6094': '614'
+    '5090': '602'
+    '5051': '612'
+    '5010': '617'
+    '3065': '603'
+    '3091': '611'
+    '276': '600'
+    '286': '605'
+    '256': '606'
+    '105': '608'
+    '174': '613'
+    '163': '616'
+    '0101': '604'
+    '024': '607'
+    '011': '615'
+
+  label_to_value:
+    't': 'Traveling'
+    'g': 'Grazing'
+    's': 'Scratching'
+    'm': 'Mineral'
+    'r': 'Resting'
+    'l': 'Laying'
+    'd': 'Drinking'
+    'f': 'Fighting'
+
+
+  # valid_activities:
+  #   - "Resting"
+  #   - "Grazing"
+  #   - "Traveling"
+  #   - "Fighting"
+  #   - "Scratching"
+  #   - "Drinking"
+  #   - "Mineral"
+
+# testing:
+#   device_id: 824  # Test with single cow  
+
+
+# This is the section where options for the momentuHMM can we defined.
+# Ideally, the LSTM config will also live here
+# analysis:
+#   mode: "LOOCV" # Create models where each cow is used as the test cow once. Collect results and print performance statistics.
+#   mode: "PRODUCT" # Create one model based on all available labeled data. Apply the model to the unlabeled data, save the model, and save the labels. 
+
+analysis:
+  # mode: "LOOCV"     # Do LOOCV on the target dataset. 
+  mode: "PRODUCT"   # predict activity labels for a full dataset
+  target_dataset: "data/processed/RB_22/all_cows_labeled.csv"  # Required The dataset to make predictions on
+  
+  # Optional, only for PRODUCT mode. The reference training information. Either `dataset` or `model`
+  training_info:     
+    # training_info_type: "dataset" # A dataset to create a trained model from
+    # training_info_path: "cowstudyapp/data/processed/dataset2.csv"
+    training_info_type: "model"   # A saved trained model  
+    training_info_path: "data/analysis_results/hmm/PRODUCT/20250212_005053/trained_model.rds"
+
+
+  r_executable: "C:/Program Files/R/R-4.3.0/bin/Rscript.exe"
+  enabled_analyses: ["hmm"]
+  #DELETE data_path: "data/processed/RB_22/all_cows_labeled.csv"
+  output_dir: "data/analysis_results"
+  
+  hmm:
+    enabled: true
+    states: # The states to use i the HMM
+      - "Grazing"
+      - "Resting"
+      - "Traveling"
+    features:
+
+    # Improve this? while it is kinda nice we could make this cleaner. 
+      - name: "step" # Powerful
+        dist: null
+        dist_type: "regular"
+      - name: "angle" # Ok
+        dist: null
+        dist_type: "circular"
+      - name: "magnitude_mean" # Powerful
+        dist: null 
+        dist_type: "regular"
+      # - name: "x_crest_factor" # OK
+      #   dist: null
+      #   dist_type: "regular"
+      # - name: "x_peak_to_peak" # not impressed
+      #   dist: null
+      #   dist_type: "regular"
+      # - name: "y_peak_to_peak" # Pretty good
+      #   dist: null
+      #   dist_type: "regular"
+      # - name: "x_impulse_factor" # Not Impressive
+      #   dist: null
+      #   dist_type: "regular"
+      - name: "magnitude_var" # Ok
+        dist: null
+        dist_type: "regular"
+    options:
+      show_dist_plots: true
+      remove_outliers: true   # From the plots
+      show_full_range: true
+      show_correlation: true
+      number_of_retry_fits: 1 # 1
+      distributions:
+        regular:
+          - "LOGNORMAL"
+          - "GAMMA"
+          # - "WEIBULL" # This does not work. Needs To be debugged.
+          - "NORMAL"
+          - "EXPONENTIAL"
+        circular:
+          - "VONMISES"
+          - "WRAPPEDCAUCHY"

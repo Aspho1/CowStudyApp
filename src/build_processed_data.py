@@ -12,7 +12,8 @@ def process_sensor_data(config_path: Optional[Path] = None):
     """
     Main processing pipeline to create feature dataset
     """
-    config_path = Path("config/default.yaml")   
+    # config_path = Path("config/default.yaml")   
+    config_path = Path("config/RB_19_config.yaml")   
     config = ConfigManager.load(config_path)
     # config = load_config(config_path)
 
@@ -33,7 +34,8 @@ def process_sensor_data(config_path: Optional[Path] = None):
     merged_df = merger.merge_sensor_data(data)
     
     # Save results
-    output_path = Path("data/processed/RB_22/all_cows_labeled.csv")
+    # output_path = Path("data/processed/RB_22/all_cows_labeled_mode.csv")
+    output_path = config.io.processed_data_path
     output_path.parent.mkdir(exist_ok=True)
     merged_df.to_csv(output_path, index=False)
     

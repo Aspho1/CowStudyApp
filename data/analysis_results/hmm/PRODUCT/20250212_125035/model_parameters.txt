@@ -1,0 +1,74 @@
+
+Model Parameters Summary
+=====================
+
+Transition Probability Matrix:
+             Grazing    Resting  Traveling
+Grazing   0.91096852 0.05752480 0.03150669
+Resting   0.02301674 0.91828040 0.05870287
+Traveling 0.03229279 0.09628223 0.87142498
+
+Initial State Distribution:
+          Grazing  Resting    Traveling
+ID:1006 0.5204469 0.479553 9.658515e-08
+ID:1008 0.5204469 0.479553 9.658515e-08
+ID:1015 0.5204469 0.479553 9.658515e-08
+ID:1017 0.5204469 0.479553 9.658515e-08
+ID:1021 0.5204469 0.479553 9.658515e-08
+ID:1022 0.5204469 0.479553 9.658515e-08
+ID:1028 0.5204469 0.479553 9.658515e-08
+ID:1030 0.5204469 0.479553 9.658515e-08
+ID:824  0.5204469 0.479553 9.658515e-08
+ID:826  0.5204469 0.479553 9.658515e-08
+ID:827  0.5204469 0.479553 9.658515e-08
+ID:828  0.5204469 0.479553 9.658515e-08
+ID:830  0.5204469 0.479553 9.658515e-08
+ID:831  0.5204469 0.479553 9.658515e-08
+ID:832  0.5204469 0.479553 9.658515e-08
+ID:837  0.5204469 0.479553 9.658515e-08
+ID:838  0.5204469 0.479553 9.658515e-08
+ID:988  0.5204469 0.479553 9.658515e-08
+ID:993  0.5204469 0.479553 9.658515e-08
+ID:996  0.5204469 0.479553 9.658515e-08
+ID:998  0.5204469 0.479553 9.658515e-08
+ID:999  0.5204469 0.479553 9.658515e-08
+
+Feature Distribution Parameters:
+
+step:
+           Grazing  Resting Traveling
+location 2.9035323 2.053355 5.2343659
+scale    0.7862686 1.010786 0.5084629
+zeromass 0.0001000 0.000100 0.0001000
+
+angle:
+                 Grazing   Resting  Traveling
+mean          -0.3052916 2.8951246 -0.4586527
+concentration  0.7765001 0.6769544  1.7531567
+
+magnitude_mean:
+            Grazing    Resting Traveling
+location 2.19481503 2.09015659 2.1190635
+scale    0.09378334 0.07317115 0.1325483
+
+magnitude_var:
+           Grazing   Resting Traveling
+mean     1.1599871 0.1162540 0.8635142
+sd       0.7642219 0.1709123 0.7471572
+zeromass 0.0001000 0.0001000 0.0001000
+
+beta:
+               1 -> 2    1 -> 3    2 -> 1    2 -> 3    3 -> 1    3 -> 2
+(Intercept) -2.762292 -3.364309 -3.686281 -2.750014 -3.295286 -2.202846
+
+Predicted State Distribution:
+      State  Count Percentage
+1   Grazing 145985      34.61
+2   Resting 263852      62.56
+3 Traveling  11935       2.83
+
+Average State Duration (in seconds):
+              State Mean_Duration_Sec Median_Duration_Sec Max_Duration_Sec
+Grazing     Grazing         5737.6523                3900            35400
+Resting     Resting        10441.2742                5400            70500
+Traveling Traveling          940.0105                 600             6000

@@ -13,15 +13,23 @@ The package handles data loading, validation, feature extraction, and merging of
 
 ## Todo
 
-* Handle when analysis.PRODUCT dataset doesn't have an activity column in hmm (no labels)
-* Generate ALL_ACTIVITIES instead of hardcoding it in the r scripts
+* Handle when analysis.PRODUCT training_information dataset doesn't have an activity column in hmm (no labels)
+* Generate ALL_ACTIVITIES instead of hardcoding it in the `run_hmm.r` script
 * Figure out what is happening with reading csv's in R (what becomes NA)
 * Save logs to a file
 * Documentation for changing sources
 * Test tests
-* Fix src/main.py
+* Fix or **delete** src/main.py
+* Make distribution plots have colored bars by activity
+* Fix hardcoded cutoff in `run_hmm.r` prepare_hmm_data
+* for reading different data sets, check if the header row is expected. 
+
 * Can we plot the distributions fits of the untrained model to see how much the model changes the parameters?
 
+
+## Concerns
+* The RB_19 data is confusing. The accelerometer data has loads of duplicates and datetimes which are nonsensical (such as data from 2045). Also there is no indication as to which timezone the data is recordd in.
+<!-- * The accelerometer magnitudes seem waaay higher. -->
 ## Installation
 
 ### Development Installation

@@ -1,5 +1,8 @@
 # src/cowstudyapp/io.py
+from datetime import datetime
+import json
 from pathlib import Path
+import numpy as np
 import pandas as pd
 from typing import Dict, Optional
 import logging
@@ -9,12 +12,12 @@ from .features import GPSFeatures, FeatureComputation #apply_feature_extraction
 
 from .labels import LabelAggregation
 from ..config import ConfigManager
-from ..validation import DataValidator
+from .validation import DataValidator
 
 
 class DataLoader:
 
-    DATEFORMAT = '%m/%d/%Y %I:%M:%S %p'
+    DATEFORMATS = ['%m/%d/%Y %I:%M:%S %p', '%m/%d/%Y %H:%M']
 
     def __init__(self, config: ConfigManager):
 
@@ -34,26 +37,86 @@ class DataLoader:
         self.feature = FeatureComputation(config.features)
         # self.merger = DataMerger() 
 
+        self.quality_report = {
+            'gps': {
+                'devices': {},
+                'summary': {
+                    'total_devices': 0,
+                    'total_records': 0,
+                    'files_processed': 0
+                }
+            },
+            'accelerometer': {
+                'devices': {},
+                'summary': {
+                    'total_devices': 0,
+                    'total_records': 0,
+                    'files_processed': 0
+                }
+            },
+            'labels': {
+                'devices': {},
+                'summary': {
+                    'total_devices': 0,
+                    'total_records': 0
+                }
+            },
+            'timestamp': datetime.now().isoformat(),
+            'config': {
+                'validation': config.validation.__dict__,
+                'io': config.io.__dict__,
+                'labels': config.labels.__dict__,
+                'features': config.features.__dict__
+            }
+        }
+
+
+    def save_quality_report(self):
+        """Save data quality report to JSON file"""
+        # Convert any remaining non-serializable types
+        def convert_to_serializable(obj):
+            if isinstance(obj, (np.int64, np.int32)):
+                return int(obj)
+            elif isinstance(obj, (np.float64, np.float32)):
+                return float(obj)
+            elif isinstance(obj, pd.Timestamp):
+                return obj.isoformat()
+            elif isinstance(obj, datetime):
+                return obj.isoformat()
+            elif isinstance(obj, (dict, list)):
+                return obj
+            return str(obj)
+
+        # Recursively convert all values in the quality report
+        def convert_dict(d):
+            result = {}
+            for k, v in d.items():
+                if isinstance(v, dict):
+                    result[k] = convert_dict(v)
+                elif isinstance(v, list):
+                    result[k] = [convert_to_serializable(item) for item in v]
+                else:
+                    result[k] = convert_to_serializable(v)
+            return result
+
+        serializable_report = convert_dict(self.quality_report)
+
+        report_path = 'data/processed/RB_19/data_quality_report.json'
+        with open(report_path, 'w') as f:
+            json.dump(serializable_report, f, indent=2)
+        print(f"Saved data quality report to {report_path}")
+
+        
 
     def load_data(self) -> Dict[str, pd.DataFrame]:
         """
         Load unmerged data.
         
         Returns:
-            Dict with separate 'gps' and 'accelerometer' DataFrames
+            Dict with separate 'gps', 'accelerometer', and 'label' DataFrames
         """
         data = self._load_multiple_files()
         return data
-
-    # def load_and_merge(self) -> pd.DataFrame:
-    #     """
-    #     Load and merge sensor data.
-        
-    #     Returns:
-    #         Merged DataFrame with all features
-    #     """
-    #     data = self.load_data()
-    #     return self.merger.merge_sensor_data(data)
 
 
 
@@ -61,20 +124,20 @@ class DataLoader:
         gps_files = list(self.config.gps_directory.glob(self.config.file_pattern))
         accel_files = list(self.config.accelerometer_directory.glob(self.config.file_pattern))
         logging.info(f"Processing {len(gps_files)} GPS files and {len(accel_files)} accelerometer files")
-        
+    
         gps_data = pd.concat([self._process_gps(f) for f in gps_files])
         accel_data = pd.concat([self._process_accel(f) for f in accel_files])
+        self.save_quality_report()
         label_data = self._process_labeled_data(self.config.labeled_data_path)
         
         return {
             'gps': gps_data, 
-                'accelerometer': accel_data, 
-                'label' : label_data}
+            'accelerometer': accel_data, 
+            'label' : label_data}
+        
 
-    def _process_accel(self, file_path: Path) -> pd.DataFrame:
-        # for ed in self.config.excluded_devices:
-        #     if file_path.as_posix().__contains__(ed):
-        #         continue
+
+    def _process_accel_with_headers(self, file_path: Path) -> pd.DataFrame:
         logging.debug(f"Processing accelerometer file: {file_path}")
         df = self._process_csv_file(file_path=file_path)
         logging.info(f"Processed {len(df)} accelerometer records")
@@ -89,64 +152,304 @@ class DataLoader:
         }
         df.rename(columns=column_mapping, inplace=True)
 
-        # Convert accelerometer readings to m/s^2
-        df[['x', 'y', 'z']] *= 0.3138128
-        
-        # Validate data
-        df = self.validator.validate_accelerometer(df)
-        
-        # Compute features
-        df = self.feature.compute_features(df)
+        df['gmt_time'] = pd.to_datetime(df['gmt_time'], utc=True)
 
+        df = add_posix_column(df,timestamp_column="gmt_time")
+        df.drop(columns=['mountain_time'], inplace=True)
+
+        # Add posix
         return df
 
 
+    def _process_accel_no_headers(self,file_path: Path) -> pd.DataFrame:
 
-    def _process_gps(self, file_path: Path) -> Optional[pd.DataFrame]:
+        df = pd.read_csv(file_path, parse_dates=['time'])
+        # print(df.head())
 
-        df = self._process_csv_file(file_path=file_path)
-
-        column_mapping = {        
-            # 'GMT Time' : 'gmt_time',
-            'Latitude' : 'latitude', 
-            'Longitude' : 'longitude', 
-            'Altitude' : 'altitude', 
-            'Duration' : 'duration', 
-            'Temperature' : 'temperature_gps', 
-            'DOP' : 'dop', 
-            'Satellites' : 'satellites',
-            'Cause of Fix' : 'cause_of_fix' 
+        column_mapping = {
+            'time': 'mountain_time',
+            'X': 'x',
+            'Y': 'y',
+            'Z': 'z',
+            'temp': 'temperature_acc',
+            "collar" : "device_id"
         }
         df.rename(columns=column_mapping, inplace=True)
 
-        df = df[(df['latitude'] != 0) & (df['longitude'] != 0)]
-        
-        df = GPSFeatures.add_utm_coordinates(df)
+        # Convert accelerometer readings to m/s^2
+        df[['x', 'y', 'z']] *= 0.3138128
+    
+        # print(df.head())
+        datetime_parsed = False
+        for dateformat in self.DATEFORMATS:
+            try:
+                df["gmt_time"] = pd.to_datetime(df['mountain_time'], format=dateformat)
+                df["gmt_time"] = df["gmt_time"].dt.tz_localize(self.config.timezone)
+                df["gmt_time"] = df["gmt_time"].dt.tz_convert(None)
+                datetime_parsed = True
+                break
+            except ValueError:
+                continue
 
-        df = round_timestamps(df, col='posix_time', interval=self.config.gps_sample_interval)
-        # Ensure columns are in a consistent order
-        desired_columns = [
-            # 'gmt_time', 
-            'posix_time'
-            , 'device_id'
-            # , 'device_type'
-            # , 'firmware_version'
-            , 'latitude'
-            , 'longitude'
-            , 'altitude'
-            # , 'duration', 
-            , 'temperature_gps'
-            , 'dop'
-            , 'satellites'
-            #, 'cause_of_fix'
-            , 'utm_easting'
-            , 'utm_northing'
-        ]
-        df = df[desired_columns]
+        if not datetime_parsed:
+            raise ValueError(f"Could not parse dates in {file_path} with any of the known formats: {self.DATEFORMATS}")
         
-        return self.validator.validate_gps(df)
+        # print(df.head())
 
-    def _process_labeled_data(self,file_path: Path) -> pd.DataFrame:
+        # df.drop_duplicates(subset="gmt_time", inplace=True, keep='first')
+        df = add_posix_column(df, timestamp_column='gmt_time')
+
+        df.drop(columns=["gmt_time", 'mountain_time'], inplace=True)
+        return df
+
+
+    def _process_accel(self, file_path: Path) -> pd.DataFrame:
+        device_id = None
+        format_type = ''
+        try:
+            # Try to detect file format
+            with open(file_path, 'r') as f:
+                first_line = f.readline().strip()
+            
+            if first_line.lower().startswith('product type'): 
+                format_type = 'original'
+            elif first_line.lower().startswith('time'): 
+                format_type = 'pivot'
+            else:
+                raise ValueError(f"Unknown accelerometer data format in {file_path}")
+
+            # Process based on format
+            df = self._process_accel_with_headers(file_path) if format_type == 'original' else self._process_accel_no_headers(file_path)
+            device_id = str(df['device_id'].iloc[0])
+            df[['x', 'y', 'z']] *= 0.3138128
+
+            df = self.validator.validate_accelerometer(df)
+            validation_results = self.validator.get_validation_stats()
+
+            print(f"Computing features for device {device_id}...")
+            df = self.feature.compute_features(df)
+
+            # Ensure JSON serializable values
+            self.quality_report['accelerometer']['devices'][device_id] = {
+                'file': str(file_path),
+                'format': format_type,
+                'validation_results': validation_results[device_id],
+                'time_range': {
+                    'start': int(df['posix_time'].min()),  # Convert np.int64 to int
+                    'end': int(df['posix_time'].max())
+                }
+            }
+            
+            # Update summary statistics
+            self._update_accelerometer_summary(device_id, format_type, df)
+            
+            return df
+            
+        except Exception as e:
+            self._handle_accelerometer_error(device_id, file_path, format_type, e)
+            raise e
+
+    def _update_accelerometer_summary(self, device_id: str, format_type: str, df: pd.DataFrame):
+        """Update summary statistics for accelerometer processing"""
+        summary = self.quality_report['accelerometer']['summary']
+        summary['total_devices'] = int(len(self.quality_report['accelerometer']['devices']))
+        summary['total_records'] = int(summary.get('total_records', 0) + len(df))
+        summary['files_processed'] = int(summary.get('files_processed', 0) + 1)
+        
+        if 'format_counts' not in summary:
+            summary['format_counts'] = {'original': 0, 'pivot': 0}
+        summary['format_counts'][format_type] = int(summary['format_counts'].get(format_type, 0) + 1)
+
+
+    def _handle_accelerometer_error(self, device_id: Optional[str], file_path: Path, format_type: str, error: Exception):
+        """Handle errors in accelerometer processing"""
+        error_info = {
+            'file': str(file_path),
+            'error': str(error),
+            'format_detected': format_type,
+            'processing_stage': 'format_detection' if device_id is None else 'data_processing'
+        }
+        
+        if device_id:
+            self.quality_report['accelerometer']['devices'][device_id] = error_info
+        else:
+            if 'errors' not in self.quality_report['accelerometer']:
+                self.quality_report['accelerometer']['errors'] = {}
+            self.quality_report['accelerometer']['errors'][str(file_path)] = error_info
+        
+        if 'error_count' not in self.quality_report['accelerometer']['summary']:
+            self.quality_report['accelerometer']['summary']['error_count'] = 0
+        self.quality_report['accelerometer']['summary']['error_count'] += 1
+
+    def _process_gps(self, file_path: Path) -> Optional[pd.DataFrame]:
+        device_id = None
+        try:
+            df = self._process_csv_file(file_path=file_path)
+            device_id = df['device_id'].iloc[0]
+            column_mapping = {        
+                # 'GMT Time' : 'gmt_time',
+                'Latitude' : 'latitude', 
+                'Longitude' : 'longitude', 
+                'Altitude' : 'altitude', 
+                'Duration' : 'duration', 
+                'Temperature' : 'temperature_gps', 
+                'DOP' : 'dop', 
+                'Satellites' : 'satellites',
+                'Cause of Fix' : 'cause_of_fix' 
+            }
+            df.rename(columns=column_mapping, inplace=True)
+
+            df = df[(df['latitude'] != 0) & (df['longitude'] != 0)]
+            
+            df = GPSFeatures.add_utm_coordinates(df)
+
+            df = round_timestamps(df, col='posix_time', interval=self.config.gps_sample_interval)
+            # Ensure columns are in a consistent order
+            desired_columns = [
+                # 'gmt_time', 
+                'posix_time'
+                , 'device_id'
+                # , 'device_type'
+                # , 'firmware_version'
+                , 'latitude'
+                , 'longitude'
+                , 'altitude'
+                # , 'duration', 
+                , 'temperature_gps'
+                , 'dop'
+                , 'satellites'
+                #, 'cause_of_fix'
+                , 'utm_easting'
+                , 'utm_northing'
+            ]
+            df = df[desired_columns]
+        
+            self.quality_report['gps']['devices'][str(device_id)] = {
+                'file': str(file_path),
+                'initial_records': len(df),
+                'final_records': len(df) if df is not None else 0,
+                'validation_results': self.validator.get_validation_stats()
+            }
+            
+            # Update summary
+            self.quality_report['gps']['summary']['total_devices'] = len(self.quality_report['gps']['devices'])
+            self.quality_report['gps']['summary']['total_records'] += len(df) if df is not None else 0
+            self.quality_report['gps']['summary']['files_processed'] += 1
+            
+            return self.validator.validate_gps(df)
+            
+        except Exception as e:
+            # Log failed files
+            self.quality_report['gps'][str(device_id) if device_id else str(file_path)] = {
+                'file': str(file_path),
+                'error': str(e)
+            }
+            raise e
+
+
+    def _process_labeled_data_NOValidation(self, file_path: Path) -> pd.DataFrame:
+        # Try to detect file format
+        with open(file_path, 'r') as f:
+            first_line = f.readline().strip()
+        
+        if first_line.lower().startswith('date,time'): # Original format
+            return self._process_labeled_data_standard(file_path)
+        elif first_line.lower().startswith('time'): # New pivot format
+            return self._process_labeled_data_pivot(file_path)
+        else:
+            raise ValueError(f"Unknown labeled data format in {file_path}")
+
+
+    def _process_labeled_data(self, file_path: Path) -> pd.DataFrame:
+        try:
+            # Try to detect file format
+            with open(file_path, 'r') as f:
+                first_line = f.readline().strip()
+            
+            # Process data based on format
+            if first_line.lower().startswith('date,time'): 
+                df = self._process_labeled_data_standard(file_path)
+            elif first_line.lower().startswith('time'): 
+                df = self._process_labeled_data_pivot(file_path)
+            else:
+                raise ValueError(f"Unknown labeled data format in {file_path}")
+            
+            for device_id in df['device_id'].unique():
+                device_df = df[df['device_id'] == device_id]
+                self.quality_report['labels'][str(device_id)] = {
+                    'file': str(file_path),
+                    'initial_records': len(device_df),
+                    'unique_activities': device_df['activity'].nunique(),
+                    'activity_counts': device_df['activity'].value_counts().to_dict(),
+                    'validation_results': self.validator.get_validation_stats()
+                }
+            
+            # Add summary section
+            self.quality_report['labels']['summary'] = {
+                'file': str(file_path),
+                'total_records': len(df),
+                'unique_devices': df['device_id'].nunique(),
+                'unique_activities': df['activity'].nunique(),
+                'activity_counts_all': df['activity'].value_counts().to_dict()
+            }
+            
+            print("\nLabel Quality Summary:")
+            print(f"Total records: {len(df)}")
+            print(f"Unique devices: {df['device_id'].nunique()}")
+            print("Records per device:")
+            print(df.groupby('device_id').size())
+            print("\nActivities per device:")
+            print(df.groupby(['device_id', 'activity']).size().unstack())
+            
+            return df
+            
+        except Exception as e:
+            self.quality_report['labels']['error'] = {
+                'file': str(file_path),
+                'error': str(e)
+            }
+            raise e
+        
+
+    def _process_labeled_data_pivot(self, file_path: Path) -> pd.DataFrame:
+        """Process pivot-style labeled data format"""
+        # Read the data
+        df = pd.read_csv(file_path, parse_dates=['time'])
+        
+        # Melt the dataframe to long format
+        df_melted = df.melt(
+            id_vars=['time'],
+            var_name='tag_id',
+            value_name='activity'
+        )
+
+        print(df_melted.head())
+        
+        # Convert tag_ids to device_ids
+        df_melted['device_id'] = df_melted['tag_id'].map(self.config.tag_to_device)
+        
+        # Drop rows with missing activities
+        df_melted = df_melted.dropna(subset=['activity'])
+
+        df_melted['activity'] = df_melted['activity'].map(self.config.label_to_value)
+        
+        # Convert to UTC and create posix time
+        df_melted['mst_time'] = pd.to_datetime(df_melted['time']).dt.tz_localize('America/Denver')
+        df_melted['posix_time'] = df_melted['mst_time'].dt.tz_convert('UTC').astype('int64') // 10**9
+        
+        # Add 5-minute window column
+        df_melted['posix_time_5min'] = (df_melted['posix_time'] // self.config.gps_sample_interval) * self.config.gps_sample_interval
+        
+        # Select and rename columns
+        result = df_melted[['posix_time', 'posix_time_5min', 'device_id', 'activity']]
+        
+        # Add any additional processing from original method
+        result = self.labeler.compute_labels(result)
+        
+        return result
+
+
+    def _process_labeled_data_standard(self,file_path: Path) -> pd.DataFrame:
         df = pd.read_csv(
             file_path,
             names=["date", "time", "cow_id", "observer", "activity", "collar_id"],
@@ -253,12 +556,45 @@ class DataLoader:
                 # date_format = ,
                 # date_parser=lambda x: pd.to_datetime(x, format='%m/%d/%Y %H:%M')
             )
-            df["GMT Time"] = pd.to_datetime(df['GMT Time'], format=self.DATEFORMAT, utc=True)
 
+            datetime_parsed = False
+            for dateformat in self.DATEFORMATS:
+                try:
+                    df["GMT Time"] = pd.to_datetime(df['GMT Time'], format=dateformat, utc=True)
+                    datetime_parsed = True
+                    break
+                except ValueError:
+                    continue
+
+            if not datetime_parsed:
+                raise ValueError(f"Could not parse dates in {file_path} with any of the known formats: {self.DATEFORMATS}")
+            
             # Add metadata as columns
-            df['device_id'] = int(metadata.get('Product ID', 0))
-            df['device_type'] = metadata.get('Product Type', 'unknown')
-            df['firmware_version'] = metadata.get('Firmware Version', 'unknown')
+            try:
+                product_id = metadata.get('Product ID', '0')
+                product_id = ''.join(c for c in product_id if c.isdigit())  # Keep only digits
+                df['device_id'] = int(product_id) if product_id else 0
+            except ValueError as e:
+                logging.warning(f"Could not parse Product ID from metadata in {file_path}: {str(e)}")
+                df['device_id'] = 0
+
+            try:
+                device_type = metadata.get('Product Type', 'unknown')
+                device_type = ''.join(c for c in device_type.split(",") if len(c) > 0)
+                df['device_type'] = device_type if device_type else 'unknown'
+            except ValueError as e:
+                logging.warning(f"Could not parse Device Type from metadata in {file_path}: {str(e)}")
+                df['device_type'] = 'unknown'
+
+            try:
+                firmware_version = metadata.get('Firmware Version', 'unknown')
+                firmware_version = ''.join(c for c in firmware_version.split(",") if len(c) > 0)  # Keep only digits
+                df['firmware_version'] = firmware_version if firmware_version else 'unknown'
+            except ValueError as e:
+                logging.warning(f"Could not parse Firmware Version from metadata in {file_path}: {str(e)}")
+                df['firmware_version'] = 'unknown'
+
+            # df['firmware_version'] = metadata.get('Firmware Version', 'unknown')
             # print(df.head())
 
             # Add posix time

@@ -70,7 +70,11 @@ init_the_script <- function(util_path, config_path, data_path, output_dir){
     
     cat("Selecting and renaming target data...\n")
     target_dataset <- load_csv_data(data_path, features)
+    # print(head(target_dataset))
+    
+    cat("Preparing target data as a momentuHMM object...\n")
     target_dataset <- prepare_hmm_data(data=target_dataset, states=states)
+    # print(head(target_dataset))
 
     # Validate configuration
     # cat("Validating config...\n")
@@ -82,31 +86,22 @@ init_the_script <- function(util_path, config_path, data_path, output_dir){
         cat("Starting LOOCV...\n")
         run_LOOCV(config, Options, features, states, dirs, target_dataset, all_activities)
         
-
     # if(config$mode == "LOOCV"){
     #     run_LOOCV(config, Options, features, states, dirs
     #             , rawData, util_path, config_path
     #             , data_path, output_dir, all_activities)
     }else if(config$mode == "PRODUCT"){
-        # run_PRODUCT(config, Options, features, states, dirs
-        #           , target_dataset, util_path, config_path
-        #           , data_path, output_dir, all_activities)
-
-
-        cat("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-        cat("Starting PRODUCT... config$training_info structure:\n")
-        str(config$training_info)
-
-
+        # str(config$training_info)
         if (!is.null(config$training_info)) {
 
-            cat(sprintf("Starting PRODUCT2... config$training_info$type = %s\n",config$training_info$type))
+            cat(sprintf("PRODUCT -- config$training_info$type = %s\n",config$training_info$training_info_type))
             if (config$training_info$training_info_type == "dataset") {
                 # Train new model using training dataset
                 cat("Configuration set to use 'dataset' as the training type\n")
 
                 cat("Loading the training dataset...\n")
-                training_dataset <- load_csv_data(data_path=config$training_info$training_info_path, features=features, all_activities=all_activities)
+                training_dataset <- load_csv_data(data_path=config$training_info$training_info_path
+                                                , features=features, all_activities=all_activities)
 
                 cat("Selecting the labeled data from the training dataset...\n")
                 training_dataset <- process_labeled_data(training_dataset, states, all_activities)
@@ -131,19 +126,25 @@ init_the_script <- function(util_path, config_path, data_path, output_dir){
                 cat("Getting target dataset predictions...\n")
                 # get_predictions_from_model(model, target_dataset, dirs, states)
                 get_predictions_from_model(model, dirs$base_dir)
-
-                cat("Finished!...\n")
                 
             } else if (config$training_info$training_info_type == "model") {
                 cat("Configuration set to use 'model' as the training type\n")
+
+                # cat("Target Data head:\n")
+                # print(head(target_dataset))
+
                 # Load and apply existing model
                 cat("Loading model parameters...\n")
-                model_params <- load_model_parameters(config$training_info$training_info_path)
+                params <- load_model_parameters(config$training_info$training_info_path)
+                features <- params$features
+                trained_model <- params$model 
+
+                cat("Applying saved model to target dataset...\n")
+                model <- apply_model(target_dataset, trained_model, features, states)
                 
-                cat("Applying model to target dataset...\n")
-                apply_saved_model_to_target(model_params, target_dataset, dirs)
-                cat("Finished!...\n")
-                
+                cat("Getting target dataset predictions...\n")
+                get_predictions_from_model(model, dirs$base_dir)
+
             } else {
                 stop(sprintf("Invalid training_info type `%s`. Must be 'dataset' or 'model'.", config$training_info$type))
             }
@@ -181,33 +182,9 @@ init_the_script <- function(util_path, config_path, data_path, output_dir){
             cat("Saving the model and featureset to disk...\n")
             save_model(model,dirs$base_dir, features)
 
-            cat("Finished!...\n")
-
-
-
-
-            # cat("Applying trained model to target dataset...\n")
-            # model <- tryCatch({
-            #     apply_model(target_dataset, trained_model, features, states)
-            # }, error = function(e) {
-            #     cat("\nError in apply_model:", e$message)
-            #     cat("\nModel state at error:")
-            #     str(trained_model)
-            #     stop(e)
-            # })
-
-            # cat("Getting target dataset predictions...\n")
-            # predictions <- tryCatch({
-            #     get_predictions_from_model(model, dirs$base_dir)
-            # }, error = function(e) {
-            #     cat("\nError in get_predictions_from_model:", e$message)
-            #     cat("\nModel state at error:")
-            #     str(model)
-            #     stop(e)
-            # })
-
         }
-
+        cat("Finished!...\n")
+    
     }else{
         stop(sprintf("Invalid mode `%s` selected.\n", config.mode))
     }
@@ -316,14 +293,18 @@ get_predictions_from_model <- function(model, output_dir) {
     states <- model$stateNames
     
     # Get the raw data from the model
-    raw_data <- model$data
+    results_df <- model$data
+    results_df$predicted_state = states[predictions]
+    results_df$factored_activity <- NULL
     
     # Create results dataframe
-    results_df <- data.frame(
-        ID = raw_data$ID,
-        timestamp = raw_data$posix_time,
-        predicted_state = states[predictions]
-    )
+
+    # results_df <- data.frame(
+    #     ID = raw_data$ID,
+    #     timestamp = raw_data$posix_time,
+    #     actual_states = raw_data$activity,
+    #     predicted_state = states[predictions]
+    # )
     
     # Save predictions to CSV
     predictions_file <- file.path(output_dir, "predictions.csv")
@@ -404,50 +385,51 @@ get_predictions_from_model <- function(model, output_dir) {
 
 
 
-# validate_config <- function(config, target_data) {
-#     # Basic path validation
-#     # if (!file.exists(data_path)) {
-#     #     stop("Target dataset not found: ", data_path)
-#     # }
+validate_config <- function(config, target_dataset) {
+    #Annoying, Kind of redundant
+    # Basic path validation
+    # if (!file.exists(data_path)) {
+    #     stop("Target dataset not found: ", data_path)
+    # }
     
-#     # Mode-specific validation
-#     if (config$mode == "LOOCV") {
-#         # Check if data has labels
-#         # data <- read.csv(data_path)
-#         if (all(is.na(target_data$activity))) {
-#             stop("LOOCV mode requires labeled data")
-#         }
-#     } else if (config$mode == "PRODUCT") {
-#         if (!is.null(config$training_info)) {
-#             if (config$training_info$training_info_type == "dataset") {
-#                 if (!file.exists(config$training_info$path)) {
-#                     stop("Training dataset not found: ", config$training_info$training_info_path)
-#                 }
-#             } else if (config$training_info$training_info_type == "model") {
-#                 model_path <- file.path(config$training_info$training_info_path)
-#                 if (!file.exists(model_path)) {
-#                     stop("Model parameters not found: ", model_path)
-#                 }
-#             }
-#         } else {
-#             # No training info - check if target data has labels
-#             # data <- read.csv(data_path)
-#             if (all(is.na(target_data$activity))) {
-#                 stop("When no training info is provided, target dataset must have labels")
-#             }
-#         }
-#     }
-# }
+    # Mode-specific validation
+    if (config$mode == "LOOCV") {
+        # Check if data has labels
+        # data <- read.csv(data_path)
+        if (all(is.na(target_dataset$activity))) {
+            stop("LOOCV mode requires labeled data")
+        }
+    } else if (config$mode == "PRODUCT") {
+        if (!is.null(config$training_info)) {
+            if (config$training_info$training_info_type == "dataset") {
+                if (!file.exists(config$training_info$path)) {
+                    stop("Training dataset not found: ", config$training_info$training_info_path)
+                }
+            } else if (config$training_info$training_info_type == "model") {
+                model_path <- file.path(config$training_info$training_info_path)
+                if (!file.exists(model_path)) {
+                    stop("Model parameters not found: ", model_path)
+                }
+            }
+        } else {
+            # No training info - check if target data has labels
+            # data <- read.csv(data_path)
+            if (all(is.na(target_dataset$activity))) {
+                stop("When no training info is provided, target dataset must have labels")
+            }
+        }
+    }
+}
 
 
 
 
-save_predictions <- function(predictions, target_data, base_dir){
+save_predictions <- function(predictions, target_dataset, base_dir){
 
     results_df <- data.frame(
-            ID = target_data$ID,
-            posix_time = target_data$posix_time,
-            actual_activity = target_data$activity,
+            ID = target_dataset$ID,
+            posix_time = target_dataset$posix_time,
+            actual_activity = target_dataset$activity,
             predicted_activity = predictions
         )
         
@@ -458,76 +440,6 @@ save_predictions <- function(predictions, target_data, base_dir){
         
 }
 
-
-run_PRODUCT <- function(config, Options, features, states, dirs, rawData, 
-                       util_path, config_path, data_path, output_dir, all_activities) {
-    tryCatch({
-        # 1. Create and train model on labeled data
-        cat("\n=== Training Model on Labeled Data ===\n")
-        
-        # Process labeled data
-        filtered_data_labeled <- process_labeled_data(rawData, states, all_activities)
-        prepped_data_labeled <- prepare_hmm_data(filtered_data_labeled, states)
-        
-        # # Fit distributions
-        features <- select_best_distributions(data=prepped_data_labeled, 
-                                            features=features,
-                                            Options=Options,
-                                            dirs=dirs)
-
-        # Train model
-        trained_model <- train_model(prepped_data_labeled, features, states)
-        
-        # Save trained model parameters
-        Par0 <- getPar0(trained_model)
-        saveRDS(Par0, file.path(dirs$base_dir, "trained_model_parameters.rds"))
-        
-        # 2. Apply model to full dataset
-        cat("\n=== Applying Model to Full Dataset ===\n")
-        
-        # Prepare full dataset
-        prepped_data_full <- prepare_hmm_data(rawData, states)
-        
-        # Apply model
-        model_full <- apply_model(prepped_data_full, trained_model, features, states)
-        predicted_states <- viterbi(model_full)
-        
-
-        save_predictions(predicted_states, prepped_data_full, dirs$base_dir)
-        # # Create results dataframe
-        # results_df <- data.frame(
-        #     ID = prepped_data_full$ID,
-        #     posix_time = prepped_data_full$posix_time,
-        #     actual_activity = prepped_data_full$activity,
-        #     predicted_activity = states[predicted_states]
-        # )
-        
-        # # Save results
-        # write.csv(results_df, 
-        #          file.path(dirs$base_dir, "predictions.csv"), 
-        #          row.names = FALSE)
-        
-        # Save summary statistics
-        sink(file.path(dirs$base_dir, "model_summary.txt"))
-        cat("=== Model Summary ===\n\n")
-        cat("Training Data Summary:\n")
-        print(summary(trained_model))
-        cat("\nPrediction Summary:\n")
-        print(table(results_df$predicted_activity))
-        if (!all(is.na(results_df$actual_activity))) {
-            cat("\nConfusion Matrix (where actual activity is known):\n")
-            print(table(Actual = results_df$actual_activity, 
-                       Predicted = results_df$predicted_activity))
-        }
-        sink()
-        
-        cat("\nResults saved to:", dirs$base_dir, "\n")
-        
-    }, error = function(e) {
-        cat("\nError in product model fitting:", e$message, "\n")
-        stop(e)
-    })
-}
 
 
 process_labeled_data <- function(raw_data, states, all_activities) {
