@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Any, Dict, Optional, Tuple
 import numpy as np
 import pandas as pd
+from cowstudyapp.utils import from_posix
 
 from ..config import DataValidationConfig
 # from .config import DataValidationConfig
@@ -17,11 +18,11 @@ class DataValidator:
     
     def __init__(self, config: DataValidationConfig):
         self.config = config
-        self.validation_stats: Dict[str, Any] = {}
+        # self.validation_stats: Dict[str, Any] = {}
 
-    def get_validation_stats(self):
-        """Return the validation statistics for the most recent validation"""
-        return self.validation_stats
+    # def get_validation_stats(self):
+    #     """Return the validation statistics for the most recent validation"""
+    #     return self.validation_stats
 
 
     def validate_gps(self, df: pd.DataFrame) -> Optional[pd.DataFrame]:
@@ -124,7 +125,7 @@ class DataValidator:
             ]
 
         # 4. Apply time range filter and check coverage
-        df = self._validate_timerange(df)
+        df = self._filter_timerange(df)
         
         if self.config.start_datetime and self.config.end_datetime:
             start_posix = int(self.config.start_datetime.timestamp())
@@ -215,7 +216,7 @@ class DataValidator:
             df = df[valid_coords]
 
         # 4. Apply time range filter
-        df = self._validate_timerange(df)
+        df = self._filter_timerange(df)
         
         # 5. Report time coverage
         if self.config.start_datetime and self.config.end_datetime:
@@ -244,7 +245,7 @@ class DataValidator:
         return df
 
 
-    def validate_accelerometer(self, df: pd.DataFrame) -> pd.DataFrame:
+    def validate_accelerometer(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]]:
         """Validate accelerometer data and return cleaned DataFrame"""
         df = df.copy()
         device_id = str(df['device_id'].iloc[0])
@@ -278,37 +279,62 @@ class DataValidator:
         print(f"Initial accelerometer records: {stats['initial_records']}")
 
         # 1. Time bounds and frequency validation
-        df = self._validate_timerange(df)
-        df, missing_pct = self._validate_time_frequency(
-            df, 
-            self.ACC_INTERVAL, 
-            interpolate=True
-        )
+        # df['tz'] = df['posix_time'].apply(from_posix)
 
-        stats['time_coverage'].update({
-            'expected_records': len(df),
-            'actual_records': df.notna().any(axis=1).sum(),
-            'coverage_pct': 100 - missing_pct,
-            'gaps_interpolated': int(len(df) * missing_pct * 0.01)
-        })
+        print("Filtered timerange")
+        df = self._filter_timerange(df)
+        # print(df.head())
+
+        print("Adding regular index")
+        df, missing_pct, frequency_stats = self._validate_time_frequency(
+                                            df, 
+                                            self.ACC_INTERVAL, 
+                                            interpolate=True
+        )
+        # print(df.head())
+
+
+        stats['frequency_stats'] = frequency_stats
 
         # 2. Check acceleration bounds
+        masks = pd.DataFrame(index=df.index)
         for axis in ['x', 'y', 'z']:
-            invalid_mask = ~df[axis].between(self.config.accel_min, self.config.accel_max)
-            invalid_records = df[invalid_mask]
+            # First check for NaN values
+            nan_mask = df[axis].isna()
             
-            print("Sample of Invalid accelerations:")
-            print(invalid_records.head())
-            if len(invalid_records) > 0:
+            # Then check for out of bounds values
+            bounds_mask = pd.Series(False, index=df.index)  # Initialize with False
+            valid_data = df[~nan_mask]  # Get non-NaN values
+            if not valid_data.empty:
+                bounds_mask.loc[valid_data.index] = ~valid_data[axis].between(
+                    self.config.accel_min, 
+                    self.config.accel_max
+                )
+            
+            # Combine the masks (no need for reindex since indexes match)
+            masks[axis] = nan_mask | bounds_mask
+
+        # Create combined mask and find invalid records
+        combined_mask = masks.any(axis=1)
+        invalid_records = df[combined_mask].copy()
+        
+        if len(invalid_records) > 0:
+            print("\nSample of invalid accelerations:")
+            for axis in ['x', 'y', 'z']:
+                # Use loc for proper indexing
+                axis_invalid = invalid_records.loc[masks[axis]]
                 stats['acceleration_issues'][axis].update({
-                    'count': len(invalid_records),
-                    'examples': invalid_records[[
-                        'posix_time', 'x', 'y', 'z'
-                    ]].head().to_dict('records')
+                    'count': len(axis_invalid),
+                    'examples': axis_invalid.head().to_dict('records'),
+                    'nan_count': axis_invalid[axis].isna().sum(),
+                    'out_of_bounds_count': len(axis_invalid) - axis_invalid[axis].isna().sum()
                 })
-                
-                print(f"Found {len(invalid_records)} records with invalid {axis} acceleration")
-                df = df[~invalid_mask]
+                print(f"Found {len(axis_invalid)} records with invalid {axis} acceleration")
+                print(f"- NaN values: {axis_invalid[axis].isna().sum()}")
+                print(f"- Out of bounds: {len(axis_invalid) - axis_invalid[axis].isna().sum()}")
+
+        # Filter out invalid records
+        df = df[~combined_mask]
 
         # 3. Check temperature bounds
         invalid_temp = ~df['temperature_acc'].between(
@@ -332,10 +358,7 @@ class DataValidator:
         stats['final_records'] = len(df)
         print(f"\nFinal accelerometer records: {stats['final_records']}")
         
-        # Store validation stats before returning
-        self.validation_stats[device_id] = stats
-        
-        return df
+        return df, stats
 
 
     def validate_accelerometer_OLD(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -344,7 +367,7 @@ class DataValidator:
         print(f"------------------------------{df['device_id'].iloc[0]}---------------------------\nInitial accelerometer records: {len(df)}")
         
         # Time bounds
-        df = self._validate_timerange(df)
+        df = self._filter_timerange(df)
         df, missing_pct = self._validate_time_frequency(
             df, 
             self.ACC_INTERVAL, 
@@ -379,7 +402,7 @@ class DataValidator:
         df: pd.DataFrame, 
         interval: int,
         interpolate: bool = False
-    ) -> Tuple[pd.DataFrame, float]:
+    ) -> Tuple[pd.DataFrame, float, Dict]:
         """
         Validate and optionally fix time frequency of data based on configured time range.
         
@@ -391,6 +414,9 @@ class DataValidator:
         Returns:
             Tuple of (processed DataFrame, percentage of missing data)
         """
+        frequency_stats: Dict[str,Any] = {}
+
+
         # Get configured time range
         if not (self.config.start_datetime and self.config.end_datetime):
             raise ValueError("start_datetime and end_datetime must be configured for time frequency validation")
@@ -398,6 +424,8 @@ class DataValidator:
         start_posix = int(self.config.start_datetime.timestamp())
         end_posix = int(self.config.end_datetime.timestamp())
         
+        frequency_stats['start_posix'] = start_posix
+        frequency_stats['end_posix'] = end_posix
         # Round start to nearest interval
         start_posix = start_posix - (start_posix % interval)
         
@@ -412,21 +440,44 @@ class DataValidator:
 
         # Sort by time
         df = df.sort_values('posix_time')
+        # print("DF SORT POSIX")
+        # print(df.head())
 
+        print("\nTime range analysis:")
+        print(f"Data start time: {from_posix(df['posix_time'].min())}")
+        print(f"Data end time: {from_posix(df['posix_time'].max())}")
+        print(f"Required start time: {from_posix(start_posix)}")
+        print(f"Required end time: {from_posix(end_posix)}")
+        
+        # Handle duplicates
         duplicates = df[df.duplicated(['posix_time'], keep=False)]
+        frequency_stats['duplicates'] = {}
+        print(f"\nFound {len(duplicates)} duplicate posix_time records")
         if len(duplicates) > 0:
-            print(f"\nFound {len(duplicates)} duplicate posix_time records")
+            frequency_stats['duplicates']['n'] = len(duplicates)
             print(f"Number of unique timestamps with duplicates: {len(duplicates['posix_time'].unique())}")
+            frequency_stats['duplicates']['unique_ts_with_dup'] = len(duplicates['posix_time'].unique())
             print("\nExample duplicates:")
             example_time = duplicates['posix_time'].iloc[0]
             print(df[df['posix_time'] == example_time])
-            
-            # Drop duplicates keeping first occurrence
+            frequency_stats['duplicates']['example_duplicate'] = df[df['posix_time'] == example_time].to_dict()
             df = df.drop_duplicates('posix_time', keep='first')
             print(f"After removing duplicates: {len(df)} records")
+            frequency_stats['duplicates']['n_after_dropping'] = len(df)
+
+        # Set index and reindex
+        # print("\nBefore reindex:")
+        # print(df.head())
         
-        # Reindex data
-        df = df.set_index('posix_time').reindex(full_index.posix_time)
+        # Create a temporary DataFrame with the full time range
+        full_df = pd.DataFrame(index=full_index['posix_time'])
+        
+        # Merge with original data
+        df = df.set_index('posix_time')
+        df = full_df.join(df)
+        
+        # print("\nAfter reindex:")
+        # print(df.head())
         
         # Calculate missing percentage
         total_expected = len(full_index)
@@ -434,11 +485,46 @@ class DataValidator:
         missing = total_expected - records_present
         missing_pct = (missing / total_expected) * 100
         
+        frequency_stats.update({
+            'n_expected': total_expected,
+            'n_available': records_present,
+            'n_missing': missing,
+            'pct_missing': missing_pct
+        })
+
+
+
+
+
         print(f"Time range: {self.config.start_datetime} to {self.config.end_datetime}")
         print(f"Expected records: {total_expected}")
         print(f"Records present: {records_present}")
         print(f"Missing records: {missing}")
         
+
+
+        missing_mask = df.isna().all(axis=1)
+        gap_starts = missing_mask[missing_mask].index[:-1]
+        gap_ends = missing_mask[missing_mask].index[1:]
+        gap_lengths = gap_ends - gap_starts
+        
+        # Count gaps by length (in intervals)
+        gap_counts = pd.Series(gap_lengths).value_counts().sort_index()
+        
+        print("\nGap analysis:")
+        print(f"Number of single-interval gaps: {gap_counts.get(interval, 0)}")
+        print("Gap distribution (intervals):")
+        for length, count in gap_counts.items():
+            print(f"{int(length/interval)} intervals: {count} gaps")
+            
+        frequency_stats['gap_analysis'] = {
+            'single_interval_gaps': gap_counts.get(interval, 0),
+            'gap_distribution': gap_counts.to_dict()
+        }
+
+
+
+
         if interpolate:
             # Interpolate small gaps
             numeric_cols = df.select_dtypes(include=[np.number]).columns
@@ -455,12 +541,13 @@ class DataValidator:
         
         # Reset index
         df = df.reset_index()
-        
-        return df, missing_pct
+        # print("DF RESET INDEX")
+        # print(df.head())
+        return df, missing_pct, frequency_stats
 
 
 
-    def _validate_timerange(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _filter_timerange(self, df: pd.DataFrame) -> pd.DataFrame:
         """Apply time range filters if configured"""
         if 'posix_time' not in df.columns:
             raise ValueError("DataFrame must have 'posix_time' column")

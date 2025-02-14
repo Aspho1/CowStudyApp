@@ -325,12 +325,14 @@ class AnalysisConfig(CommonConfig):
 
     enabled_analyses: List[Literal["hmm"]] = ["hmm"]
 
-    @field_validator('target_dataset')
-    @classmethod
-    def validate_data_path(cls, v: Path) -> Path:
-        if not v.exists():
-            raise ValueError(f"Data file does not exist: {v}")
-        return v
+
+    # Not compatible with build_processed_data function
+    # @field_validator('target_dataset')
+    # @classmethod
+    # def validate_data_path(cls, v: Path) -> Path:
+    #     if not v.exists():
+    #         raise ValueError(f"Data file does not exist: {v}")
+    #     return v
 
     @field_validator('output_dir')
     @classmethod

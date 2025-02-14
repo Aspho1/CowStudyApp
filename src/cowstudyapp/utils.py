@@ -18,7 +18,6 @@ def to_posix(timestamp: pd.Timestamp | datetime | str) -> int:
         timestamp = pd.to_datetime(timestamp)
     return int(timestamp.timestamp())
 
-
 def from_posix(posix_time: int | float) -> pd.Timestamp:
     """
     Convert POSIX time to pandas Timestamp.
@@ -26,6 +25,7 @@ def from_posix(posix_time: int | float) -> pd.Timestamp:
     Args:
         posix_time: POSIX timestamp (seconds since Unix epoch)
         
+
     Returns:
         pandas Timestamp
     """

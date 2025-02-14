@@ -1,2525 +1,3021 @@
 {
+  "timestamp": "2025-02-13T23:42:14.040304",
   "gps": {
     "devices": {
       "600": {
+        "device_id": "600",
+        "format_type": "original",
         "file": "data\\raw\\RB_19\\gps\\PinPoint 600 2019-02-11 09-53-12.csv",
-        "initial_records": "24762",
-        "final_records": "24762",
-        "validation_results": {}
+        "total_records": "24762",
+        "time_range": {
+          "start": "2018-11-16T04:00:00",
+          "end": "2019-02-11T07:55:00"
+        },
+        "coordinate_bounds": {
+          "latitude": {
+            "min": "45.5138246",
+            "max": "45.7501603"
+          },
+          "longitude": {
+            "min": "-111.7314542",
+            "max": "-111.005913"
+          },
+          "altitude": {
+            "min": "-0.61",
+            "max": "2572.27"
+          }
+        },
+        "quality_metrics": {
+          "satellites": {
+            "min": "0",
+            "max": "12",
+            "mean": "5.887690816573782",
+            "median": "6.0"
+          },
+          "dop": {
+            "min": "0.0",
+            "max": "50.0",
+            "mean": "2.0446329052580565",
+            "median": "1.6"
+          },
+          "temperature": {
+            "min": "-21.0",
+            "max": "20.5",
+            "mean": "0.03531621032226799"
+          }
+        },
+        "sampling_stats": {
+          "expected_interval": "300",
+          "actual_intervals": {
+            "min": "300.0",
+            "max": "9600.0",
+            "mean": "304.1436129397036",
+            "median": "300.0"
+          }
+        },
+        "processing_stats": {
+          "initial_records": "25120",
+          "zero_coordinates_removed": "358",
+          "final_records": "24762"
+        },
+        "validation": {
+          "records_after_validation": "23802",
+          "validation_success_rate": "96.12%"
+        }
       },
       "602": {
+        "device_id": "602",
+        "format_type": "original",
         "file": "data\\raw\\RB_19\\gps\\PinPoint 602 2019-02-11 12-22-12.csv",
-        "initial_records": "24062",
-        "final_records": "24062",
-        "validation_results": {
-          "device_id": 600,
-          "initial_records": "24762",
-          "duplicates": {
-            "count": "0",
-            "unique_timestamps": "0",
-            "examples": []
+        "total_records": "24062",
+        "time_range": {
+          "start": "2018-11-16T04:35:00",
+          "end": "2019-02-11T07:55:00"
+        },
+        "coordinate_bounds": {
+          "latitude": {
+            "min": "45.3230881",
+            "max": "45.7516696"
           },
-          "quality_issues": {
-            "poor_satellite_count": "0",
-            "poor_dop": "82",
-            "examples": [
-              {
-                "posix_time": 1542493800,
-                "satellites": 5,
-                "dop": 10.4
-              },
-              {
-                "posix_time": 1542711300,
-                "satellites": 5,
-                "dop": 11.2
-              },
-              {
-                "posix_time": 1542712500,
-                "satellites": 5,
-                "dop": 10.8
-              },
-              {
-                "posix_time": 1543249200,
-                "satellites": 5,
-                "dop": 10.6
-              },
-              {
-                "posix_time": 1543411800,
-                "satellites": 4,
-                "dop": 12.6
-              }
-            ]
+          "longitude": {
+            "min": "-111.8662656",
+            "max": "-110.9531033"
           },
-          "coordinate_issues": {
-            "out_of_bounds": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "24480",
-            "actual_records": "24009",
-            "coverage_pct": "98.07598039215686",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
+          "altitude": {
+            "min": "-0.59",
+            "max": "11925.01"
           }
+        },
+        "quality_metrics": {
+          "satellites": {
+            "min": "0",
+            "max": "12",
+            "mean": "6.003781896766686",
+            "median": "6.0"
+          },
+          "dop": {
+            "min": "0.0",
+            "max": "47.0",
+            "mean": "1.9818552073809326",
+            "median": "1.6"
+          },
+          "temperature": {
+            "min": "-21.5",
+            "max": "29.0",
+            "mean": "-0.056292078796442525"
+          }
+        },
+        "sampling_stats": {
+          "expected_interval": "300",
+          "actual_intervals": {
+            "min": "0.0",
+            "max": "11700.0",
+            "mean": "312.9047005527617",
+            "median": "300.0"
+          }
+        },
+        "processing_stats": {
+          "initial_records": "25110",
+          "zero_coordinates_removed": "1048",
+          "final_records": "24062"
+        },
+        "validation": {
+          "records_after_validation": "23079",
+          "validation_success_rate": "95.91%"
         }
       },
       "603": {
+        "device_id": "603",
+        "format_type": "original",
         "file": "data\\raw\\RB_19\\gps\\PinPoint 603 2019-02-11 11-35-51.csv",
-        "initial_records": "24714",
-        "final_records": "24714",
-        "validation_results": {
-          "device_id": 602,
-          "initial_records": "24062",
-          "duplicates": {
-            "count": "8",
-            "unique_timestamps": "4",
-            "examples": [
-              {
-                "posix_time": 1544501100,
-                "latitude": 45.6019846,
-                "longitude": -111.6784187,
-                "dop": 1.0
-              },
-              {
-                "posix_time": 1544501100,
-                "latitude": 45.6019807,
-                "longitude": -111.6784067,
-                "dop": 1.0
-              },
-              {
-                "posix_time": 1545267600,
-                "latitude": 45.6029001,
-                "longitude": -111.6453754,
-                "dop": 6.0
-              },
-              {
-                "posix_time": 1545267600,
-                "latitude": 45.6002429,
-                "longitude": -111.6345532,
-                "dop": 1.2
-              },
-              {
-                "posix_time": 1547751600,
-                "latitude": 45.5948276,
-                "longitude": -111.6283145,
-                "dop": 2.8
-              }
-            ]
+        "total_records": "24714",
+        "time_range": {
+          "start": "2018-11-16T03:40:00",
+          "end": "2019-02-11T07:55:00"
+        },
+        "coordinate_bounds": {
+          "latitude": {
+            "min": "44.997728",
+            "max": "45.7603103"
           },
-          "quality_issues": {
-            "poor_satellite_count": "0",
-            "poor_dop": "96",
-            "examples": [
-              {
-                "posix_time": 1542569400,
-                "satellites": 5.0,
-                "dop": 10.2
-              },
-              {
-                "posix_time": 1542569700,
-                "satellites": 5.0,
-                "dop": 12.6
-              },
-              {
-                "posix_time": 1542570000,
-                "satellites": 5.0,
-                "dop": 16.8
-              },
-              {
-                "posix_time": 1542570300,
-                "satellites": 5.0,
-                "dop": 25.0
-              },
-              {
-                "posix_time": 1542593400,
-                "satellites": 3.0,
-                "dop": 12.8
-              }
-            ]
+          "longitude": {
+            "min": "-111.7705936",
+            "max": "-111.0017788"
           },
-          "coordinate_issues": {
-            "out_of_bounds": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "24480",
-            "actual_records": "23293",
-            "coverage_pct": "95.15114379084967",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
+          "altitude": {
+            "min": "-416.62",
+            "max": "2502.43"
           }
+        },
+        "quality_metrics": {
+          "satellites": {
+            "min": "0",
+            "max": "11",
+            "mean": "6.006271748806345",
+            "median": "6.0"
+          },
+          "dop": {
+            "min": "0.0",
+            "max": "50.0",
+            "mean": "1.957230719430282",
+            "median": "1.6"
+          },
+          "temperature": {
+            "min": "-24.5",
+            "max": "21.5",
+            "mean": "0.25950878044832887"
+          }
+        },
+        "sampling_stats": {
+          "expected_interval": "300",
+          "actual_intervals": {
+            "min": "0.0",
+            "max": "12600.0",
+            "mean": "304.78290778132964",
+            "median": "300.0"
+          }
+        },
+        "processing_stats": {
+          "initial_records": "25124",
+          "zero_coordinates_removed": "410",
+          "final_records": "24714"
+        },
+        "validation": {
+          "records_after_validation": "23762",
+          "validation_success_rate": "96.15%"
         }
       },
       "604": {
+        "device_id": "604",
+        "format_type": "original",
         "file": "data\\raw\\RB_19\\gps\\PinPoint 604 2019-02-11 09-48-59.csv",
-        "initial_records": "24777",
-        "final_records": "24777",
-        "validation_results": {
-          "device_id": 603,
-          "initial_records": "24714",
-          "duplicates": {
-            "count": "2",
-            "unique_timestamps": "1",
-            "examples": [
-              {
-                "posix_time": 1542951600,
-                "latitude": 45.5986569,
-                "longitude": -111.6587893,
-                "dop": 3.4
-              },
-              {
-                "posix_time": 1542951600,
-                "latitude": 45.6009121,
-                "longitude": -111.6626239,
-                "dop": 1.8
-              }
-            ]
+        "total_records": "24777",
+        "time_range": {
+          "start": "2018-11-16T04:15:00",
+          "end": "2019-02-11T07:55:00"
+        },
+        "coordinate_bounds": {
+          "latitude": {
+            "min": "45.1488539",
+            "max": "45.7506937"
           },
-          "quality_issues": {
-            "poor_satellite_count": "0",
-            "poor_dop": "86",
-            "examples": [
-              {
-                "posix_time": 1542365100,
-                "satellites": 4.0,
-                "dop": 11.0
-              },
-              {
-                "posix_time": 1542365700,
-                "satellites": 3.0,
-                "dop": 12.0
-              },
-              {
-                "posix_time": 1542366000,
-                "satellites": 3.0,
-                "dop": 16.4
-              },
-              {
-                "posix_time": 1542441300,
-                "satellites": 5.0,
-                "dop": 13.8
-              },
-              {
-                "posix_time": 1542464100,
-                "satellites": 4.0,
-                "dop": 14.2
-              }
-            ]
+          "longitude": {
+            "min": "-112.1724768",
+            "max": "-110.9758797"
           },
-          "coordinate_issues": {
-            "out_of_bounds": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "24480",
-            "actual_records": "23961",
-            "coverage_pct": "97.87990196078431",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
+          "altitude": {
+            "min": "-72.78",
+            "max": "1813.15"
           }
+        },
+        "quality_metrics": {
+          "satellites": {
+            "min": "3",
+            "max": "11",
+            "mean": "5.945836864834322",
+            "median": "6.0"
+          },
+          "dop": {
+            "min": "0.6",
+            "max": "39.2",
+            "mean": "2.0022036566170236",
+            "median": "1.6"
+          },
+          "temperature": {
+            "min": "-20.5",
+            "max": "23.5",
+            "mean": "-0.7897041611171651"
+          }
+        },
+        "sampling_stats": {
+          "expected_interval": "300",
+          "actual_intervals": {
+            "min": "0.0",
+            "max": "12000.0",
+            "mean": "303.9231514368744",
+            "median": "300.0"
+          }
+        },
+        "processing_stats": {
+          "initial_records": "25118",
+          "zero_coordinates_removed": "341",
+          "final_records": "24777"
+        },
+        "validation": {
+          "records_after_validation": "23831",
+          "validation_success_rate": "96.18%"
         }
       },
       "605": {
+        "device_id": "605",
+        "format_type": "original",
         "file": "data\\raw\\RB_19\\gps\\PinPoint 605 2019-02-11 12-06-29.csv",
-        "initial_records": "25040",
-        "final_records": "25040",
-        "validation_results": {
-          "device_id": 604,
-          "initial_records": "24777",
-          "duplicates": {
-            "count": "4",
-            "unique_timestamps": "2",
-            "examples": [
-              {
-                "posix_time": 1543263600,
-                "latitude": 45.5984487,
-                "longitude": -111.6673755,
-                "dop": 1.8
-              },
-              {
-                "posix_time": 1543263600,
-                "latitude": 45.5985026,
-                "longitude": -111.6673232,
-                "dop": 1.8
-              },
-              {
-                "posix_time": 1549152300,
-                "latitude": 45.6029299,
-                "longitude": -111.6399507,
-                "dop": 2.0
-              },
-              {
-                "posix_time": 1549152300,
-                "latitude": 45.6034951,
-                "longitude": -111.6399876,
-                "dop": 5.2
-              }
-            ]
+        "total_records": "25040",
+        "time_range": {
+          "start": "2018-11-16T03:45:00",
+          "end": "2019-02-11T07:55:00"
+        },
+        "coordinate_bounds": {
+          "latitude": {
+            "min": "45.5672554",
+            "max": "45.7665913"
           },
-          "quality_issues": {
-            "poor_satellite_count": "0",
-            "poor_dop": "76",
-            "examples": [
-              {
-                "posix_time": 1542495000,
-                "satellites": 6.0,
-                "dop": 10.4
-              },
-              {
-                "posix_time": 1542495300,
-                "satellites": 6.0,
-                "dop": 18.2
-              },
-              {
-                "posix_time": 1542495600,
-                "satellites": 6.0,
-                "dop": 22.6
-              },
-              {
-                "posix_time": 1542495900,
-                "satellites": 5.0,
-                "dop": 18.8
-              },
-              {
-                "posix_time": 1542571800,
-                "satellites": 5.0,
-                "dop": 11.4
-              }
-            ]
+          "longitude": {
+            "min": "-111.6898275",
+            "max": "-110.992463"
           },
-          "coordinate_issues": {
-            "out_of_bounds": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "24480",
-            "actual_records": "24028",
-            "coverage_pct": "98.15359477124183",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
+          "altitude": {
+            "min": "-0.51",
+            "max": "1805.6"
           }
+        },
+        "quality_metrics": {
+          "satellites": {
+            "min": "3",
+            "max": "11",
+            "mean": "6.0735223642172524",
+            "median": "6.0"
+          },
+          "dop": {
+            "min": "0.6",
+            "max": "49.8",
+            "mean": "1.9266373801916934",
+            "median": "1.6"
+          },
+          "temperature": {
+            "min": "-20.0",
+            "max": "19.5",
+            "mean": "0.06170127795527156"
+          }
+        },
+        "sampling_stats": {
+          "expected_interval": "300",
+          "actual_intervals": {
+            "min": "0.0",
+            "max": "15000.0",
+            "mean": "300.8027477135668",
+            "median": "300.0"
+          }
+        },
+        "processing_stats": {
+          "initial_records": "25123",
+          "zero_coordinates_removed": "83",
+          "final_records": "25040"
+        },
+        "validation": {
+          "records_after_validation": "24133",
+          "validation_success_rate": "96.38%"
         }
       },
       "606": {
+        "device_id": "606",
+        "format_type": "original",
         "file": "data\\raw\\RB_19\\gps\\PinPoint 606 2019-02-11 08-19-58.csv",
-        "initial_records": "23438",
-        "final_records": "23438",
-        "validation_results": {
-          "device_id": 605,
-          "initial_records": "25040",
-          "duplicates": {
-            "count": "4",
-            "unique_timestamps": "2",
-            "examples": [
-              {
-                "posix_time": 1549712700,
-                "latitude": 45.7485233,
-                "longitude": -111.006529,
-                "dop": 3.2
-              },
-              {
-                "posix_time": 1549712700,
-                "latitude": 45.7486044,
-                "longitude": -111.0065872,
-                "dop": 3.0
-              },
-              {
-                "posix_time": 1549796400,
-                "latitude": 45.7485714,
-                "longitude": -111.0066148,
-                "dop": 1.2
-              },
-              {
-                "posix_time": 1549796400,
-                "latitude": 45.7486694,
-                "longitude": -111.0065262,
-                "dop": 1.2
-              }
-            ]
+        "total_records": "23438",
+        "time_range": {
+          "start": "2018-11-16T04:15:00",
+          "end": "2019-02-11T08:00:00"
+        },
+        "coordinate_bounds": {
+          "latitude": {
+            "min": "45.4630279",
+            "max": "45.7496957"
           },
-          "quality_issues": {
-            "poor_satellite_count": "0",
-            "poor_dop": "47",
-            "examples": [
-              {
-                "posix_time": 1542374700,
-                "satellites": 3.0,
-                "dop": 49.8
-              },
-              {
-                "posix_time": 1542569700,
-                "satellites": 5.0,
-                "dop": 12.4
-              },
-              {
-                "posix_time": 1542581100,
-                "satellites": 5.0,
-                "dop": 17.4
-              },
-              {
-                "posix_time": 1542581400,
-                "satellites": 5.0,
-                "dop": 25.2
-              },
-              {
-                "posix_time": 1542588900,
-                "satellites": 5.0,
-                "dop": 10.4
-              }
-            ]
+          "longitude": {
+            "min": "-111.7761751",
+            "max": "-110.9979242"
           },
-          "coordinate_issues": {
-            "out_of_bounds": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "24480",
-            "actual_records": "24323",
-            "coverage_pct": "99.35866013071896",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
+          "altitude": {
+            "min": "-0.7",
+            "max": "1787.33"
           }
+        },
+        "quality_metrics": {
+          "satellites": {
+            "min": "0",
+            "max": "12",
+            "mean": "5.855875074665073",
+            "median": "6.0"
+          },
+          "dop": {
+            "min": "0.0",
+            "max": "49.6",
+            "mean": "2.075740250874648",
+            "median": "1.6"
+          },
+          "temperature": {
+            "min": "-21.0",
+            "max": "20.5",
+            "mean": "0.7283684614728219"
+          }
+        },
+        "sampling_stats": {
+          "expected_interval": "300",
+          "actual_intervals": {
+            "min": "300.0",
+            "max": "10500.0",
+            "mean": "321.299654392627",
+            "median": "300.0"
+          }
+        },
+        "processing_stats": {
+          "initial_records": "25102",
+          "zero_coordinates_removed": "1664",
+          "final_records": "23438"
+        },
+        "validation": {
+          "records_after_validation": "22419",
+          "validation_success_rate": "95.65%"
         }
       },
       "607": {
+        "device_id": "607",
+        "format_type": "original",
         "file": "data\\raw\\RB_19\\gps\\PinPoint 607 2019-02-11 08-32-50.csv",
-        "initial_records": "22997",
-        "final_records": "22997",
-        "validation_results": {
-          "device_id": 606,
-          "initial_records": "23438",
-          "duplicates": {
-            "count": "0",
-            "unique_timestamps": "0",
-            "examples": []
+        "total_records": "22997",
+        "time_range": {
+          "start": "2018-11-16T04:05:00",
+          "end": "2019-02-11T07:55:00"
+        },
+        "coordinate_bounds": {
+          "latitude": {
+            "min": "45.5119784",
+            "max": "45.7583618"
           },
-          "quality_issues": {
-            "poor_satellite_count": "0",
-            "poor_dop": "145",
-            "examples": [
-              {
-                "posix_time": 1542474000,
-                "satellites": 4,
-                "dop": 10.4
-              },
-              {
-                "posix_time": 1542505200,
-                "satellites": 5,
-                "dop": 12.8
-              },
-              {
-                "posix_time": 1542581400,
-                "satellites": 6,
-                "dop": 16.2
-              },
-              {
-                "posix_time": 1542581700,
-                "satellites": 6,
-                "dop": 23.6
-              },
-              {
-                "posix_time": 1542753600,
-                "satellites": 6,
-                "dop": 13.0
-              }
-            ]
+          "longitude": {
+            "min": "-111.8125398",
+            "max": "-110.9998864"
           },
-          "coordinate_issues": {
-            "out_of_bounds": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "24480",
-            "actual_records": "22621",
-            "coverage_pct": "92.406045751634",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
+          "altitude": {
+            "min": "-0.73",
+            "max": "2421.05"
           }
+        },
+        "quality_metrics": {
+          "satellites": {
+            "min": "0",
+            "max": "12",
+            "mean": "5.847936687394008",
+            "median": "6.0"
+          },
+          "dop": {
+            "min": "0.0",
+            "max": "49.8",
+            "mean": "2.0926381701961123",
+            "median": "1.6"
+          },
+          "temperature": {
+            "min": "-21.5",
+            "max": "22.0",
+            "mean": "-0.4870635300256555"
+          }
+        },
+        "sampling_stats": {
+          "expected_interval": "300",
+          "actual_intervals": {
+            "min": "300.0",
+            "max": "15600.0",
+            "mean": "327.4743433640633",
+            "median": "300.0"
+          }
+        },
+        "processing_stats": {
+          "initial_records": "25107",
+          "zero_coordinates_removed": "2110",
+          "final_records": "22997"
+        },
+        "validation": {
+          "records_after_validation": "22002",
+          "validation_success_rate": "95.67%"
         }
       },
       "608": {
+        "device_id": "608",
+        "format_type": "original",
         "file": "data\\raw\\RB_19\\gps\\PinPoint 608 2019-02-11 09-02-49.csv",
-        "initial_records": "24989",
-        "final_records": "24989",
-        "validation_results": {
-          "device_id": 607,
-          "initial_records": "22997",
-          "duplicates": {
-            "count": "0",
-            "unique_timestamps": "0",
-            "examples": []
+        "total_records": "24989",
+        "time_range": {
+          "start": "2018-11-16T03:30:00",
+          "end": "2019-02-11T07:55:00"
+        },
+        "coordinate_bounds": {
+          "latitude": {
+            "min": "45.5095356",
+            "max": "45.8039064"
           },
-          "quality_issues": {
-            "poor_satellite_count": "0",
-            "poor_dop": "129",
-            "examples": [
-              {
-                "posix_time": 1542601500,
-                "satellites": 4,
-                "dop": 12.8
-              },
-              {
-                "posix_time": 1542753000,
-                "satellites": 5,
-                "dop": 10.4
-              },
-              {
-                "posix_time": 1542753300,
-                "satellites": 5,
-                "dop": 15.0
-              },
-              {
-                "posix_time": 1542753900,
-                "satellites": 5,
-                "dop": 25.8
-              },
-              {
-                "posix_time": 1543067400,
-                "satellites": 4,
-                "dop": 30.8
-              }
-            ]
+          "longitude": {
+            "min": "-111.7860458",
+            "max": "-110.9398111"
           },
-          "coordinate_issues": {
-            "out_of_bounds": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "24480",
-            "actual_records": "22200",
-            "coverage_pct": "90.68627450980392",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
+          "altitude": {
+            "min": "-0.65",
+            "max": "1886.69"
           }
+        },
+        "quality_metrics": {
+          "satellites": {
+            "min": "3",
+            "max": "11",
+            "mean": "6.0471007243187005",
+            "median": "6.0"
+          },
+          "dop": {
+            "min": "0.6",
+            "max": "49.6",
+            "mean": "1.9287766617311617",
+            "median": "1.6"
+          },
+          "temperature": {
+            "min": "-20.0",
+            "max": "25.0",
+            "mean": "0.863459922365841"
+          }
+        },
+        "sampling_stats": {
+          "expected_interval": "300",
+          "actual_intervals": {
+            "min": "0.0",
+            "max": "14100.0",
+            "mean": "301.45269729470147",
+            "median": "300.0"
+          }
+        },
+        "processing_stats": {
+          "initial_records": "25124",
+          "zero_coordinates_removed": "135",
+          "final_records": "24989"
+        },
+        "validation": {
+          "records_after_validation": "24066",
+          "validation_success_rate": "96.31%"
         }
       },
       "609": {
+        "device_id": "609",
+        "format_type": "original",
         "file": "data\\raw\\RB_19\\gps\\PinPoint 609 2019-02-11 12-16-24.csv",
-        "initial_records": "23245",
-        "final_records": "23245",
-        "validation_results": {
-          "device_id": 608,
-          "initial_records": "24989",
-          "duplicates": {
-            "count": "6",
-            "unique_timestamps": "3",
-            "examples": [
-              {
-                "posix_time": 1545398100,
-                "latitude": 45.5947231,
-                "longitude": -111.6558157,
-                "dop": 1.6
-              },
-              {
-                "posix_time": 1545398100,
-                "latitude": 45.5947069,
-                "longitude": -111.655799,
-                "dop": 1.6
-              },
-              {
-                "posix_time": 1549688100,
-                "latitude": 45.747866,
-                "longitude": -111.0068004,
-                "dop": 5.2
-              },
-              {
-                "posix_time": 1549688100,
-                "latitude": 45.7484582,
-                "longitude": -111.006671,
-                "dop": 2.2
-              },
-              {
-                "posix_time": 1549689600,
-                "latitude": 45.7485932,
-                "longitude": -111.0066158,
-                "dop": 2.8
-              }
-            ]
+        "total_records": "23245",
+        "time_range": {
+          "start": "2018-11-16T03:55:00",
+          "end": "2019-02-11T07:55:00"
+        },
+        "coordinate_bounds": {
+          "latitude": {
+            "min": "45.4815748",
+            "max": "45.7830854"
           },
-          "quality_issues": {
-            "poor_satellite_count": "0",
-            "poor_dop": "60",
-            "examples": [
-              {
-                "posix_time": 1542433800,
-                "satellites": 5.0,
-                "dop": 11.8
-              },
-              {
-                "posix_time": 1542710100,
-                "satellites": 4.0,
-                "dop": 16.0
-              },
-              {
-                "posix_time": 1542747900,
-                "satellites": 5.0,
-                "dop": 13.0
-              },
-              {
-                "posix_time": 1542785700,
-                "satellites": 4.0,
-                "dop": 27.0
-              },
-              {
-                "posix_time": 1543187700,
-                "satellites": 5.0,
-                "dop": 11.6
-              }
-            ]
+          "longitude": {
+            "min": "-111.7988048",
+            "max": "-110.9316086"
           },
-          "coordinate_issues": {
-            "out_of_bounds": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "24480",
-            "actual_records": "24262",
-            "coverage_pct": "99.10947712418302",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
+          "altitude": {
+            "min": "-1.4",
+            "max": "2771.22"
           }
+        },
+        "quality_metrics": {
+          "satellites": {
+            "min": "0",
+            "max": "12",
+            "mean": "5.80258120025812",
+            "median": "5.0"
+          },
+          "dop": {
+            "min": "0.0",
+            "max": "47.2",
+            "mean": "2.11827919982792",
+            "median": "1.6"
+          },
+          "temperature": {
+            "min": "-21.5",
+            "max": "23.5",
+            "mean": "-0.19574101957410195"
+          }
+        },
+        "sampling_stats": {
+          "expected_interval": "300",
+          "actual_intervals": {
+            "min": "0.0",
+            "max": "13500.0",
+            "mean": "324.00619514713475",
+            "median": "300.0"
+          }
+        },
+        "processing_stats": {
+          "initial_records": "25117",
+          "zero_coordinates_removed": "1872",
+          "final_records": "23245"
+        },
+        "validation": {
+          "records_after_validation": "22204",
+          "validation_success_rate": "95.52%"
         }
       },
       "610": {
+        "device_id": "610",
+        "format_type": "original",
         "file": "data\\raw\\RB_19\\gps\\PinPoint 610 2019-02-11 12-03-33.csv",
-        "initial_records": "24672",
-        "final_records": "24672",
-        "validation_results": {
-          "device_id": 609,
-          "initial_records": "23245",
-          "duplicates": {
-            "count": "20",
-            "unique_timestamps": "10",
-            "examples": [
-              {
-                "posix_time": 1544306700,
-                "latitude": 45.599364,
-                "longitude": -111.6927562,
-                "dop": 5.0
-              },
-              {
-                "posix_time": 1544306700,
-                "latitude": 45.6492196,
-                "longitude": -111.7721514,
-                "dop": 30.0
-              },
-              {
-                "posix_time": 1544388000,
-                "latitude": 45.6042513,
-                "longitude": -111.6703196,
-                "dop": 1.4
-              },
-              {
-                "posix_time": 1544388000,
-                "latitude": 45.604306,
-                "longitude": -111.6524958,
-                "dop": 5.6
-              },
-              {
-                "posix_time": 1544391900,
-                "latitude": 45.6168575,
-                "longitude": -111.667557,
-                "dop": 5.2
-              }
-            ]
+        "total_records": "24672",
+        "time_range": {
+          "start": "2018-11-16T04:30:00",
+          "end": "2019-02-11T07:55:00"
+        },
+        "coordinate_bounds": {
+          "latitude": {
+            "min": "45.5104997",
+            "max": "45.8216"
           },
-          "quality_issues": {
-            "poor_satellite_count": "0",
-            "poor_dop": "184",
-            "examples": [
-              {
-                "posix_time": 1542421800,
-                "satellites": 4.0,
-                "dop": 12.4
-              },
-              {
-                "posix_time": 1542537900,
-                "satellites": 4.0,
-                "dop": 19.2
-              },
-              {
-                "posix_time": 1542549600,
-                "satellites": 3.0,
-                "dop": 10.8
-              },
-              {
-                "posix_time": 1542569400,
-                "satellites": 3.0,
-                "dop": 17.2
-              },
-              {
-                "posix_time": 1542576600,
-                "satellites": 3.0,
-                "dop": 11.2
-              }
-            ]
+          "longitude": {
+            "min": "-111.7877546",
+            "max": "-111.0047399"
           },
-          "coordinate_issues": {
-            "out_of_bounds": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "24480",
-            "actual_records": "22399",
-            "coverage_pct": "91.49918300653594",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
+          "altitude": {
+            "min": "-0.67",
+            "max": "1821.07"
           }
+        },
+        "quality_metrics": {
+          "satellites": {
+            "min": "3",
+            "max": "12",
+            "mean": "6.078996433203631",
+            "median": "6.0"
+          },
+          "dop": {
+            "min": "0.6",
+            "max": "47.4",
+            "mean": "1.9423962386511027",
+            "median": "1.6"
+          },
+          "temperature": {
+            "min": "-20.0",
+            "max": "24.0",
+            "mean": "1.540937094682231"
+          }
+        },
+        "sampling_stats": {
+          "expected_interval": "300",
+          "actual_intervals": {
+            "min": "0.0",
+            "max": "5400.0",
+            "mean": "305.18017105103155",
+            "median": "300.0"
+          }
+        },
+        "processing_stats": {
+          "initial_records": "25113",
+          "zero_coordinates_removed": "441",
+          "final_records": "24672"
+        },
+        "validation": {
+          "records_after_validation": "23710",
+          "validation_success_rate": "96.10%"
         }
       },
       "611": {
+        "device_id": "611",
+        "format_type": "original",
         "file": "data\\raw\\RB_19\\gps\\PinPoint 611 2019-02-11 08-46-30.csv",
-        "initial_records": "24351",
-        "final_records": "24351",
-        "validation_results": {
-          "device_id": 610,
-          "initial_records": "24672",
-          "duplicates": {
-            "count": "4",
-            "unique_timestamps": "2",
-            "examples": [
-              {
-                "posix_time": 1545545100,
-                "latitude": 45.5932404,
-                "longitude": -111.6511628,
-                "dop": 1.0
-              },
-              {
-                "posix_time": 1545545100,
-                "latitude": 45.593428,
-                "longitude": -111.6512503,
-                "dop": 1.0
-              },
-              {
-                "posix_time": 1549275900,
-                "latitude": 45.582572,
-                "longitude": -111.6537524,
-                "dop": 4.8
-              },
-              {
-                "posix_time": 1549275900,
-                "latitude": 45.5891818,
-                "longitude": -111.6478883,
-                "dop": 2.0
-              }
-            ]
+        "total_records": "24351",
+        "time_range": {
+          "start": "2018-11-16T04:45:00",
+          "end": "2019-02-11T07:55:00"
+        },
+        "coordinate_bounds": {
+          "latitude": {
+            "min": "45.5027667",
+            "max": "45.7522878"
           },
-          "quality_issues": {
-            "poor_satellite_count": "0",
-            "poor_dop": "72",
-            "examples": [
-              {
-                "posix_time": 1542450600,
-                "satellites": 4.0,
-                "dop": 10.2
-              },
-              {
-                "posix_time": 1542711300,
-                "satellites": 5.0,
-                "dop": 11.2
-              },
-              {
-                "posix_time": 1542711600,
-                "satellites": 5.0,
-                "dop": 11.8
-              },
-              {
-                "posix_time": 1542981000,
-                "satellites": 5.0,
-                "dop": 10.4
-              },
-              {
-                "posix_time": 1543024500,
-                "satellites": 3.0,
-                "dop": 10.8
-              }
-            ]
+          "longitude": {
+            "min": "-111.7603176",
+            "max": "-111.0060596"
           },
-          "coordinate_issues": {
-            "out_of_bounds": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "24480",
-            "actual_records": "23926",
-            "coverage_pct": "97.73692810457516",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
+          "altitude": {
+            "min": "-0.6",
+            "max": "2321.21"
           }
+        },
+        "quality_metrics": {
+          "satellites": {
+            "min": "0",
+            "max": "12",
+            "mean": "6.021970350293622",
+            "median": "6.0"
+          },
+          "dop": {
+            "min": "0.0",
+            "max": "49.8",
+            "mean": "1.953759599195105",
+            "median": "1.6"
+          },
+          "temperature": {
+            "min": "-19.5",
+            "max": "23.5",
+            "mean": "0.3067841156420681"
+          }
+        },
+        "sampling_stats": {
+          "expected_interval": "300",
+          "actual_intervals": {
+            "min": "0.0",
+            "max": "7800.0",
+            "mean": "309.1663244353183",
+            "median": "300.0"
+          }
+        },
+        "processing_stats": {
+          "initial_records": "25102",
+          "zero_coordinates_removed": "751",
+          "final_records": "24351"
+        },
+        "validation": {
+          "records_after_validation": "23361",
+          "validation_success_rate": "95.93%"
         }
       },
       "612": {
+        "device_id": "612",
+        "format_type": "original",
         "file": "data\\raw\\RB_19\\gps\\PinPoint 612 2019-02-11 11-18-09.csv",
-        "initial_records": "23294",
-        "final_records": "23294",
-        "validation_results": {
-          "device_id": 611,
-          "initial_records": "24351",
-          "duplicates": {
-            "count": "2",
-            "unique_timestamps": "1",
-            "examples": [
-              {
-                "posix_time": 1544787600,
-                "latitude": 45.5901157,
-                "longitude": -111.6415755,
-                "dop": 2.0
-              },
-              {
-                "posix_time": 1544787600,
-                "latitude": 45.5901055,
-                "longitude": -111.6415636,
-                "dop": 2.0
-              }
-            ]
+        "total_records": "23294",
+        "time_range": {
+          "start": "2018-11-16T03:35:00",
+          "end": "2019-02-11T07:55:00"
+        },
+        "coordinate_bounds": {
+          "latitude": {
+            "min": "45.4308193",
+            "max": "45.7524984"
           },
-          "quality_issues": {
-            "poor_satellite_count": "0",
-            "poor_dop": "95",
-            "examples": [
-              {
-                "posix_time": 1542550500,
-                "satellites": 4.0,
-                "dop": 30.6
-              },
-              {
-                "posix_time": 1542839700,
-                "satellites": 5.0,
-                "dop": 12.0
-              },
-              {
-                "posix_time": 1542840000,
-                "satellites": 6.0,
-                "dop": 21.0
-              },
-              {
-                "posix_time": 1542840600,
-                "satellites": 5.0,
-                "dop": 15.4
-              },
-              {
-                "posix_time": 1542925800,
-                "satellites": 5.0,
-                "dop": 10.8
-              }
-            ]
+          "longitude": {
+            "min": "-111.7740414",
+            "max": "-111.0005226"
           },
-          "coordinate_issues": {
-            "out_of_bounds": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "24480",
-            "actual_records": "23584",
-            "coverage_pct": "96.33986928104575",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
+          "altitude": {
+            "min": "-0.61",
+            "max": "2820.72"
           }
+        },
+        "quality_metrics": {
+          "satellites": {
+            "min": "0",
+            "max": "12",
+            "mean": "5.965312956126041",
+            "median": "6.0"
+          },
+          "dop": {
+            "min": "0.0",
+            "max": "49.8",
+            "mean": "1.9829226410234393",
+            "median": "1.6"
+          },
+          "temperature": {
+            "min": "-19.0",
+            "max": "22.0",
+            "mean": "0.7370996823216279"
+          }
+        },
+        "sampling_stats": {
+          "expected_interval": "300",
+          "actual_intervals": {
+            "min": "0.0",
+            "max": "136200.0",
+            "mean": "323.376121581591",
+            "median": "300.0"
+          }
+        },
+        "processing_stats": {
+          "initial_records": "24205",
+          "zero_coordinates_removed": "911",
+          "final_records": "23294"
+        },
+        "validation": {
+          "records_after_validation": "22434",
+          "validation_success_rate": "96.31%"
         }
       },
       "613": {
+        "device_id": "613",
+        "format_type": "original",
         "file": "data\\raw\\RB_19\\gps\\PinPoint 613 2019-02-11 08-37-36.csv",
-        "initial_records": "24786",
-        "final_records": "24786",
-        "validation_results": {
-          "device_id": 612,
-          "initial_records": "23294",
-          "duplicates": {
-            "count": "10",
-            "unique_timestamps": "5",
-            "examples": [
-              {
-                "posix_time": 1549418100,
-                "latitude": 45.5905229,
-                "longitude": -111.6407559,
-                "dop": 1.2
-              },
-              {
-                "posix_time": 1549418100,
-                "latitude": 45.590465,
-                "longitude": -111.6407752,
-                "dop": 1.0
-              },
-              {
-                "posix_time": 1549473000,
-                "latitude": 45.5897924,
-                "longitude": -111.6462109,
-                "dop": 2.2
-              },
-              {
-                "posix_time": 1549473000,
-                "latitude": 45.5897206,
-                "longitude": -111.6465086,
-                "dop": 2.2
-              },
-              {
-                "posix_time": 1549579500,
-                "latitude": 45.5901772,
-                "longitude": -111.6413612,
-                "dop": 1.2
-              }
-            ]
+        "total_records": "24786",
+        "time_range": {
+          "start": "2018-11-16T04:40:00",
+          "end": "2019-02-11T07:55:00"
+        },
+        "coordinate_bounds": {
+          "latitude": {
+            "min": "44.8982306",
+            "max": "45.7706793"
           },
-          "quality_issues": {
-            "poor_satellite_count": "0",
-            "poor_dop": "92",
-            "examples": [
-              {
-                "posix_time": 1542452700,
-                "satellites": 5.0,
-                "dop": 10.2
-              },
-              {
-                "posix_time": 1542600300,
-                "satellites": 3.0,
-                "dop": 44.2
-              },
-              {
-                "posix_time": 1542617400,
-                "satellites": 5.0,
-                "dop": 15.6
-              },
-              {
-                "posix_time": 1542776100,
-                "satellites": 4.0,
-                "dop": 13.0
-              },
-              {
-                "posix_time": 1542833100,
-                "satellites": 3.0,
-                "dop": 20.6
-              }
-            ]
+          "longitude": {
+            "min": "-111.6896639",
+            "max": "-110.9079368"
           },
-          "coordinate_issues": {
-            "out_of_bounds": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "24480",
-            "actual_records": "22632",
-            "coverage_pct": "92.45098039215686",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
+          "altitude": {
+            "min": "-0.58",
+            "max": "2858.77"
           }
+        },
+        "quality_metrics": {
+          "satellites": {
+            "min": "0",
+            "max": "11",
+            "mean": "6.0480109739369",
+            "median": "6.0"
+          },
+          "dop": {
+            "min": "0.0",
+            "max": "46.6",
+            "mean": "1.9411361252319859",
+            "median": "1.6"
+          },
+          "temperature": {
+            "min": "-20.0",
+            "max": "27.0",
+            "mean": "0.5157952069716776"
+          }
+        },
+        "sampling_stats": {
+          "expected_interval": "300",
+          "actual_intervals": {
+            "min": "0.0",
+            "max": "6300.0",
+            "mean": "303.75226951785356",
+            "median": "300.0"
+          }
+        },
+        "processing_stats": {
+          "initial_records": "25103",
+          "zero_coordinates_removed": "317",
+          "final_records": "24786"
+        },
+        "validation": {
+          "records_after_validation": "23836",
+          "validation_success_rate": "96.17%"
         }
       },
       "614": {
+        "device_id": "614",
+        "format_type": "original",
         "file": "data\\raw\\RB_19\\gps\\PinPoint 614 2019-02-11 11-26-32.csv",
-        "initial_records": "24271",
-        "final_records": "24271",
-        "validation_results": {
-          "device_id": 613,
-          "initial_records": "24786",
-          "duplicates": {
-            "count": "8",
-            "unique_timestamps": "4",
-            "examples": [
-              {
-                "posix_time": 1544606700,
-                "latitude": 45.6034366,
-                "longitude": -111.6524329,
-                "dop": 3.0
-              },
-              {
-                "posix_time": 1544606700,
-                "latitude": 45.6033367,
-                "longitude": -111.6524447,
-                "dop": 3.0
-              },
-              {
-                "posix_time": 1547503800,
-                "latitude": 45.6130912,
-                "longitude": -111.6340889,
-                "dop": 5.0
-              },
-              {
-                "posix_time": 1547503800,
-                "latitude": 45.6136501,
-                "longitude": -111.6342706,
-                "dop": 5.2
-              },
-              {
-                "posix_time": 1548214800,
-                "latitude": 45.6128959,
-                "longitude": -111.658018,
-                "dop": 2.8
-              }
-            ]
+        "total_records": "24271",
+        "time_range": {
+          "start": "2018-11-16T03:55:00",
+          "end": "2019-02-11T07:55:00"
+        },
+        "coordinate_bounds": {
+          "latitude": {
+            "min": "45.4626222",
+            "max": "45.7624917"
           },
-          "quality_issues": {
-            "poor_satellite_count": "0",
-            "poor_dop": "66",
-            "examples": [
-              {
-                "posix_time": 1542375600,
-                "satellites": 3.0,
-                "dop": 24.0
-              },
-              {
-                "posix_time": 1542464100,
-                "satellites": 5.0,
-                "dop": 10.6
-              },
-              {
-                "posix_time": 1542539100,
-                "satellites": 5.0,
-                "dop": 12.0
-              },
-              {
-                "posix_time": 1542625200,
-                "satellites": 5.0,
-                "dop": 11.8
-              },
-              {
-                "posix_time": 1542837000,
-                "satellites": 5.0,
-                "dop": 11.4
-              }
-            ]
+          "longitude": {
+            "min": "-111.9282487",
+            "max": "-110.973534"
           },
-          "coordinate_issues": {
-            "out_of_bounds": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "24480",
-            "actual_records": "24051",
-            "coverage_pct": "98.24754901960785",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
+          "altitude": {
+            "min": "-0.67",
+            "max": "10987.04"
           }
+        },
+        "quality_metrics": {
+          "satellites": {
+            "min": "3",
+            "max": "11",
+            "mean": "5.938156647851345",
+            "median": "6.0"
+          },
+          "dop": {
+            "min": "0.6",
+            "max": "47.0",
+            "mean": "1.983123892711466",
+            "median": "1.6"
+          },
+          "temperature": {
+            "min": "-20.0",
+            "max": "24.0",
+            "mean": "1.4408759424827984"
+          }
+        },
+        "sampling_stats": {
+          "expected_interval": "300",
+          "actual_intervals": {
+            "min": "0.0",
+            "max": "13200.0",
+            "mean": "310.3090234857849",
+            "median": "300.0"
+          }
+        },
+        "processing_stats": {
+          "initial_records": "25120",
+          "zero_coordinates_removed": "849",
+          "final_records": "24271"
+        },
+        "validation": {
+          "records_after_validation": "23317",
+          "validation_success_rate": "96.07%"
         }
       },
       "615": {
+        "device_id": "615",
+        "format_type": "original",
         "file": "data\\raw\\RB_19\\gps\\PinPoint 615 2019-02-11 12-12-18.csv",
-        "initial_records": "24654",
-        "final_records": "24654",
-        "validation_results": {
-          "device_id": 614,
-          "initial_records": "24271",
-          "duplicates": {
-            "count": "2",
-            "unique_timestamps": "1",
-            "examples": [
-              {
-                "posix_time": 1549275000,
-                "latitude": 45.5932719,
-                "longitude": -111.6473984,
-                "dop": 3.8
-              },
-              {
-                "posix_time": 1549275000,
-                "latitude": 45.5936439,
-                "longitude": -111.6468571,
-                "dop": 1.4
-              }
-            ]
+        "total_records": "24654",
+        "time_range": {
+          "start": "2018-11-16T04:20:00",
+          "end": "2135-09-18T07:55:00"
+        },
+        "coordinate_bounds": {
+          "latitude": {
+            "min": "-12.3074814",
+            "max": "45.753608"
           },
-          "quality_issues": {
-            "poor_satellite_count": "0",
-            "poor_dop": "86",
-            "examples": [
-              {
-                "posix_time": 1542441600,
-                "satellites": 5.0,
-                "dop": 12.2
-              },
-              {
-                "posix_time": 1542581400,
-                "satellites": 5.0,
-                "dop": 17.8
-              },
-              {
-                "posix_time": 1542642900,
-                "satellites": 3.0,
-                "dop": 20.8
-              },
-              {
-                "posix_time": 1542829200,
-                "satellites": 3.0,
-                "dop": 10.4
-              },
-              {
-                "posix_time": 1543183200,
-                "satellites": 5.0,
-                "dop": 11.8
-              }
-            ]
+          "longitude": {
+            "min": "-111.7151487",
+            "max": "-82.7674584"
           },
-          "coordinate_issues": {
-            "out_of_bounds": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "24480",
-            "actual_records": "23514",
-            "coverage_pct": "96.05392156862746",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
+          "altitude": {
+            "min": "-0.64",
+            "max": "1570067.71"
           }
+        },
+        "quality_metrics": {
+          "satellites": {
+            "min": "0",
+            "max": "12",
+            "mean": "5.960696033098078",
+            "median": "6.0"
+          },
+          "dop": {
+            "min": "0.0",
+            "max": "49.8",
+            "mean": "1.9878234769205807",
+            "median": "1.6"
+          },
+          "temperature": {
+            "min": "-20.5",
+            "max": "28.0",
+            "mean": "0.8518901598117953"
+          }
+        },
+        "sampling_stats": {
+          "expected_interval": "300",
+          "actual_intervals": {
+            "min": "-3686305200.0",
+            "max": "3686340300.0",
+            "mean": "305.42733135926665",
+            "median": "300.0"
+          }
+        },
+        "processing_stats": {
+          "initial_records": "24997",
+          "zero_coordinates_removed": "343",
+          "final_records": "24654"
+        },
+        "validation": {
+          "records_after_validation": "23710",
+          "validation_success_rate": "96.17%"
         }
       },
       "616": {
+        "device_id": "616",
+        "format_type": "original",
         "file": "data\\raw\\RB_19\\gps\\PinPoint 616 2019-02-11 08-42-27.csv",
-        "initial_records": "23904",
-        "final_records": "23904",
-        "validation_results": {
-          "device_id": 615,
-          "initial_records": "24654",
-          "duplicates": {
-            "count": "4",
-            "unique_timestamps": "1",
-            "examples": [
-              {
-                "posix_time": 5229410100,
-                "latitude": -12.3074814,
-                "longitude": -86.6998757,
-                "dop": 38.4
-              },
-              {
-                "posix_time": 5229410100,
-                "latitude": -12.2610815,
-                "longitude": -83.7854121,
-                "dop": 38.4
-              },
-              {
-                "posix_time": 5229410100,
-                "latitude": -12.2857613,
-                "longitude": -84.2388819,
-                "dop": 38.4
-              },
-              {
-                "posix_time": 5229410100,
-                "latitude": -12.2537007,
-                "longitude": -82.7674584,
-                "dop": 38.4
-              }
-            ]
+        "total_records": "23904",
+        "time_range": {
+          "start": "2018-11-16T04:20:00",
+          "end": "2135-09-18T08:00:00"
+        },
+        "coordinate_bounds": {
+          "latitude": {
+            "min": "-23.6459971",
+            "max": "45.7619222"
           },
-          "quality_issues": {
-            "poor_satellite_count": "0",
-            "poor_dop": "64",
-            "examples": [
-              {
-                "posix_time": 1542434100,
-                "satellites": 4.0,
-                "dop": 44.4
-              },
-              {
-                "posix_time": 1542581100,
-                "satellites": 5.0,
-                "dop": 17.4
-              },
-              {
-                "posix_time": 1542581400,
-                "satellites": 5.0,
-                "dop": 25.2
-              },
-              {
-                "posix_time": 1542722700,
-                "satellites": 3.0,
-                "dop": 12.4
-              },
-              {
-                "posix_time": 1542839700,
-                "satellites": 5.0,
-                "dop": 11.8
-              }
-            ]
+          "longitude": {
+            "min": "-111.8326967",
+            "max": "-72.1189885"
           },
-          "coordinate_issues": {
-            "out_of_bounds": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "24480",
-            "actual_records": "23916",
-            "coverage_pct": "97.69607843137254",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
+          "altitude": {
+            "min": "-2226326.66",
+            "max": "375559.51"
           }
+        },
+        "quality_metrics": {
+          "satellites": {
+            "min": "0",
+            "max": "12",
+            "mean": "5.889432730923695",
+            "median": "6.0"
+          },
+          "dop": {
+            "min": "0.0",
+            "max": "49.0",
+            "mean": "2.0673109103078984",
+            "median": "1.6"
+          },
+          "temperature": {
+            "min": "-21.5",
+            "max": "24.0",
+            "mean": "-0.11368390227576974"
+          }
+        },
+        "sampling_stats": {
+          "expected_interval": "300",
+          "actual_intervals": {
+            "min": "-3684951600.0",
+            "max": "3684975000.0",
+            "mean": "315.01066811697274",
+            "median": "300.0"
+          }
+        },
+        "processing_stats": {
+          "initial_records": "25028",
+          "zero_coordinates_removed": "1124",
+          "final_records": "23904"
+        },
+        "validation": {
+          "records_after_validation": "22906",
+          "validation_success_rate": "95.82%"
         }
       },
       "617": {
+        "device_id": "617",
+        "format_type": "original",
         "file": "data\\raw\\RB_19\\gps\\PinPoint 617 2019-02-11 11-39-46.csv",
-        "initial_records": "24822",
-        "final_records": "24822",
-        "validation_results": {
-          "device_id": 616,
-          "initial_records": "23904",
-          "duplicates": {
-            "count": "9",
-            "unique_timestamps": "4",
-            "examples": [
-              {
-                "posix_time": 1542592500,
-                "latitude": 45.5718508,
-                "longitude": -111.6462617,
-                "dop": 3.4
-              },
-              {
-                "posix_time": 1542592500,
-                "latitude": 45.5778998,
-                "longitude": -111.6400219,
-                "dop": 3.0
-              },
-              {
-                "posix_time": 5229409800,
-                "latitude": -14.2360658,
-                "longitude": -72.1189885,
-                "dop": 38.4
-              },
-              {
-                "posix_time": 5229409800,
-                "latitude": -14.9066436,
-                "longitude": -85.372855,
-                "dop": 38.4
-              },
-              {
-                "posix_time": 5229409800,
-                "latitude": -14.8834192,
-                "longitude": -83.569677,
-                "dop": 38.4
-              }
-            ]
+        "total_records": "24822",
+        "time_range": {
+          "start": "2018-11-16T04:30:00",
+          "end": "2019-02-11T07:55:00"
+        },
+        "coordinate_bounds": {
+          "latitude": {
+            "min": "45.4564585",
+            "max": "45.781953"
           },
-          "quality_issues": {
-            "poor_satellite_count": "0",
-            "poor_dop": "124",
-            "examples": [
-              {
-                "posix_time": 1542506100,
-                "satellites": 3.0,
-                "dop": 10.6
-              },
-              {
-                "posix_time": 1542558600,
-                "satellites": 3.0,
-                "dop": 11.0
-              },
-              {
-                "posix_time": 1542572700,
-                "satellites": 3.0,
-                "dop": 16.2
-              },
-              {
-                "posix_time": 1542583500,
-                "satellites": 3.0,
-                "dop": 14.0
-              },
-              {
-                "posix_time": 1542588600,
-                "satellites": 3.0,
-                "dop": 29.8
-              }
-            ]
+          "longitude": {
+            "min": "-111.8228876",
+            "max": "-111.0022026"
           },
-          "coordinate_issues": {
-            "out_of_bounds": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "24480",
-            "actual_records": "23111",
-            "coverage_pct": "94.4076797385621",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
+          "altitude": {
+            "min": "-0.55",
+            "max": "1975.71"
           }
+        },
+        "quality_metrics": {
+          "satellites": {
+            "min": "3",
+            "max": "12",
+            "mean": "5.943437273386512",
+            "median": "6.0"
+          },
+          "dop": {
+            "min": "0.6",
+            "max": "48.0",
+            "mean": "1.9727983240673594",
+            "median": "1.6"
+          },
+          "temperature": {
+            "min": "-24.5",
+            "max": "24.0",
+            "mean": "-0.9298807509467408"
+          }
+        },
+        "sampling_stats": {
+          "expected_interval": "300",
+          "actual_intervals": {
+            "min": "0.0",
+            "max": "7500.0",
+            "mean": "303.3358849361428",
+            "median": "300.0"
+          }
+        },
+        "processing_stats": {
+          "initial_records": "25112",
+          "zero_coordinates_removed": "290",
+          "final_records": "24822"
+        },
+        "validation": {
+          "records_after_validation": "23872",
+          "validation_success_rate": "96.17%"
         }
       }
     },
     "summary": {
       "total_devices": "17",
       "total_records": "412778",
-      "files_processed": "17"
+      "files_processed": "17",
+      "time_range": {
+        "start": "2018-11-16T03:30:00",
+        "end": "2135-09-18T08:00:00"
+      },
+      "coordinate_bounds": {
+        "latitude": {
+          "min": "-23.6459971",
+          "max": "45.8216"
+        },
+        "longitude": {
+          "min": "-112.1724768",
+          "max": "-72.1189885"
+        },
+        "altitude": {
+          "min": "-2226326.66",
+          "max": "1570067.71"
+        }
+      },
+      "quality_metrics": {
+        "satellites": {
+          "min": "inf",
+          "max": "-inf"
+        },
+        "dop": {
+          "min": "inf",
+          "max": "-inf"
+        }
+      },
+      "devices": {
+        "600": {
+          "records": "24762",
+          "time_range": {
+            "start": "2018-11-16T04:00:00",
+            "end": "2019-02-11T07:55:00"
+          }
+        },
+        "602": {
+          "records": "24062",
+          "time_range": {
+            "start": "2018-11-16T04:35:00",
+            "end": "2019-02-11T07:55:00"
+          }
+        },
+        "603": {
+          "records": "24714",
+          "time_range": {
+            "start": "2018-11-16T03:40:00",
+            "end": "2019-02-11T07:55:00"
+          }
+        },
+        "604": {
+          "records": "24777",
+          "time_range": {
+            "start": "2018-11-16T04:15:00",
+            "end": "2019-02-11T07:55:00"
+          }
+        },
+        "605": {
+          "records": "25040",
+          "time_range": {
+            "start": "2018-11-16T03:45:00",
+            "end": "2019-02-11T07:55:00"
+          }
+        },
+        "606": {
+          "records": "23438",
+          "time_range": {
+            "start": "2018-11-16T04:15:00",
+            "end": "2019-02-11T08:00:00"
+          }
+        },
+        "607": {
+          "records": "22997",
+          "time_range": {
+            "start": "2018-11-16T04:05:00",
+            "end": "2019-02-11T07:55:00"
+          }
+        },
+        "608": {
+          "records": "24989",
+          "time_range": {
+            "start": "2018-11-16T03:30:00",
+            "end": "2019-02-11T07:55:00"
+          }
+        },
+        "609": {
+          "records": "23245",
+          "time_range": {
+            "start": "2018-11-16T03:55:00",
+            "end": "2019-02-11T07:55:00"
+          }
+        },
+        "610": {
+          "records": "24672",
+          "time_range": {
+            "start": "2018-11-16T04:30:00",
+            "end": "2019-02-11T07:55:00"
+          }
+        },
+        "611": {
+          "records": "24351",
+          "time_range": {
+            "start": "2018-11-16T04:45:00",
+            "end": "2019-02-11T07:55:00"
+          }
+        },
+        "612": {
+          "records": "23294",
+          "time_range": {
+            "start": "2018-11-16T03:35:00",
+            "end": "2019-02-11T07:55:00"
+          }
+        },
+        "613": {
+          "records": "24786",
+          "time_range": {
+            "start": "2018-11-16T04:40:00",
+            "end": "2019-02-11T07:55:00"
+          }
+        },
+        "614": {
+          "records": "24271",
+          "time_range": {
+            "start": "2018-11-16T03:55:00",
+            "end": "2019-02-11T07:55:00"
+          }
+        },
+        "615": {
+          "records": "24654",
+          "time_range": {
+            "start": "2018-11-16T04:20:00",
+            "end": "2135-09-18T07:55:00"
+          }
+        },
+        "616": {
+          "records": "23904",
+          "time_range": {
+            "start": "2018-11-16T04:20:00",
+            "end": "2135-09-18T08:00:00"
+          }
+        },
+        "617": {
+          "records": "24822",
+          "time_range": {
+            "start": "2018-11-16T04:30:00",
+            "end": "2019-02-11T07:55:00"
+          }
+        }
+      }
     }
   },
   "accelerometer": {
-    "devices": {
-      "600": {
-        "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 600 2019-02-11.csv",
-        "format": "pivot",
-        "validation_results": {
-          "device_id": "600",
-          "initial_records": "125607",
-          "acceleration_issues": {
-            "x": {
-              "count": "660",
-              "examples": [
-                {
-                  "posix_time": 1542351600,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351660,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351720,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351780,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351840,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                }
-              ]
-            },
-            "y": {
-              "count": "0",
-              "examples": []
-            },
-            "z": {
-              "count": "0",
-              "examples": []
-            }
-          },
-          "temperature_issues": {
+    "600": {
+      "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 600 2019-02-11.csv",
+      "format": "headless",
+      "validation_results": {
+        "device_id": "600",
+        "initial_records": "125607",
+        "acceleration_issues": {
+          "x": {
             "count": "0",
             "examples": []
           },
-          "time_coverage": {
-            "expected_records": "122396",
-            "actual_records": 122396,
-            "coverage_pct": 99.45913265139383,
-            "gaps_interpolated": "662",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
+          "y": {
+            "count": "0",
+            "examples": []
           },
-          "final_records": "121736"
+          "z": {
+            "count": "0",
+            "examples": []
+          }
         },
-        "time_range": {
-          "start": "1542391200",
-          "end": "1549695300"
-        }
+        "temperature_issues": {
+          "count": "0",
+          "examples": []
+        },
+        "time_coverage": {
+          "expected_records": "0",
+          "actual_records": "0",
+          "coverage_pct": "0",
+          "gaps_interpolated": "0",
+          "time_range": {
+            "start": "2018-11-17 00:00:00-07:00",
+            "end": "2019-02-09 00:00:00-07:00"
+          }
+        },
+        "frequency_stats": {
+          "start_posix": "1542438000",
+          "end_posix": "1549695600",
+          "duplicates": {},
+          "n_expected": "120961",
+          "n_available": 120959,
+          "n_missing": 2,
+          "pct_missing": 0.0016534254842469885,
+          "gap_analysis": {
+            "single_interval_gaps": "0",
+            "gap_distribution": {
+              "1277100": "1"
+            }
+          }
+        },
+        "final_records": "120961"
       },
-      "602": {
-        "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 602 2019-02-11.csv",
-        "format": "pivot",
-        "validation_results": {
-          "device_id": "602",
-          "initial_records": "125566",
-          "acceleration_issues": {
-            "x": {
-              "count": "7586",
-              "examples": [
-                {
-                  "posix_time": 1542351600,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351660,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351720,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351780,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351840,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                }
-              ]
-            },
-            "y": {
-              "count": "0",
-              "examples": []
-            },
-            "z": {
-              "count": "0",
-              "examples": []
-            }
-          },
-          "temperature_issues": {
-            "count": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "122396",
-            "actual_records": 122396,
-            "coverage_pct": 93.79799993463838,
-            "gaps_interpolated": "7591",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
-          },
-          "final_records": "114810"
-        },
-        "time_range": {
-          "start": "1542393000",
-          "end": "1549695300"
-        }
-      },
-      "603": {
-        "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 603 2019-02-11.csv",
-        "format": "pivot",
-        "validation_results": {
-          "device_id": "603",
-          "initial_records": "125628",
-          "acceleration_issues": {
-            "x": {
-              "count": "637",
-              "examples": [
-                {
-                  "posix_time": 1542351600,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351660,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351720,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351780,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351840,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                }
-              ]
-            },
-            "y": {
-              "count": "0",
-              "examples": []
-            },
-            "z": {
-              "count": "0",
-              "examples": []
-            }
-          },
-          "temperature_issues": {
-            "count": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "122396",
-            "actual_records": 122396,
-            "coverage_pct": 99.47792411516716,
-            "gaps_interpolated": "639",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
-          },
-          "final_records": "121759"
-        },
-        "time_range": {
-          "start": "1542389700",
-          "end": "1549695300"
-        }
-      },
-      "604": {
-        "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 604 2019-02-11.csv",
-        "format": "pivot",
-        "validation_results": {
-          "device_id": "604",
-          "initial_records": "125598",
-          "acceleration_issues": {
-            "x": {
-              "count": "850",
-              "examples": [
-                {
-                  "posix_time": 1542351600,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351660,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351720,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351780,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351840,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                }
-              ]
-            },
-            "y": {
-              "count": "0",
-              "examples": []
-            },
-            "z": {
-              "count": "0",
-              "examples": []
-            }
-          },
-          "temperature_issues": {
-            "count": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "122396",
-            "actual_records": 122396,
-            "coverage_pct": 99.30226477989477,
-            "gaps_interpolated": "854",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
-          },
-          "final_records": "121546"
-        },
-        "time_range": {
-          "start": "1542391500",
-          "end": "1549695300"
-        }
-      },
-      "605": {
-        "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 605 2019-02-11.csv",
-        "format": "pivot",
-        "validation_results": {
-          "device_id": "605",
-          "initial_records": "125621",
-          "acceleration_issues": {
-            "x": {
-              "count": "643",
-              "examples": [
-                {
-                  "posix_time": 1542351600,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351660,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351720,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351780,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351840,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                }
-              ]
-            },
-            "y": {
-              "count": "0",
-              "examples": []
-            },
-            "z": {
-              "count": "0",
-              "examples": []
-            }
-          },
-          "temperature_issues": {
-            "count": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "122396",
-            "actual_records": 122396,
-            "coverage_pct": 99.47383901434688,
-            "gaps_interpolated": "644",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
-          },
-          "final_records": "121753"
-        },
-        "time_range": {
-          "start": "1542390000",
-          "end": "1549695300"
-        }
-      },
-      "606": {
-        "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 606 2019-02-11.csv",
-        "format": "pivot",
-        "validation_results": {
-          "device_id": "606",
-          "initial_records": "125522",
-          "acceleration_issues": {
-            "x": {
-              "count": "665",
-              "examples": [
-                {
-                  "posix_time": 1542351600,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351660,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351720,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351780,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351840,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                }
-              ]
-            },
-            "y": {
-              "count": "0",
-              "examples": []
-            },
-            "z": {
-              "count": "0",
-              "examples": []
-            }
-          },
-          "temperature_issues": {
-            "count": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "122396",
-            "actual_records": 122396,
-            "coverage_pct": 99.45504755057355,
-            "gaps_interpolated": "667",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
-          },
-          "final_records": "121731"
-        },
-        "time_range": {
-          "start": "1542391500",
-          "end": "1549695300"
-        }
-      },
-      "607": {
-        "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 607 2019-02-11.csv",
-        "format": "pivot",
-        "validation_results": {
-          "device_id": "607",
-          "initial_records": "125547",
-          "acceleration_issues": {
-            "x": {
-              "count": "917",
-              "examples": [
-                {
-                  "posix_time": 1542351600,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351660,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351720,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351780,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351840,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                }
-              ]
-            },
-            "y": {
-              "count": "0",
-              "examples": []
-            },
-            "z": {
-              "count": "0",
-              "examples": []
-            }
-          },
-          "temperature_issues": {
-            "count": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "122396",
-            "actual_records": 122396,
-            "coverage_pct": 99.24670740873884,
-            "gaps_interpolated": "922",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
-          },
-          "final_records": "121479"
-        },
-        "time_range": {
-          "start": "1542391200",
-          "end": "1549695300"
-        }
-      },
-      "608": {
-        "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 608 2019-02-11.csv",
-        "format": "pivot",
-        "validation_results": {
-          "device_id": "608",
-          "initial_records": "125617",
-          "acceleration_issues": {
-            "x": {
-              "count": "625",
-              "examples": [
-                {
-                  "posix_time": 1542351600,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351660,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351720,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351780,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351840,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                }
-              ]
-            },
-            "y": {
-              "count": "0",
-              "examples": []
-            },
-            "z": {
-              "count": "0",
-              "examples": []
-            }
-          },
-          "temperature_issues": {
-            "count": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "122396",
-            "actual_records": 122396,
-            "coverage_pct": 99.48936239746396,
-            "gaps_interpolated": "625",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
-          },
-          "final_records": "121771"
-        },
-        "time_range": {
-          "start": "1542389100",
-          "end": "1549695300"
-        }
-      },
-      "609": {
-        "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 609 2019-02-11.csv",
-        "format": "pivot",
-        "validation_results": {
-          "device_id": "609",
-          "initial_records": "125592",
-          "acceleration_issues": {
-            "x": {
-              "count": "650",
-              "examples": [
-                {
-                  "posix_time": 1542351600,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351660,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351720,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351780,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351840,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                }
-              ]
-            },
-            "y": {
-              "count": "0",
-              "examples": []
-            },
-            "z": {
-              "count": "0",
-              "examples": []
-            }
-          },
-          "temperature_issues": {
-            "count": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "122396",
-            "actual_records": 122396,
-            "coverage_pct": 99.46730285303441,
-            "gaps_interpolated": "652",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
-          },
-          "final_records": "121746"
-        },
-        "time_range": {
-          "start": "1542390600",
-          "end": "1549695300"
-        }
-      },
-      "610": {
-        "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 610 2019-02-11.csv",
-        "format": "pivot",
-        "validation_results": {
-          "device_id": "610",
-          "initial_records": "125577",
-          "acceleration_issues": {
-            "x": {
-              "count": "685",
-              "examples": [
-                {
-                  "posix_time": 1542351600,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351660,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351720,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351780,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351840,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                }
-              ]
-            },
-            "y": {
-              "count": "0",
-              "examples": []
-            },
-            "z": {
-              "count": "0",
-              "examples": []
-            }
-          },
-          "temperature_issues": {
-            "count": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "122396",
-            "actual_records": 122396,
-            "coverage_pct": 99.43789012712834,
-            "gaps_interpolated": "688",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
-          },
-          "final_records": "121711"
-        },
-        "time_range": {
-          "start": "1542392700",
-          "end": "1549695300"
-        }
-      },
-      "611": {
-        "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 611 2019-02-11.csv",
-        "format": "pivot",
-        "validation_results": {
-          "device_id": "611",
-          "initial_records": "125523",
-          "acceleration_issues": {
-            "x": {
-              "count": "699",
-              "examples": [
-                {
-                  "posix_time": 1542351600,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351660,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351720,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351780,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351840,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                }
-              ]
-            },
-            "y": {
-              "count": "0",
-              "examples": []
-            },
-            "z": {
-              "count": "0",
-              "examples": []
-            }
-          },
-          "temperature_issues": {
-            "count": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "122396",
-            "actual_records": 122396,
-            "coverage_pct": 99.42645184483153,
-            "gaps_interpolated": "702",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
-          },
-          "final_records": "121697"
-        },
-        "time_range": {
-          "start": "1542393300",
-          "end": "1549695300"
-        }
-      },
-      "612": {
-        "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 612 2019-02-11.csv",
-        "format": "pivot",
-        "validation_results": {
-          "device_id": "612",
-          "initial_records": "125634",
-          "acceleration_issues": {
-            "x": {
-              "count": "632",
-              "examples": [
-                {
-                  "posix_time": 1542351600,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351660,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351720,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351780,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351840,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                }
-              ]
-            },
-            "y": {
-              "count": "0",
-              "examples": []
-            },
-            "z": {
-              "count": "0",
-              "examples": []
-            }
-          },
-          "temperature_issues": {
-            "count": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "122396",
-            "actual_records": 122396,
-            "coverage_pct": 99.48200921598745,
-            "gaps_interpolated": "634",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
-          },
-          "final_records": "121764"
-        },
-        "time_range": {
-          "start": "1542389400",
-          "end": "1549695300"
-        }
-      },
-      "613": {
-        "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 613 2019-02-11.csv",
-        "format": "pivot",
-        "validation_results": {
-          "device_id": "613",
-          "initial_records": "125519",
-          "acceleration_issues": {
-            "x": {
-              "count": "1186",
-              "examples": [
-                {
-                  "posix_time": 1542351600,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351660,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351720,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351780,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351840,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                }
-              ]
-            },
-            "y": {
-              "count": "0",
-              "examples": []
-            },
-            "z": {
-              "count": "0",
-              "examples": []
-            }
-          },
-          "temperature_issues": {
-            "count": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "122396",
-            "actual_records": 122396,
-            "coverage_pct": 99.0277460047714,
-            "gaps_interpolated": "1190",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
-          },
-          "final_records": "121210"
-        },
-        "time_range": {
-          "start": "1542393300",
-          "end": "1549695300"
-        }
-      },
-      "614": {
-        "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 614 2019-02-11.csv",
-        "format": "pivot",
-        "validation_results": {
-          "device_id": "614",
-          "initial_records": "125616",
-          "acceleration_issues": {
-            "x": {
-              "count": "647",
-              "examples": [
-                {
-                  "posix_time": 1542351600,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351660,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351720,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351780,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351840,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                }
-              ]
-            },
-            "y": {
-              "count": "0",
-              "examples": []
-            },
-            "z": {
-              "count": "0",
-              "examples": []
-            }
-          },
-          "temperature_issues": {
-            "count": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "122396",
-            "actual_records": 122396,
-            "coverage_pct": 99.46811987319848,
-            "gaps_interpolated": "650",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
-          },
-          "final_records": "121749"
-        },
-        "time_range": {
-          "start": "1542390300",
-          "end": "1549695300"
-        }
-      },
-      "615": {
-        "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 615 2019-02-11.csv",
-        "format": "pivot",
-        "validation_results": {
-          "device_id": "615",
-          "initial_records": "125563",
-          "acceleration_issues": {
-            "x": {
-              "count": "677",
-              "examples": [
-                {
-                  "posix_time": 1542351600,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351660,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351720,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351780,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351840,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                }
-              ]
-            },
-            "y": {
-              "count": "0",
-              "examples": []
-            },
-            "z": {
-              "count": "0",
-              "examples": []
-            }
-          },
-          "temperature_issues": {
-            "count": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "122396",
-            "actual_records": 122396,
-            "coverage_pct": 99.44279224811268,
-            "gaps_interpolated": "682",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
-          },
-          "final_records": "121719"
-        },
-        "time_range": {
-          "start": "1542392100",
-          "end": "1549695300"
-        }
-      },
-      "616": {
-        "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 616 2019-02-11.csv",
-        "format": "pivot",
-        "validation_results": {
-          "device_id": "616",
-          "initial_records": "125538",
-          "acceleration_issues": {
-            "x": {
-              "count": "680",
-              "examples": [
-                {
-                  "posix_time": 1542351600,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351660,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351720,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351780,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351840,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                }
-              ]
-            },
-            "y": {
-              "count": "0",
-              "examples": []
-            },
-            "z": {
-              "count": "0",
-              "examples": []
-            }
-          },
-          "temperature_issues": {
-            "count": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "122396",
-            "actual_records": 122396,
-            "coverage_pct": 99.44360926827675,
-            "gaps_interpolated": "681",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
-          },
-          "final_records": "121716"
-        },
-        "time_range": {
-          "start": "1542392400",
-          "end": "1549695300"
-        }
-      },
-      "617": {
-        "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 617 2019-02-11.csv",
-        "format": "pivot",
-        "validation_results": {
-          "device_id": "617",
-          "initial_records": "125580",
-          "acceleration_issues": {
-            "x": {
-              "count": "682",
-              "examples": [
-                {
-                  "posix_time": 1542351600,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351660,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351720,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351780,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                },
-                {
-                  "posix_time": 1542351840,
-                  "x": NaN,
-                  "y": NaN,
-                  "z": NaN
-                }
-              ]
-            },
-            "y": {
-              "count": "0",
-              "examples": []
-            },
-            "z": {
-              "count": "0",
-              "examples": []
-            }
-          },
-          "temperature_issues": {
-            "count": "0",
-            "examples": []
-          },
-          "time_coverage": {
-            "expected_records": "122396",
-            "actual_records": 122396,
-            "coverage_pct": 99.43952416745645,
-            "gaps_interpolated": "686",
-            "time_range": {
-              "start": "2018-11-16 00:00:00-07:00",
-              "end": "2019-02-08 23:55:00-07:00"
-            }
-          },
-          "final_records": "121714"
-        },
-        "time_range": {
-          "start": "1542392400",
-          "end": "1549695300"
-        }
+      "time_range": {
+        "start": "1542438000",
+        "end": "1549695600"
       }
     },
     "summary": {
-      "total_devices": "17",
-      "total_records": "412346",
+      "total_devices": "18",
+      "total_records": "409722",
       "files_processed": "17",
       "format_counts": {
         "original": "0",
-        "pivot": "17"
+        "pivot": "0",
+        "headless": "17"
+      }
+    },
+    "602": {
+      "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 602 2019-02-11.csv",
+      "format": "headless",
+      "validation_results": {
+        "device_id": "602",
+        "initial_records": "125566",
+        "acceleration_issues": {
+          "x": {
+            "count": "6893",
+            "examples": [
+              {
+                "posix_time": 1544328660,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1544328720,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1544328780,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1544328840,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1544328900,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              }
+            ],
+            "nan_count": 6893,
+            "out_of_bounds_count": 0
+          },
+          "y": {
+            "count": "6893",
+            "examples": [
+              {
+                "posix_time": 1544328660,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1544328720,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1544328780,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1544328840,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1544328900,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              }
+            ],
+            "nan_count": 6893,
+            "out_of_bounds_count": 0
+          },
+          "z": {
+            "count": "6893",
+            "examples": [
+              {
+                "posix_time": 1544328660,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1544328720,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1544328780,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1544328840,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1544328900,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              }
+            ],
+            "nan_count": 6893,
+            "out_of_bounds_count": 0
+          }
+        },
+        "temperature_issues": {
+          "count": "0",
+          "examples": []
+        },
+        "time_coverage": {
+          "expected_records": "0",
+          "actual_records": "0",
+          "coverage_pct": "0",
+          "gaps_interpolated": "0",
+          "time_range": {
+            "start": "2018-11-17 00:00:00-07:00",
+            "end": "2019-02-09 00:00:00-07:00"
+          }
+        },
+        "frequency_stats": {
+          "start_posix": "1542438000",
+          "end_posix": "1549695600",
+          "duplicates": {
+            "n": "107",
+            "unique_ts_with_dup": "25",
+            "example_duplicate": {
+              "x": {
+                "36244": "-29.4984032",
+                "36229": "-29.4984032",
+                "58075": "-0.3138128"
+              },
+              "y": {
+                "36244": "-22.2807088",
+                "36229": "-26.9879008",
+                "58075": "1.2552512"
+              },
+              "z": {
+                "36244": "9.414384",
+                "36229": "2.1966896",
+                "58075": "-9.7281968"
+              },
+              "temperature_acc": {
+                "36244": "-2.5",
+                "36229": "-4.5",
+                "58075": "3.5"
+              },
+              "device_id": {
+                "36244": "602",
+                "36229": "602",
+                "58075": "602"
+              },
+              "posix_time": {
+                "36244": "1545877860",
+                "36229": "1545877860",
+                "58075": "1545877860"
+              }
+            },
+            "n_after_dropping": "114063"
+          },
+          "n_expected": "120961",
+          "n_available": 114063,
+          "n_missing": 6898,
+          "pct_missing": 5.7026644951678644,
+          "gap_analysis": {
+            "single_interval_gaps": 6894,
+            "gap_distribution": {
+              "60": "6894",
+              "616920": "1",
+              "1213440": "1",
+              "2075700": "1"
+            }
+          }
+        },
+        "final_records": "114068"
+      },
+      "time_range": {
+        "start": "1542438000",
+        "end": "1549695600"
+      }
+    },
+    "603": {
+      "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 603 2019-02-11.csv",
+      "format": "headless",
+      "validation_results": {
+        "device_id": "603",
+        "initial_records": "125628",
+        "acceleration_issues": {
+          "x": {
+            "count": "0",
+            "examples": []
+          },
+          "y": {
+            "count": "0",
+            "examples": []
+          },
+          "z": {
+            "count": "0",
+            "examples": []
+          }
+        },
+        "temperature_issues": {
+          "count": "0",
+          "examples": []
+        },
+        "time_coverage": {
+          "expected_records": "0",
+          "actual_records": "0",
+          "coverage_pct": "0",
+          "gaps_interpolated": "0",
+          "time_range": {
+            "start": "2018-11-17 00:00:00-07:00",
+            "end": "2019-02-09 00:00:00-07:00"
+          }
+        },
+        "frequency_stats": {
+          "start_posix": "1542438000",
+          "end_posix": "1549695600",
+          "duplicates": {},
+          "n_expected": "120961",
+          "n_available": 120959,
+          "n_missing": 2,
+          "pct_missing": 0.0016534254842469885,
+          "gap_analysis": {
+            "single_interval_gaps": "0",
+            "gap_distribution": {
+              "1990800": "1"
+            }
+          }
+        },
+        "final_records": "120961"
+      },
+      "time_range": {
+        "start": "1542438000",
+        "end": "1549695600"
+      }
+    },
+    "604": {
+      "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 604 2019-02-11.csv",
+      "format": "headless",
+      "validation_results": {
+        "device_id": "604",
+        "initial_records": "125598",
+        "acceleration_issues": {
+          "x": {
+            "count": "181",
+            "examples": [
+              {
+                "posix_time": 1545356400,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1545356460,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1545356520,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1545356580,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1545356640,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              }
+            ],
+            "nan_count": 181,
+            "out_of_bounds_count": 0
+          },
+          "y": {
+            "count": "181",
+            "examples": [
+              {
+                "posix_time": 1545356400,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1545356460,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1545356520,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1545356580,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1545356640,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              }
+            ],
+            "nan_count": 181,
+            "out_of_bounds_count": 0
+          },
+          "z": {
+            "count": "181",
+            "examples": [
+              {
+                "posix_time": 1545356400,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1545356460,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1545356520,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1545356580,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1545356640,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              }
+            ],
+            "nan_count": 181,
+            "out_of_bounds_count": 0
+          }
+        },
+        "temperature_issues": {
+          "count": "0",
+          "examples": []
+        },
+        "time_coverage": {
+          "expected_records": "0",
+          "actual_records": "0",
+          "coverage_pct": "0",
+          "gaps_interpolated": "0",
+          "time_range": {
+            "start": "2018-11-17 00:00:00-07:00",
+            "end": "2019-02-09 00:00:00-07:00"
+          }
+        },
+        "frequency_stats": {
+          "start_posix": "1542438000",
+          "end_posix": "1549695600",
+          "duplicates": {},
+          "n_expected": "120961",
+          "n_available": 120776,
+          "n_missing": 185,
+          "pct_missing": 0.15294185729284646,
+          "gap_analysis": {
+            "single_interval_gaps": 182,
+            "gap_distribution": {
+              "60": "182",
+              "428100": "1",
+              "1380780": "1"
+            }
+          }
+        },
+        "final_records": "120780"
+      },
+      "time_range": {
+        "start": "1542438000",
+        "end": "1549695600"
+      }
+    },
+    "605": {
+      "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 605 2019-02-11.csv",
+      "format": "headless",
+      "validation_results": {
+        "device_id": "605",
+        "initial_records": "125621",
+        "acceleration_issues": {
+          "x": {
+            "count": "0",
+            "examples": []
+          },
+          "y": {
+            "count": "0",
+            "examples": []
+          },
+          "z": {
+            "count": "0",
+            "examples": []
+          }
+        },
+        "temperature_issues": {
+          "count": "0",
+          "examples": []
+        },
+        "time_coverage": {
+          "expected_records": "0",
+          "actual_records": "0",
+          "coverage_pct": "0",
+          "gaps_interpolated": "0",
+          "time_range": {
+            "start": "2018-11-17 00:00:00-07:00",
+            "end": "2019-02-09 00:00:00-07:00"
+          }
+        },
+        "frequency_stats": {
+          "start_posix": "1542438000",
+          "end_posix": "1549695600",
+          "duplicates": {},
+          "n_expected": "120961",
+          "n_available": 120960,
+          "n_missing": 1,
+          "pct_missing": 0.0008267127421234942,
+          "gap_analysis": {
+            "single_interval_gaps": "0",
+            "gap_distribution": {}
+          }
+        },
+        "final_records": "120961"
+      },
+      "time_range": {
+        "start": "1542438000",
+        "end": "1549695600"
+      }
+    },
+    "606": {
+      "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 606 2019-02-11.csv",
+      "format": "headless",
+      "validation_results": {
+        "device_id": "606",
+        "initial_records": "125522",
+        "acceleration_issues": {
+          "x": {
+            "count": "0",
+            "examples": []
+          },
+          "y": {
+            "count": "0",
+            "examples": []
+          },
+          "z": {
+            "count": "0",
+            "examples": []
+          }
+        },
+        "temperature_issues": {
+          "count": "0",
+          "examples": []
+        },
+        "time_coverage": {
+          "expected_records": "0",
+          "actual_records": "0",
+          "coverage_pct": "0",
+          "gaps_interpolated": "0",
+          "time_range": {
+            "start": "2018-11-17 00:00:00-07:00",
+            "end": "2019-02-09 00:00:00-07:00"
+          }
+        },
+        "frequency_stats": {
+          "start_posix": "1542438000",
+          "end_posix": "1549695600",
+          "duplicates": {},
+          "n_expected": "120961",
+          "n_available": 120959,
+          "n_missing": 2,
+          "pct_missing": 0.0016534254842469885,
+          "gap_analysis": {
+            "single_interval_gaps": "0",
+            "gap_distribution": {
+              "5164500": "1"
+            }
+          }
+        },
+        "final_records": "120961"
+      },
+      "time_range": {
+        "start": "1542438000",
+        "end": "1549695600"
+      }
+    },
+    "607": {
+      "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 607 2019-02-11.csv",
+      "format": "headless",
+      "validation_results": {
+        "device_id": "607",
+        "initial_records": "125547",
+        "acceleration_issues": {
+          "x": {
+            "count": "255",
+            "examples": [
+              {
+                "posix_time": 1548309480,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1548309540,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1548309600,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1548309660,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1548309720,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              }
+            ],
+            "nan_count": 255,
+            "out_of_bounds_count": 0
+          },
+          "y": {
+            "count": "255",
+            "examples": [
+              {
+                "posix_time": 1548309480,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1548309540,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1548309600,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1548309660,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1548309720,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              }
+            ],
+            "nan_count": 255,
+            "out_of_bounds_count": 0
+          },
+          "z": {
+            "count": "255",
+            "examples": [
+              {
+                "posix_time": 1548309480,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1548309540,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1548309600,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1548309660,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1548309720,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              }
+            ],
+            "nan_count": 255,
+            "out_of_bounds_count": 0
+          }
+        },
+        "temperature_issues": {
+          "count": "0",
+          "examples": []
+        },
+        "time_coverage": {
+          "expected_records": "0",
+          "actual_records": "0",
+          "coverage_pct": "0",
+          "gaps_interpolated": "0",
+          "time_range": {
+            "start": "2018-11-17 00:00:00-07:00",
+            "end": "2019-02-09 00:00:00-07:00"
+          }
+        },
+        "frequency_stats": {
+          "start_posix": "1542438000",
+          "end_posix": "1549695600",
+          "duplicates": {
+            "n": "6",
+            "unique_ts_with_dup": "2",
+            "example_duplicate": {
+              "x": {
+                "98769": "-33.2641568",
+                "98648": "-33.2641568",
+                "59132": "2.1966896"
+              },
+              "y": {
+                "98769": "-12.866324800000001",
+                "98648": "29.4984032",
+                "59132": "-1.8828768"
+              },
+              "z": {
+                "98769": "-7.84532",
+                "98648": "-8.1591328",
+                "59132": "-9.100571200000001"
+              },
+              "temperature_acc": {
+                "98769": "5.0",
+                "98648": "4.0",
+                "59132": "0.0"
+              },
+              "device_id": {
+                "98769": "607",
+                "98648": "607",
+                "59132": "607"
+              },
+              "posix_time": {
+                "98769": "1545939360",
+                "98648": "1545939360",
+                "59132": "1545939360"
+              }
+            },
+            "n_after_dropping": "120701"
+          },
+          "n_expected": "120961",
+          "n_available": 120701,
+          "n_missing": 260,
+          "pct_missing": 0.21494531295210853,
+          "gap_analysis": {
+            "single_interval_gaps": 256,
+            "gap_distribution": {
+              "60": "256",
+              "143280": "1",
+              "1218300": "1",
+              "3555960": "1"
+            }
+          }
+        },
+        "final_records": "120706"
+      },
+      "time_range": {
+        "start": "1542438000",
+        "end": "1549695600"
+      }
+    },
+    "608": {
+      "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 608 2019-02-11.csv",
+      "format": "headless",
+      "validation_results": {
+        "device_id": "608",
+        "initial_records": "125617",
+        "acceleration_issues": {
+          "x": {
+            "count": "0",
+            "examples": []
+          },
+          "y": {
+            "count": "0",
+            "examples": []
+          },
+          "z": {
+            "count": "0",
+            "examples": []
+          }
+        },
+        "temperature_issues": {
+          "count": "0",
+          "examples": []
+        },
+        "time_coverage": {
+          "expected_records": "0",
+          "actual_records": "0",
+          "coverage_pct": "0",
+          "gaps_interpolated": "0",
+          "time_range": {
+            "start": "2018-11-17 00:00:00-07:00",
+            "end": "2019-02-09 00:00:00-07:00"
+          }
+        },
+        "frequency_stats": {
+          "start_posix": "1542438000",
+          "end_posix": "1549695600",
+          "duplicates": {},
+          "n_expected": "120961",
+          "n_available": 120961,
+          "n_missing": 0,
+          "pct_missing": 0.0,
+          "gap_analysis": {
+            "single_interval_gaps": "0",
+            "gap_distribution": {}
+          }
+        },
+        "final_records": "120961"
+      },
+      "time_range": {
+        "start": "1542438000",
+        "end": "1549695600"
+      }
+    },
+    "609": {
+      "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 609 2019-02-11.csv",
+      "format": "headless",
+      "validation_results": {
+        "device_id": "609",
+        "initial_records": "125592",
+        "acceleration_issues": {
+          "x": {
+            "count": "0",
+            "examples": []
+          },
+          "y": {
+            "count": "0",
+            "examples": []
+          },
+          "z": {
+            "count": "0",
+            "examples": []
+          }
+        },
+        "temperature_issues": {
+          "count": "0",
+          "examples": []
+        },
+        "time_coverage": {
+          "expected_records": "0",
+          "actual_records": "0",
+          "coverage_pct": "0",
+          "gaps_interpolated": "0",
+          "time_range": {
+            "start": "2018-11-17 00:00:00-07:00",
+            "end": "2019-02-09 00:00:00-07:00"
+          }
+        },
+        "frequency_stats": {
+          "start_posix": "1542438000",
+          "end_posix": "1549695600",
+          "duplicates": {},
+          "n_expected": "120961",
+          "n_available": 120959,
+          "n_missing": 2,
+          "pct_missing": 0.0016534254842469885,
+          "gap_analysis": {
+            "single_interval_gaps": "0",
+            "gap_distribution": {
+              "1135500": "1"
+            }
+          }
+        },
+        "final_records": "120961"
+      },
+      "time_range": {
+        "start": "1542438000",
+        "end": "1549695600"
+      }
+    },
+    "610": {
+      "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 610 2019-02-11.csv",
+      "format": "headless",
+      "validation_results": {
+        "device_id": "610",
+        "initial_records": "125577",
+        "acceleration_issues": {
+          "x": {
+            "count": "0",
+            "examples": []
+          },
+          "y": {
+            "count": "0",
+            "examples": []
+          },
+          "z": {
+            "count": "0",
+            "examples": []
+          }
+        },
+        "temperature_issues": {
+          "count": "0",
+          "examples": []
+        },
+        "time_coverage": {
+          "expected_records": "0",
+          "actual_records": "0",
+          "coverage_pct": "0",
+          "gaps_interpolated": "0",
+          "time_range": {
+            "start": "2018-11-17 00:00:00-07:00",
+            "end": "2019-02-09 00:00:00-07:00"
+          }
+        },
+        "frequency_stats": {
+          "start_posix": "1542438000",
+          "end_posix": "1549695600",
+          "duplicates": {},
+          "n_expected": "120961",
+          "n_available": 120958,
+          "n_missing": 3,
+          "pct_missing": 0.002480138226370483,
+          "gap_analysis": {
+            "single_interval_gaps": "0",
+            "gap_distribution": {
+              "358800": "1",
+              "5356800": "1"
+            }
+          }
+        },
+        "final_records": "120961"
+      },
+      "time_range": {
+        "start": "1542438000",
+        "end": "1549695600"
+      }
+    },
+    "611": {
+      "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 611 2019-02-11.csv",
+      "format": "headless",
+      "validation_results": {
+        "device_id": "611",
+        "initial_records": "125523",
+        "acceleration_issues": {
+          "x": {
+            "count": "0",
+            "examples": []
+          },
+          "y": {
+            "count": "0",
+            "examples": []
+          },
+          "z": {
+            "count": "0",
+            "examples": []
+          }
+        },
+        "temperature_issues": {
+          "count": "0",
+          "examples": []
+        },
+        "time_coverage": {
+          "expected_records": "0",
+          "actual_records": "0",
+          "coverage_pct": "0",
+          "gaps_interpolated": "0",
+          "time_range": {
+            "start": "2018-11-17 00:00:00-07:00",
+            "end": "2019-02-09 00:00:00-07:00"
+          }
+        },
+        "frequency_stats": {
+          "start_posix": "1542438000",
+          "end_posix": "1549695600",
+          "duplicates": {},
+          "n_expected": "120961",
+          "n_available": 120958,
+          "n_missing": 3,
+          "pct_missing": 0.002480138226370483,
+          "gap_analysis": {
+            "single_interval_gaps": "0",
+            "gap_distribution": {
+              "432600": "1",
+              "1383300": "1"
+            }
+          }
+        },
+        "final_records": "120961"
+      },
+      "time_range": {
+        "start": "1542438000",
+        "end": "1549695600"
+      }
+    },
+    "612": {
+      "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 612 2019-02-11.csv",
+      "format": "headless",
+      "validation_results": {
+        "device_id": "612",
+        "initial_records": "125634",
+        "acceleration_issues": {
+          "x": {
+            "count": "0",
+            "examples": []
+          },
+          "y": {
+            "count": "0",
+            "examples": []
+          },
+          "z": {
+            "count": "0",
+            "examples": []
+          }
+        },
+        "temperature_issues": {
+          "count": "0",
+          "examples": []
+        },
+        "time_coverage": {
+          "expected_records": "0",
+          "actual_records": "0",
+          "coverage_pct": "0",
+          "gaps_interpolated": "0",
+          "time_range": {
+            "start": "2018-11-17 00:00:00-07:00",
+            "end": "2019-02-09 00:00:00-07:00"
+          }
+        },
+        "frequency_stats": {
+          "start_posix": "1542438000",
+          "end_posix": "1549695600",
+          "duplicates": {},
+          "n_expected": "120961",
+          "n_available": 120959,
+          "n_missing": 2,
+          "pct_missing": 0.0016534254842469885,
+          "gap_analysis": {
+            "single_interval_gaps": "0",
+            "gap_distribution": {
+              "1923960": "1"
+            }
+          }
+        },
+        "final_records": "120961"
+      },
+      "time_range": {
+        "start": "1542438000",
+        "end": "1549695600"
+      }
+    },
+    "613": {
+      "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 613 2019-02-11.csv",
+      "format": "headless",
+      "validation_results": {
+        "device_id": "613",
+        "initial_records": "125519",
+        "acceleration_issues": {
+          "x": {
+            "count": "490",
+            "examples": [
+              {
+                "posix_time": 1544573460,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1544573520,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1544573580,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1544573640,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1544573700,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              }
+            ],
+            "nan_count": 490,
+            "out_of_bounds_count": 0
+          },
+          "y": {
+            "count": "490",
+            "examples": [
+              {
+                "posix_time": 1544573460,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1544573520,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1544573580,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1544573640,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1544573700,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              }
+            ],
+            "nan_count": 490,
+            "out_of_bounds_count": 0
+          },
+          "z": {
+            "count": "490",
+            "examples": [
+              {
+                "posix_time": 1544573460,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1544573520,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1544573580,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1544573640,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              },
+              {
+                "posix_time": 1544573700,
+                "x": NaN,
+                "y": NaN,
+                "z": NaN,
+                "temperature_acc": NaN,
+                "device_id": NaN
+              }
+            ],
+            "nan_count": 490,
+            "out_of_bounds_count": 0
+          }
+        },
+        "temperature_issues": {
+          "count": "0",
+          "examples": []
+        },
+        "time_coverage": {
+          "expected_records": "0",
+          "actual_records": "0",
+          "coverage_pct": "0",
+          "gaps_interpolated": "0",
+          "time_range": {
+            "start": "2018-11-17 00:00:00-07:00",
+            "end": "2019-02-09 00:00:00-07:00"
+          }
+        },
+        "frequency_stats": {
+          "start_posix": "1542438000",
+          "end_posix": "1549695600",
+          "duplicates": {
+            "n": "14",
+            "unique_ts_with_dup": "6",
+            "example_duplicate": {
+              "x": {
+                "87302": "33.2641568",
+                "59100": "-2.1966896",
+                "87322": "33.2641568"
+              },
+              "y": {
+                "87302": "13.8077632",
+                "59100": "-1.2552512",
+                "87322": "20.0840192"
+              },
+              "z": {
+                "87302": "7.5315072",
+                "59100": "-9.414384",
+                "87322": "8.1591328"
+              },
+              "temperature_acc": {
+                "87302": "-7.0",
+                "59100": "0.0",
+                "87322": "-3.0"
+              },
+              "device_id": {
+                "87302": "613",
+                "59100": "613",
+                "87322": "613"
+              },
+              "posix_time": {
+                "87302": "1545939360",
+                "59100": "1545939360",
+                "87322": "1545939360"
+              }
+            },
+            "n_after_dropping": "120467"
+          },
+          "n_expected": "120961",
+          "n_available": 120467,
+          "n_missing": 494,
+          "pct_missing": 0.4083960946090062,
+          "gap_analysis": {
+            "single_interval_gaps": 492,
+            "gap_distribution": {
+              "60": "492",
+              "3030360": "1"
+            }
+          }
+        },
+        "final_records": "120471"
+      },
+      "time_range": {
+        "start": "1542438000",
+        "end": "1549695600"
+      }
+    },
+    "614": {
+      "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 614 2019-02-11.csv",
+      "format": "headless",
+      "validation_results": {
+        "device_id": "614",
+        "initial_records": "125616",
+        "acceleration_issues": {
+          "x": {
+            "count": "0",
+            "examples": []
+          },
+          "y": {
+            "count": "0",
+            "examples": []
+          },
+          "z": {
+            "count": "0",
+            "examples": []
+          }
+        },
+        "temperature_issues": {
+          "count": "0",
+          "examples": []
+        },
+        "time_coverage": {
+          "expected_records": "0",
+          "actual_records": "0",
+          "coverage_pct": "0",
+          "gaps_interpolated": "0",
+          "time_range": {
+            "start": "2018-11-17 00:00:00-07:00",
+            "end": "2019-02-09 00:00:00-07:00"
+          }
+        },
+        "frequency_stats": {
+          "start_posix": "1542438000",
+          "end_posix": "1549695600",
+          "duplicates": {},
+          "n_expected": "120961",
+          "n_available": 120957,
+          "n_missing": 4,
+          "pct_missing": 0.003306850968493977,
+          "gap_analysis": {
+            "single_interval_gaps": "0",
+            "gap_distribution": {
+              "1460400": "1",
+              "1634400": "1",
+              "2862300": "1"
+            }
+          }
+        },
+        "final_records": "120961"
+      },
+      "time_range": {
+        "start": "1542438000",
+        "end": "1549695600"
+      }
+    },
+    "615": {
+      "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 615 2019-02-11.csv",
+      "format": "headless",
+      "validation_results": {
+        "device_id": "615",
+        "initial_records": "125563",
+        "acceleration_issues": {
+          "x": {
+            "count": "0",
+            "examples": []
+          },
+          "y": {
+            "count": "0",
+            "examples": []
+          },
+          "z": {
+            "count": "0",
+            "examples": []
+          }
+        },
+        "temperature_issues": {
+          "count": "0",
+          "examples": []
+        },
+        "time_coverage": {
+          "expected_records": "0",
+          "actual_records": "0",
+          "coverage_pct": "0",
+          "gaps_interpolated": "0",
+          "time_range": {
+            "start": "2018-11-17 00:00:00-07:00",
+            "end": "2019-02-09 00:00:00-07:00"
+          }
+        },
+        "frequency_stats": {
+          "start_posix": "1542438000",
+          "end_posix": "1549695600",
+          "duplicates": {},
+          "n_expected": "120961",
+          "n_available": 120956,
+          "n_missing": 5,
+          "pct_missing": 0.004133563710617472,
+          "gap_analysis": {
+            "single_interval_gaps": "0",
+            "gap_distribution": {
+              "262200": "1",
+              "1399800": "1",
+              "1622100": "1",
+              "3285600": "1"
+            }
+          }
+        },
+        "final_records": "120961"
+      },
+      "time_range": {
+        "start": "1542438000",
+        "end": "1549695600"
+      }
+    },
+    "616": {
+      "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 616 2019-02-11.csv",
+      "format": "headless",
+      "validation_results": {
+        "device_id": "616",
+        "initial_records": "125538",
+        "acceleration_issues": {
+          "x": {
+            "count": "0",
+            "examples": []
+          },
+          "y": {
+            "count": "0",
+            "examples": []
+          },
+          "z": {
+            "count": "0",
+            "examples": []
+          }
+        },
+        "temperature_issues": {
+          "count": "0",
+          "examples": []
+        },
+        "time_coverage": {
+          "expected_records": "0",
+          "actual_records": "0",
+          "coverage_pct": "0",
+          "gaps_interpolated": "0",
+          "time_range": {
+            "start": "2018-11-17 00:00:00-07:00",
+            "end": "2019-02-09 00:00:00-07:00"
+          }
+        },
+        "frequency_stats": {
+          "start_posix": "1542438000",
+          "end_posix": "1549695600",
+          "duplicates": {},
+          "n_expected": "120961",
+          "n_available": 120960,
+          "n_missing": 1,
+          "pct_missing": 0.0008267127421234942,
+          "gap_analysis": {
+            "single_interval_gaps": "0",
+            "gap_distribution": {}
+          }
+        },
+        "final_records": "120961"
+      },
+      "time_range": {
+        "start": "1542438000",
+        "end": "1549695600"
+      }
+    },
+    "617": {
+      "file": "data\\raw\\RB_19\\accelerometer\\PinPoint 617 2019-02-11.csv",
+      "format": "headless",
+      "validation_results": {
+        "device_id": "617",
+        "initial_records": "125580",
+        "acceleration_issues": {
+          "x": {
+            "count": "0",
+            "examples": []
+          },
+          "y": {
+            "count": "0",
+            "examples": []
+          },
+          "z": {
+            "count": "0",
+            "examples": []
+          }
+        },
+        "temperature_issues": {
+          "count": "0",
+          "examples": []
+        },
+        "time_coverage": {
+          "expected_records": "0",
+          "actual_records": "0",
+          "coverage_pct": "0",
+          "gaps_interpolated": "0",
+          "time_range": {
+            "start": "2018-11-17 00:00:00-07:00",
+            "end": "2019-02-09 00:00:00-07:00"
+          }
+        },
+        "frequency_stats": {
+          "start_posix": "1542438000",
+          "end_posix": "1549695600",
+          "duplicates": {},
+          "n_expected": "120961",
+          "n_available": 120957,
+          "n_missing": 4,
+          "pct_missing": 0.003306850968493977,
+          "gap_analysis": {
+            "single_interval_gaps": "0",
+            "gap_distribution": {
+              "1322400": "1",
+              "1474800": "1",
+              "3275100": "1"
+            }
+          }
+        },
+        "final_records": "120961"
+      },
+      "time_range": {
+        "start": "1542438000",
+        "end": "1549695600"
       }
     }
   },
   "labels": {
-    "devices": {},
-    "summary": {
-      "total_devices": "0",
-      "total_records": "0"
-    }
+    "format_type": "pivot",
+    "total_records": "590",
+    "unique_devices": "15",
+    "devices": {
+      "600": {
+        "records": "42",
+        "activity_counts": {
+          "Grazing": "29",
+          "Traveling": "7",
+          "Standing": "6"
+        },
+        "time_range": {
+          "start": "2019-01-18T13:25:00",
+          "end": "2019-01-31T14:35:00"
+        }
+      },
+      "602": {
+        "records": "35",
+        "activity_counts": {
+          "Grazing": "18",
+          "Laying": "15",
+          "Standing": "1",
+          "Fighting": "1"
+        },
+        "time_range": {
+          "start": "2019-01-25T08:20:00",
+          "end": "2019-02-01T13:10:00"
+        }
+      },
+      "603": {
+        "records": "37",
+        "activity_counts": {
+          "Standing": "18",
+          "Grazing": "17",
+          "Traveling": "1",
+          "Mineral": "1"
+        },
+        "time_range": {
+          "start": "2019-01-22T12:00:00",
+          "end": "2019-01-22T15:00:00"
+        }
+      },
+      "604": {
+        "records": "41",
+        "activity_counts": {
+          "Standing": "19",
+          "Grazing": "13",
+          "Traveling": "7",
+          "Resting": "2"
+        },
+        "time_range": {
+          "start": "2019-01-18T13:25:00",
+          "end": "2019-01-31T15:20:00"
+        }
+      },
+      "605": {
+        "records": "12",
+        "activity_counts": {
+          "Grazing": "8",
+          "Laying": "3",
+          "Standing": "1"
+        },
+        "time_range": {
+          "start": "2019-01-31T13:25:00",
+          "end": "2019-01-31T14:20:00"
+        }
+      },
+      "606": {
+        "records": "43",
+        "activity_counts": {
+          "Grazing": "30",
+          "Standing": "8",
+          "Traveling": "4",
+          "Drinking": "1"
+        },
+        "time_range": {
+          "start": "2019-01-25T08:50:00",
+          "end": "2019-01-25T12:20:00"
+        }
+      },
+      "607": {
+        "records": "46",
+        "activity_counts": {
+          "Grazing": "43",
+          "Traveling": "2",
+          "Standing": "1"
+        },
+        "time_range": {
+          "start": "2019-01-25T08:50:00",
+          "end": "2019-01-26T11:50:00"
+        }
+      },
+      "608": {
+        "records": "40",
+        "activity_counts": {
+          "Grazing": "30",
+          "Standing": "8",
+          "Laying": "2"
+        },
+        "time_range": {
+          "start": "2019-02-01T09:50:00",
+          "end": "2019-02-01T13:10:00"
+        }
+      },
+      "610": {
+        "records": "22",
+        "activity_counts": {
+          "Grazing": "16",
+          "Traveling": "4",
+          "Standing": "2"
+        },
+        "time_range": {
+          "start": "2019-01-24T15:00:00",
+          "end": "2019-01-24T16:45:00"
+        }
+      },
+      "611": {
+        "records": "69",
+        "activity_counts": {
+          "Grazing": "42",
+          "Standing": "18",
+          "Traveling": "8",
+          "Laying": "1"
+        },
+        "time_range": {
+          "start": "2019-01-21T12:35:00",
+          "end": "2019-01-30T12:15:00"
+        }
+      },
+      "613": {
+        "records": "37",
+        "activity_counts": {
+          "Grazing": "18",
+          "Laying": "16",
+          "Standing": "3"
+        },
+        "time_range": {
+          "start": "2019-01-30T09:15:00",
+          "end": "2019-01-30T12:15:00"
+        }
+      },
+      "614": {
+        "records": "19",
+        "activity_counts": {
+          "Laying": "13",
+          "Standing": "5",
+          "Grazing": "1"
+        },
+        "time_range": {
+          "start": "2019-02-01T11:40:00",
+          "end": "2019-02-01T13:10:00"
+        }
+      },
+      "615": {
+        "records": "67",
+        "activity_counts": {
+          "Grazing": "54",
+          "Standing": "7",
+          "Laying": "6"
+        },
+        "time_range": {
+          "start": "2019-01-26T08:45:00",
+          "end": "2019-02-01T12:05:00"
+        }
+      },
+      "616": {
+        "records": "36",
+        "activity_counts": {
+          "Grazing": "22",
+          "Laying": "11",
+          "Standing": "3"
+        },
+        "time_range": {
+          "start": "2019-01-26T09:50:00",
+          "end": "2019-01-30T12:15:00"
+        }
+      },
+      "617": {
+        "records": "44",
+        "activity_counts": {
+          "Grazing": "32",
+          "Traveling": "7",
+          "Laying": "5"
+        },
+        "time_range": {
+          "start": "2019-01-21T12:20:00",
+          "end": "2019-01-30T12:15:00"
+        }
+      }
+    },
+    "activity_counts": {
+      "Grazing": "373",
+      "Standing": "100",
+      "Laying": "72",
+      "Traveling": "40",
+      "Resting": "2",
+      "Fighting": "1",
+      "Mineral": "1",
+      "Drinking": "1"
+    },
+    "overall_time_range": {
+      "start": "2019-01-18T13:25:00",
+      "end": "2019-02-01T13:10:00"
+    },
+    "initial_shape": "(36987, 18)",
+    "records_after_melting": "2788",
+    "records_after_dropping_nan_tags": "2788",
+    "records_after_mapping": "2788",
+    "records_after_dropping_nan_activities": "2788",
+    "tag_id_mapping_success_rate": "100.00%",
+    "file": "data\\raw\\RB_19\\labeled\\rb_2018_activity_observ.csv"
   },
-  "timestamp": "2025-02-13T03:33:19.772862",
   "config": {
     "validation": {
       "excluded_devices": [],
       "timezone": "America/Denver",
       "gps_sample_interval": "300",
       "acc_sample_interval": "60",
-      "start_datetime": "2018-11-16T00:00:00-07:00",
-      "end_datetime": "2019-02-08T23:55:00-07:00",
+      "start_datetime": "2018-11-17T00:00:00-07:00",
+      "end_datetime": "2019-02-09T00:00:00-07:00",
       "lat_min": "-90.0",
       "lat_max": "90.0",
       "lon_min": "-180.0",
@@ -2542,8 +3038,35 @@
       "accelerometer_directory": "data\\raw\\RB_19\\accelerometer",
       "labeled_data_path": "data\\raw\\RB_19\\labeled\\rb_2018_activity_observ.csv",
       "file_pattern": "*.csv",
-      "tag_to_device": "None",
-      "label_to_value": "None",
+      "tag_to_device": {
+        "6082": "609",
+        "6085": "610",
+        "6094": "614",
+        "5090": "602",
+        "5051": "612",
+        "5010": "617",
+        "3065": "603",
+        "3091": "611",
+        "0276": "600",
+        "0286": "605",
+        "0256": "606",
+        "0105": "608",
+        "0174": "613",
+        "0163": "616",
+        "0101": "604",
+        "0024": "607",
+        "0011": "615"
+      },
+      "label_to_value": {
+        "t": "Traveling",
+        "g": "Grazing",
+        "s": "Standing",
+        "m": "Mineral",
+        "r": "Resting",
+        "l": "Laying",
+        "d": "Drinking",
+        "f": "Fighting"
+      },
       "processed_data_path": "data\\processed\\RB_19\\all_cows_labeled_mode.csv"
     },
     "labels": {
@@ -2560,7 +3083,7 @@
       "acc_sample_interval": "60",
       "enable_axis_features": "True",
       "enable_magnitude_features": "True",
-      "feature_types": "{<FeatureType.CORRELATION: 'CORRELATION'>, <FeatureType.ZERO_CROSSINGS: 'ZERO_CROSSINGS'>, <FeatureType.BASIC_STATS: 'BASIC_STATS'>, <FeatureType.PEAK_FEATURES: 'PEAK_FEATURES'>}"
+      "feature_types": "{<FeatureType.CORRELATION: 'CORRELATION'>, <FeatureType.BASIC_STATS: 'BASIC_STATS'>, <FeatureType.ZERO_CROSSINGS: 'ZERO_CROSSINGS'>, <FeatureType.PEAK_FEATURES: 'PEAK_FEATURES'>}"
     }
   }
 }

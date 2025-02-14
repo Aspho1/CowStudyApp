@@ -400,7 +400,8 @@ def run_hmm_analysis(config: AnalysisConfig, target_data_path: Path, output_dir:
 
 def main():
     # Load configuration
-    config_path = Path("config/default.yaml")
+    # config_path = Path("config/default.yaml")
+    config_path = Path("config/RB_19_config.yaml")
     config = ConfigManager.load(config_path)
     
     # Set up logging with more detail
