@@ -18,7 +18,7 @@ def to_posix(timestamp: pd.Timestamp | datetime | str) -> int:
         timestamp = pd.to_datetime(timestamp)
     return int(timestamp.timestamp())
 
-def from_posix(posix_time: int | float) -> pd.Timestamp:
+def from_posix(posix_time: int | float, tz=None) -> pd.Timestamp:
     """
     Convert POSIX time to pandas Timestamp.
     
@@ -30,6 +30,22 @@ def from_posix(posix_time: int | float) -> pd.Timestamp:
         pandas Timestamp
     """
     return pd.Timestamp.fromtimestamp(posix_time)
+
+
+
+def from_posix_col(posix_col: pd.Series, tz) -> pd.Series:
+    """
+    Convert POSIX time to pandas Timestamp.
+    
+    Args:
+        posix_time: POSIX timestamp (seconds since Unix epoch)
+        
+
+    Returns:
+        pandas Timestamp
+    """
+    return pd.to_datetime(posix_col, unit='s', utc=True).dt.tz_convert(tz)
+
 
 def add_posix_column(df: pd.DataFrame, timestamp_column: str = 'GMT Time') -> pd.DataFrame:
     """
@@ -47,29 +63,34 @@ def add_posix_column(df: pd.DataFrame, timestamp_column: str = 'GMT Time') -> pd
     return df
 
 
-def round_to_interval(posix_time: int, interval: int = 300) -> int:
+def round_to_interval(posix_time: int, interval: int = 300, direction='nearest') -> int:
     """
     Round POSIX timestamp to nearest interval.
     
     Args:
         posix_time: POSIX timestamp in seconds
         interval: Interval in seconds (default 300 for 5 minutes)
+        direction: ['nearest', 'up', 'down']
         
     Returns:
         Rounded POSIX timestamp
     """
-    base = posix_time // interval
-    remainder = posix_time % interval
-    
+    base:int = posix_time // interval
+    remainder:int = (posix_time % interval) 
+    ud: bool = remainder >= (interval/2)
+    d:int = 1 if ((direction == 'up') | (ud)) else 0
+
+    return (base + d) * interval
+
     if remainder >= interval/2:
         return (base + 1) * interval
     return base * interval
 
-def round_timestamps(df: pd.DataFrame, col: str = 'posix_time', interval: int = 300) -> pd.DataFrame:
+def round_timestamps(df: pd.DataFrame, col: str = 'posix_time', interval: int = 300, direction='nearest') -> pd.DataFrame:
     """Add column with time rounded to specified interval"""
     df = df.copy()
     # new_col = f"{col}_{interval}s"
-    df[col] = df[col].apply(lambda x: round_to_interval(x, interval))
+    df[col] = df[col].apply(lambda x: round_to_interval(posix_time=x, interval=interval, direction=direction))
     return df
 
 def list_valid_timezones():

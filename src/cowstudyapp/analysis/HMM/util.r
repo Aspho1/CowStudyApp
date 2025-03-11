@@ -31,10 +31,15 @@ create_output_structure <- function(base_output_dir, features) {
 get_feature_distributions <- function(features) {
   distributions <- list()
     for (i in 1:nrow(features)) {
+        if (features$dist_type[i] != 'covariate')
     distributions[[features$name[i]]] <- features$dist[i]
     }
     return(distributions)
 }
+
+
+
+
 
 # get_initial_parameters <- function(features, data_by_state) {
 #   par0_list <- lapply(features, function(feature) {
@@ -109,38 +114,79 @@ save_plot <- function(plot, filename, directory, width = 10, height = 8) {
 
 
 calculate_parameters <- function(data_by_state, feature_name, dist_type, nbStates, feature_has_zeros) {
-  validate_numeric <- function(values, name) {
-    if (!is.numeric(values)) {
-      stop(sprintf("Non-numeric values found in %s", name))
-    }
-    return(values)
-  }
-  # print(1)
-  calculate_zero_mass <- function(x, feature_name) {
-      if (!feature_has_zeros) {
-          return(c())
-      }
-      values <- validate_numeric(x[[feature_name]], feature_name)
-      zero_count <- sum(values == 0, na.rm = TRUE)
-      total_count <- sum(!is.na(values))
-      cat("Zeros (", feature_name, "):", zero_count, "\n")
-      if (zero_count > 0) {
-          return(rep(zero_count/total_count, nbStates))
-      }
-      return(rep(0.0001, nbStates))  # Small non-zero value when needed
-  }
   
-  # print(2)
-  zero_mass <- if (dist_type %in% c("gamma", "weibull", "exp", "lnorm") && feature_has_zeros) {
-      calculate_zero_mass(do.call(rbind, data_by_state), feature_name)
-  } else {
-      c()
-  }
-  # print(3)
+    # cat(sprintf("Feature Name: %s | Dist type: %s, \n", feature_name, dist_type))
+    # if (!is.null(dist_type) && dist_type == "covariate") {
+    #     return(NULL)  # Covariates don't need distribution parameters
+    # }
 
-  n_states <- length(data_by_state)
-  
-  params <- switch(dist_type,
+    validate_numeric <- function(values, name) {
+        if (!is.numeric(values)) {
+        stop(sprintf("Non-numeric values found in %s", name))
+        }
+        return(values)
+    }
+    # print(1)
+    calculate_zero_mass <- function(x, feature_name) {
+        if (!feature_has_zeros) {
+            return(c())
+        }
+        values <- validate_numeric(x[[feature_name]], feature_name)
+        zero_count <- sum(values == 0, na.rm = TRUE)
+        total_count <- sum(!is.na(values))
+        cat("Zeros (", feature_name, "):", zero_count, "\n")
+        if (zero_count > 0) {
+            return(rep(zero_count/total_count, nbStates))
+        }
+        return(rep(0.0001, nbStates))  # Small non-zero value when needed
+    }
+    
+    # print(2)
+    #   zero_mass <- if (dist_type %in% c("gamma", "weibull", "exp", "lnorm") && feature_has_zeros) {
+    zero_mass <- calculate_zero_mass(do.call(rbind, data_by_state), feature_name)
+    
+
+
+
+
+    # #################### Debug
+    # if (dist_type == "wrpcauchy") {
+    #     cat("\nDebugging Wrapped Cauchy parameters for", feature_name, ":\n")
+        
+    #     # Print data summary for each state
+    #     for (state_name in names(data_by_state)) {
+    #         angles <- data_by_state[[state_name]][[feature_name]]
+    #         angles <- angles[!is.na(angles)]
+            
+    #         cat("\nState:", state_name, "\n")
+    #         cat("Angle range:", range(angles), "\n")
+    #         cat("Mean angle:", mean(angles, na.rm = TRUE), "\n")
+    #         cat("Circular mean:", mean.circular(circular(angles)), "\n")
+            
+    #         # Calculate rho (concentration parameter)
+    #         R <- mean(cos(angles)^2 + sin(angles)^2)
+    #         cat("Mean resultant length (rho):", R, "\n")
+            
+    #         # Check if parameters are in valid ranges
+    #         if (R >= 1) {
+    #             cat("WARNING: rho >= 1, adjusting to 0.99\n")
+    #         }
+    #         if (R <= 0) {
+    #             cat("WARNING: rho <= 0, adjusting to 0.01\n")
+    #         }
+    #     }
+    # }
+
+
+
+
+
+
+    # print(3)
+
+    n_states <- length(data_by_state)
+    
+    params <- switch(dist_type,
           "lnorm" = {
             mu <- sapply(data_by_state, function(x) {
               values <- validate_numeric(x[[feature_name]], feature_name)
@@ -156,6 +202,22 @@ calculate_parameters <- function(data_by_state, feature_name, dist_type, nbState
             
             c(mu, sigma, zero_mass)
           },
+        #   "gamma" = {
+        #     means <- sapply(data_by_state, function(x) {
+        #       values <- validate_numeric(x[[feature_name]], feature_name)
+        #       values <- values[values > 0]
+        #       mean(values, na.rm = TRUE)
+        #     })
+
+        #     sds <- sapply(data_by_state, function(x) {
+        #       values <- validate_numeric(x[[feature_name]], feature_name)
+        #       values <- values[values > 0]
+        #       sd(values, na.rm = TRUE)
+        #     })
+
+        #     c(means, sds, zero_mass)
+        #     },
+
           "gamma" = {
             means <- sapply(data_by_state, function(x) {
               values <- validate_numeric(x[[feature_name]], feature_name)
@@ -163,72 +225,151 @@ calculate_parameters <- function(data_by_state, feature_name, dist_type, nbState
               mean(values, na.rm = TRUE)
             })
             
-            sds <- sapply(data_by_state, function(x) {
+            vars <- sapply(data_by_state, function(x) {
               values <- validate_numeric(x[[feature_name]], feature_name)
               values <- values[values > 0]
-              sd(values, na.rm = TRUE)
-            })
-
-            c(means, sds, zero_mass)
-          },
-          "vm" = {
-            mu <- sapply(data_by_state, function(x) {
-              angles <- validate_numeric(x[[feature_name]], feature_name)
-              mean(angles, na.rm = TRUE)
+              var(values, na.rm = TRUE)
             })
             
-            kappa <- sapply(data_by_state, function(x) {
-              angles <- validate_numeric(x[[feature_name]], feature_name)
-              angles <- angles[!is.na(angles)]
-              est.kappa(circular(angles))
-            })
+            # Convert mean/variance to shape/scale
+            shapes <- means^2 / vars  # shape = mean^2/variance
+            scales <- vars / means    # scale = variance/mean
             
-            c(mu, kappa)  # No zero mass needed for von Mises
-          },
-          "exp" = {
-            rates <- sapply(data_by_state, function(x) {
-              values <- validate_numeric(x[[feature_name]], feature_name)
-              values <- values[values > 0]
-              1/mean(values, na.rm = TRUE)
-            })
-
-            c(rates, zero_mass)
-          },
-          "norm" = {
-            means <- sapply(data_by_state, function(x) {
-              values <- validate_numeric(x[[feature_name]], feature_name)
-              mean(values, na.rm = TRUE)
-            })
-            
-            sds <- sapply(data_by_state, function(x) {
-              values <- validate_numeric(x[[feature_name]], feature_name)
-              sd(values, na.rm = TRUE)
-            })
-            
-            c(means, sds)  # No zero mass needed for normal
-          },
-          "weibull" = {
-            shapes <- numeric(n_states)
-            scales <- numeric(n_states)
-            
-            for(i in 1:n_states) {
-              values <- validate_numeric(data_by_state[[i]][[feature_name]], feature_name)
-              values <- values[values > 0]
-              mean_val <- mean(values, na.rm = TRUE)
-              var_val <- var(values, na.rm = TRUE)
-              cv <- sqrt(var_val)/mean_val
-              shapes[i] <- (0.9874/cv)^1.0983
-              scales[i] <- mean_val/gamma(1 + 1/shapes[i])
-            }
-
             c(shapes, scales, zero_mass)
           },
-          stop(sprintf("Unsupported distribution type: %s", dist_type))
+
+        #   "wrpcauchy" = {
+        #     mu <- sapply(data_by_state, function(x) {
+        #       angles <- validate_numeric(x[[feature_name]], feature_name)
+        #       mean(angles, na.rm = TRUE)
+        #     })
+            
+        #     rho <- sapply(data_by_state, function(x) {
+        #       angles <- validate_numeric(x[[feature_name]], feature_name)
+        #       # Calculate concentration parameter (rho) 
+        #       # This is a simplified estimate - you might want to use 
+        #       # a more sophisticated method for wrapped Cauchy
+        #       angles <- angles[!is.na(angles)]
+        #       R <- mean(cos(angles)^2 + sin(angles)^2)
+        #       R  # R is the mean resultant length
+        #     })
+            
+        #     c(mu, rho)  # No zero mass needed for circular distributions
+        #   },
+
+
+            "wrpcauchy" = {
+                mu <- sapply(data_by_state, function(x) {
+                    angles <- validate_numeric(x[[feature_name]], feature_name)
+                    angles <- angles[!is.na(angles)]
+                    # Convert to circular object and get mean direction
+                    circ_angles <- circular(angles, units="radians", template="none")
+                    mu <- mean.circular(circ_angles)
+                    # Ensure mu is in [-pi, pi]
+                    mu <- atan2(sin(mu), cos(mu))
+                    # cat(sprintf("Calculated mu for state: %.4f\n", mu))
+                    mu
+                })
+                
+                rho <- sapply(data_by_state, function(x) {
+                    angles <- validate_numeric(x[[feature_name]], feature_name)
+                    angles <- angles[!is.na(angles)]
+                    # Calculate mean resultant length properly
+                    sin_mean <- mean(sin(angles), na.rm = TRUE)
+                    cos_mean <- mean(cos(angles), na.rm = TRUE)
+                    R <- sqrt(sin_mean^2 + cos_mean^2)
+                    # Ensure rho is in (0,1) with some buffer
+                    rho <- pmin(pmax(R, 0.01), 0.99)  # Using 0.95 as upper limit for stability
+                    # cat(sprintf("Calculated rho for state: %.4f\n", rho))
+                    rho
+                })
+                
+                # cat("\nFinal wrapped Cauchy parameters:\n")
+                # cat("mu:", sprintf("%.4f ", mu), "\n")
+                # cat("rho:", sprintf("%.4f ", rho), "\n")
+                
+                params <- c(mu, rho)
+                if (any(is.na(params))) {
+                    stop("NA values in wrapped Cauchy parameters\n",
+                        "mu: ", paste(mu, collapse=", "), "\n",
+                        "rho: ", paste(rho, collapse=", "))
+                }
+                
+                params
+            },
+
+            "vm" = {
+                mu <- sapply(data_by_state, function(x) {
+                angles <- validate_numeric(x[[feature_name]], feature_name)
+                mean(angles, na.rm = TRUE)
+                })
+                
+                kappa <- sapply(data_by_state, function(x) {
+                angles <- validate_numeric(x[[feature_name]], feature_name)
+                angles <- angles[!is.na(angles)]
+                est.kappa(circular(angles))
+                })
+                
+                c(mu, kappa)  # No zero mass needed for von Mises
+            },
+            "exp" = {
+                rates <- sapply(data_by_state, function(x) {
+                values <- validate_numeric(x[[feature_name]], feature_name)
+                values <- values[values > 0]
+                1/mean(values, na.rm = TRUE)
+                })
+
+                c(rates, zero_mass)
+            },
+            "norm" = {
+                means <- sapply(data_by_state, function(x) {
+                values <- validate_numeric(x[[feature_name]], feature_name)
+                mean(values, na.rm = TRUE)
+                })
+                
+                sds <- sapply(data_by_state, function(x) {
+                values <- validate_numeric(x[[feature_name]], feature_name)
+                sd(values, na.rm = TRUE)
+                })
+                
+                c(means, sds)  # No zero mass needed for normal
+            },
+            "weibull" = {
+                shapes <- numeric(n_states)
+                scales <- numeric(n_states)
+                
+                for(i in 1:n_states) {
+                values <- validate_numeric(data_by_state[[i]][[feature_name]], feature_name)
+                values <- values[values > 0]
+                mean_val <- mean(values, na.rm = TRUE)
+                var_val <- var(values, na.rm = TRUE)
+                cv <- sqrt(var_val)/mean_val
+                shapes[i] <- (0.9874/cv)^1.0983
+                scales[i] <- mean_val/gamma(1 + 1/shapes[i])
+                }
+
+                c(shapes, scales, zero_mass)
+            },
+            stop(sprintf("Unsupported distribution type: %s", dist_type))
   )
   # print(4)
   
   return(params)
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 calculate_parameters_no_zeromass <- function(data_by_state, feature_name, dist_type) {
@@ -352,12 +493,46 @@ select_best_distributions <- function(data, Options, features, dirs) {
         feature_name <- features$name[i]
         dist_type <- features$dist_type[i]
         feature_data <- data[[feature_name]]
-        
+
+        if (dist_type == "covariate") {
+            # Skip distribution fitting for covariates
+            next
+        }
+
+
         # Remove NA and infinite values
-        feature_data <- feature_data[is.finite(feature_data) & !is.na(feature_data)]
+        valid_indices <- is.finite(feature_data) & !is.na(feature_data)
+        feature_data <- feature_data[valid_indices]
+        corresponding_activities <- data$activity[valid_indices]  # Get corresponding activities
+
         cat("Getting fits for ", feature_name, "...\n")
-        flush.console()
+        # flush.console()
         
+
+        # Activity colors
+        activity_colors <- c(
+            "Grazing" = "#2ecc71",     # Softer green
+            "Resting" = "#3498db",     # Nicer blue
+            "Traveling" = "#e74c3c",   # Softer red
+            "Fighting" = "#f39c12",    # Orange
+            "Mineral" = "#9b59b6",     # Purple
+            "Drinking" = "#1abc9c",    # Turquoise
+            "NA" = "#95a5a6",         # Gray
+            "Unknown" = "#bdc3c7"     # Light gray
+        )
+
+        distribution_colors <- c(
+            "Empirical Density" = "black",
+            "vm" = "#E41A1C",
+            "wrpcauchy" = "#377EB8",
+            "weibull" = "#4DAF4A",
+            "lnorm" = "#984EA3",
+            "gamma" = "#FF7F00",
+            "exp" = "#FFAD33",
+            "norm" = "#33B2FF"
+        )
+
+
         if (dist_type == "circular") {
             # Handle circular data
 
@@ -371,7 +546,17 @@ select_best_distributions <- function(data, Options, features, dirs) {
             
             # Plot if requested
             if (Options$show_dist_plots) {
-                dist_plot <- plot_circular_distributions(feature_data, feature_name, fits, Options)
+                dist_plot <- plot_circular_distributions(
+                      data = feature_data
+                    , feature_name = feature_name
+                    , fits = fits
+                    , Options = Options
+                    , activities = corresponding_activities
+                    , activity_colors = activity_colors
+                    , distribution_colors = distribution_colors    
+                )
+
+
                 save_plot(dist_plot,
                         paste0("distribution_", feature_name),
                         dirs$dist_plots_dir)
@@ -386,20 +571,37 @@ select_best_distributions <- function(data, Options, features, dirs) {
             best_dist <- names(which.min(aic_values))
             features$dist[i] <- best_dist
             
-            # Plot if requested
-            if (Options$show_dist_plots) {
-                dist_plot <- plot_distribution_analysis_old(feature_data, feature_name, fits, Options)
-                save_plot(dist_plot,
-                          paste0("distribution_", feature_name),
-                          dirs$dist_plots_dir)
 
-                # cat(sprintf("\nDistribution fits for %s:\n", feature_name))
-                # print(data.frame(
-                #     Distribution = names(fits),
-                #     AIC = sapply(fits, function(x) round(x$aic, 2)),
-                #     LogLik = sapply(fits, function(x) round(x$loglik, 2))
-                # ))
+            if (Options$show_dist_plots) {
+                dist_plot <- plot_distribution_analysis(
+                    feature_data, 
+                    feature_name, 
+                    fits, 
+                    Options,
+                    # activities = data$activity
+                    activities = corresponding_activities,
+                    activity_colors = activity_colors, distribution_colors = distribution_colors
+                )
+                save_plot(dist_plot,
+                        paste0("distribution_", feature_name),
+                        dirs$dist_plots_dir)
             }
+
+            # # Plot if requested
+            # if (Options$show_dist_plots) {
+            #     # dist_plot <- plot_distribution_analysis_old(feature_data, feature_name, fits, Options)
+            #     dist_plot <- plot_distribution_analysis(feature_data, feature_name, fits, Options)
+            #     save_plot(dist_plot,
+            #               paste0("distribution_", feature_name),
+            #               dirs$dist_plots_dir)
+
+            #     # cat(sprintf("\nDistribution fits for %s:\n", feature_name))
+            #     # print(data.frame(
+            #     #     Distribution = names(fits),
+            #     #     AIC = sapply(fits, function(x) round(x$aic, 2)),
+            #     #     LogLik = sapply(fits, function(x) round(x$loglik, 2))
+            #     # ))
+            # }
         }else{
           stop(sprintf("Distribution selection failed! Unknown distribution type `%s` for feature `%s`.", dist_type, feature_name))
         }
@@ -458,8 +660,8 @@ get_circular_fit_metrics_old <- function(data, distributions) {
             # Add small constant to avoid log(0)
             wc_loglik <- sum(log(wc_densities + .Machine$double.xmin))
             
-            fits$wc <- list(
-                distribution = "wc",
+            fits$wrpcauchy <- list(
+                distribution = "wrpcauchy",
                 parameters = list(
                     mu = wc_fit$mu,
                     rho = wc_fit$rho
@@ -601,8 +803,8 @@ get_circular_fit_metrics <- function(data, distributions) {
             best_method <- names(methods)[which.max(sapply(methods, function(x) x$loglik))]
             best_fit <- methods[[best_method]]
             
-            fits$wc <- list(
-                distribution = "wc",
+            fits$wrpcauchy <- list(
+                distribution = "wrpcauchy",
                 parameters = list(
                     mu = best_fit$mu,
                     rho = best_fit$rho
@@ -648,7 +850,102 @@ check_angle_distribution <- function(angles_rad) {
 }
 
 
-plot_circular_distributions <- function(data, feature_name, fits, Options) {
+plot_circular_distributions <- function(data, feature_name, fits, Options, 
+                                      activities = NULL, 
+                                      activity_colors, 
+                                      distribution_colors) {
+    # Create initial data frame
+    plot_data <- data.frame(
+        x = as.numeric(data),
+        activity = if(!is.null(activities)) activities else rep("Unknown", length(data))
+    )
+    
+    # Calculate bin width and scaling factor
+    bin_width <- diff(c(-pi, pi)) / 60  # 60 bins
+    n_samples <- length(data)
+    scaling_factor <- n_samples * bin_width
+    
+    # Transform angles
+    angles <- plot_data$x
+    angles[angles < 0] <- angles[angles < 0] + 2*pi
+    
+    # Create density estimate
+    angles_rad <- circular(angles, units="radians", template="none",
+                         type="angles", modulo="2pi")
+    dc <- density.circular(angles_rad, bw=40)
+    
+    # Transform density values and scale them
+    dc_x <- dc$x
+    dc_x[dc_x > pi] <- dc_x[dc_x > pi] - 2*pi
+    sort_idx <- order(dc_x)
+    dc_x <- dc_x[sort_idx]
+    dc_y <- dc$y[sort_idx] * scaling_factor
+    
+    # Create base plot
+    p1 <- ggplot(plot_data) +
+        geom_histogram(aes(x = x, y = after_stat(count), fill = activity),
+                      bins = 60, position = "stack") +
+        geom_line(data = data.frame(x = dc_x, y = dc_y),
+                 aes(x = x, y = y, color = "Empirical Density"),
+                 linewidth = 1)
+    
+    # Add distributions
+    theta <- seq(-pi, pi, length=200)
+    for (dist_name in names(fits)) {
+        fit <- fits[[dist_name]]
+        theta_pos <- theta
+        theta_pos[theta < 0] <- theta_pos[theta < 0] + 2*pi
+        
+        density_values <- switch(dist_name,
+            "vm" = dvonmises(theta_pos, mu=fit$parameters$mu, kappa=fit$parameters$kappa),
+            "wrpcauchy" = dwrappedcauchy(theta_pos, mu=fit$parameters$mu, rho=fit$parameters$rho)
+        )
+        
+        # Scale density values to match histogram height
+        density_values <- density_values * scaling_factor
+        
+        dist_df <- data.frame(x = theta, y = density_values,
+                            Distribution = dist_name)
+        p1 <- p1 + geom_line(data = dist_df,
+                            aes(x = x, y = y, color = Distribution),
+                            linewidth = 1)
+    }
+    
+    # Add styling
+    p1 <- p1 +
+        scale_x_continuous(breaks = c(-pi, -pi/2, 0, pi/2, pi),
+                         labels = c("-π", "-π/2", "0", "π/2", "π"),
+                         limits = c(-pi, pi)) +
+        scale_color_manual(name = "Distributions",
+                         values = distribution_colors) +
+        scale_fill_manual(name = "Activities",
+                        values = activity_colors) +
+        theme_minimal() +
+        labs(title = paste("Circular Distribution Fitting for", feature_name),
+             x = "Angle (radians)",
+             y = "Count") +
+        theme(legend.position = "right",
+              legend.title = element_text(face = "bold"),
+              plot.title = element_text(hjust = 0.5),
+              legend.box = "vertical")
+    
+    # Add AIC values to legend
+    legend_labels <- sapply(names(fits),
+                          function(n) sprintf("%s (AIC=%.2f)", n, fits[[n]]$aic))
+    p1 <- p1 + guides(color = guide_legend(title = "Distributions",
+                                         labels = legend_labels))
+    
+    # Add reference lines
+    p1 <- p1 +
+        geom_vline(xintercept = 0, linetype = "dashed", alpha = 0.3) +
+        geom_vline(xintercept = c(-pi, pi), linetype = "dashed", alpha = 0.3)
+    
+    return(p1)
+}
+
+
+
+plot_circular_distributions_old <- function(data, feature_name, fits, Options) {
     # First transform angles to [0, 2π)
     angles <- as.numeric(data)
     angles[angles < 0] <- angles[angles < 0] + 2*pi
@@ -690,7 +987,7 @@ plot_circular_distributions <- function(data, feature_name, fits, Options) {
         
         density_values <- switch(dist_name,
             "vm" = dvonmises(theta_pos, mu=fit$parameters$mu, kappa=fit$parameters$kappa),
-            "wc" = dwrappedcauchy(theta_pos, mu=fit$parameters$mu, rho=fit$parameters$rho)
+            "wrpcauchy" = dwrappedcauchy(theta_pos, mu=fit$parameters$mu, rho=fit$parameters$rho)
         )
         
         dist_df <- data.frame(x = theta, y = density_values,
@@ -708,7 +1005,7 @@ plot_circular_distributions <- function(data, feature_name, fits, Options) {
         scale_color_manual(name = "Distributions",
                          values = c("Empirical Density" = "black",
                                   "vm" = "#E41A1C",
-                                  "wc" = "#377EB8")) +
+                                  "wrpcauchy" = "#377EB8")) +
         scale_fill_manual(name = "Data",
                         values = c("Empirical" = "lightgrey")) +
         theme_minimal() +
@@ -739,7 +1036,7 @@ get_regular_fit_metrics <- function(data, distributions) {
     if (!requireNamespace("fitdistrplus", quietly = TRUE)) {
         stop("fitdistrplus package is required for distribution fitting")
     }
-    
+    # print(data)
     # Data preprocessing
     data <- data[data > 0]  # Ensure positive values
     if (length(data) == 0) {
@@ -952,141 +1249,373 @@ plot_distribution_analysis_old <- function(data, col_name, fits, Options) {
 }
 
 
-plot_distribution_analysis <- function(data, feature_name, fits, Options) {
+
+
+plot_distribution_analysis <- function(data, col_name, fits, Options, activities = NULL, distribution_colors, activity_colors) {
+    # Create initial data frame with all data and activities
+    plot_data <- data.frame(
+        x = data,
+        activity = if(!is.null(activities)) activities else rep("Unknown", length(data))
+    )
+    
     # Handle outliers if requested
     if (Options$remove_outliers) {
-        Q1 <- quantile(data, 0.25)
-        Q3 <- quantile(data, 0.75)
+        Q1 <- quantile(plot_data$x, 0.25)
+        Q3 <- quantile(plot_data$x, 0.75)
         IQR <- Q3 - Q1
         outlier_bounds <- c(Q1 - 1.5 * IQR, Q3 + 1.5 * IQR)
-        data <- data[data >= outlier_bounds[1] & data <= outlier_bounds[2]]
+        clean_indices <- plot_data$x >= outlier_bounds[1] & plot_data$x <= outlier_bounds[2]
+        plot_data <- plot_data[clean_indices, ]
     }
     
-    # Create base plot
-    p <- ggplot(data.frame(x = data), aes(x = x)) +
-        geom_histogram(aes(y = after_stat(density)), bins = 30, 
-                      fill = "lightgrey", color = "black", alpha = 0.5) +
-        geom_density(color = "black", linewidth = 1)
+
+  
+    # Calculate histogram counts first
+    hist_data <- ggplot_build(
+        ggplot(plot_data, aes(x = x)) +
+        geom_histogram(aes(fill = activity), bins = 30, position = "stack")
+    )$data[[1]]
     
-    # Add fitted distributions
-    x_range <- seq(min(data), max(data), length.out = 200)
-    colors <- c("lnorm" = "blue", "gamma" = "red", "weibull" = "green",
-                "norm" = "purple", "exp" = "orange")
+    max_count <- max(hist_data$count)
     
-    for (dist_name in names(fits)) {
-        fit <- fits[[dist_name]]
+    # Calculate bin width for proper density scaling
+    bin_width <- diff(range(plot_data$x)) / 30  # 30 bins
+    n_samples <- nrow(plot_data)
+    scaling_factor <- n_samples * bin_width
+    
+    # Create base plot with histogram
+    p1 <- ggplot(plot_data, aes(x = x)) +
+        geom_histogram(aes(y = after_stat(count), fill = activity),
+                        bins = 30,
+                        position = "stack") +
+        scale_y_continuous(name = "Count")
+    
+    # Add distribution curves scaled to match histogram area
+    x_range <- seq(min(plot_data$x), max(plot_data$x), length.out = 200)
+    for (fit in fits) {
+        dist_name <- fit$distribution
         y_values <- switch(dist_name,
-            "weibull" = dweibull(x_range, shape = fit$parameters$shape, 
-                                scale = fit$parameters$scale),
-            "lnorm" = dlnorm(x_range, meanlog = fit$parameters$meanlog, 
-                            sdlog = fit$parameters$sdlog),
-            "gamma" = dgamma(x_range, shape = fit$parameters$shape, 
-                            rate = fit$parameters$rate),
-            "exp" = dexp(x_range, rate = fit$parameters$rate),
-            "norm" = dnorm(x_range, mean = fit$parameters$mean, 
-                          sd = fit$parameters$sd)
+                        "weibull" = dweibull(x_range, shape = fit$parameters$shape, 
+                                                scale = fit$parameters$scale),
+                        "lnorm" = dlnorm(x_range, meanlog = fit$parameters$meanlog, 
+                                            sdlog = fit$parameters$sdlog),
+                        "gamma" = dgamma(x_range, shape = fit$parameters$shape, 
+                                            rate = fit$parameters$rate),
+                        "exp" = dexp(x_range, rate = fit$parameters$rate),
+                        "norm" = dnorm(x_range, mean = fit$parameters$mean, 
+                                        sd = fit$parameters$sd)
         )
         
-        p <- p + geom_line(data = data.frame(x = x_range, y = y_values),
-                          aes(y = y, color = dist_name),
-                          linewidth = 1)
+        # Scale density to match histogram area
+        y_values <- y_values * scaling_factor
+        
+        dist_df <- data.frame(x = x_range, 
+                            y = y_values,
+                            Distribution = dist_name)
+        p1 <- p1 + geom_line(data = dist_df, 
+                            aes(x = x, y = y, color = Distribution),
+                            linewidth = 1)
     }
     
-    p + scale_color_manual(values = colors) +
+    # Add empirical density scaled to match
+    density_line <- density(plot_data$x)
+    density_df <- data.frame(
+        x = density_line$x,
+        y = density_line$y * scaling_factor
+    )
+    p1 <- p1 + geom_line(data = density_df,
+                        aes(x = x, y = y, color = "Empirical Density"),
+                        linewidth = 1)
+
+
+
+    # Add scales and theme
+    p1 <- p1 + 
+        scale_color_manual(name = "Distributions",
+                        values = c("Empirical Density" = "black",
+                                    "weibull" = "#E41A1C",
+                                    "lnorm" = "#377EB8",
+                                    "gamma" = "#4DAF4A",
+                                    "exp" = "#984EA3",
+                                    "norm" = "#FF7F00")) +
+        scale_fill_manual(name = "Activities",
+                        values = activity_colors) +
         theme_minimal() +
-        labs(title = sprintf("Distribution Fits for %s", feature_name),
-             x = feature_name,
-             y = "Density",
-             color = "Distribution")
+        labs(title = paste("Distribution Fitting for", col_name),
+            x = col_name) +
+        theme(legend.position = "right",
+            legend.title = element_text(face = "bold"),
+            plot.title = element_text(hjust = 0.5),
+            legend.box = "vertical")
+
+    # If showing full range, create a second plot
+    if (Options$show_full_range) {
+        full_data <- data.frame(
+        x = data,
+        activity = if(!is.null(activities)) activities[1:length(data)] 
+                    else rep("Unknown", length(data))
+        )
+        
+        # Calculate max count for full range
+        full_hist_data <- ggplot_build(
+        ggplot(full_data, aes(x = x)) +
+            geom_histogram(aes(fill = activity), bins = 30, position = "stack")
+        )$data[[1]]
+        
+        full_max_count <- max(full_hist_data$count)
+        
+        p2 <- ggplot(full_data, aes(x = x)) +
+        geom_histogram(aes(y = after_stat(count),
+                            fill = activity),
+                        bins = 30,
+                        position = "stack") +
+        scale_y_continuous(
+            name = "Count",
+            sec.axis = sec_axis(~./full_max_count, name = "Density")
+        ) +
+        scale_fill_manual(name = "Activities",
+                        values = activity_colors) +
+        theme_minimal() +
+        labs(title = "Full Range Distribution",
+            x = col_name)
+
+        return(gridExtra::grid.arrange(p1, p2, ncol = 1,
+                                    heights = c(2, 1)))
+    }
+
+    return(p1)
 }
+
+
 
 
 get_cv_metrics <- function(cv_models, all_actual_states, all_predicted_states, test_type, features) {
-  # Ensure states are factors with same levels
-  all_levels <- unique(c(levels(all_actual_states), levels(all_predicted_states)))
-  all_actual_states <- factor(all_actual_states, levels = all_levels)
-  all_predicted_states <- factor(all_predicted_states, levels = all_levels)
-  
-  # Overall accuracy and confusion matrix
-  accuracy <- mean(all_actual_states == all_predicted_states)
-  conf_matrix <- confusionMatrix(all_predicted_states, all_actual_states)
-  
-  
-  # Aggregate transition matrices
-  gamma_matrices <- lapply(cv_models, function(m) m$mle$gamma)
-  mean_gamma <- Reduce('+', gamma_matrices) / length(gamma_matrices)
-  sd_gamma <- sqrt(Reduce('+', lapply(gamma_matrices, function(x) (x - mean_gamma)^2)) / length(gamma_matrices))
-  
-  emission_params <- names(cv_models[[1]]$mle)[names(cv_models[[1]]$mle) %in% names(features)]
-  
-  # Process emission parameters dynamically
-  emission_stats <- lapply(emission_params, function(param_name) {
-    params <- lapply(cv_models, function(m) m$mle[[param_name]])
+    # Ensure states are factors with same levels
+    # all_levels <- unique(c(levels(all_actual_states), levels(all_predicted_states)))
+    # all_actual_states <- factor(all_actual_states, levels = all_levels)
+    # all_predicted_states <- factor(all_predicted_states, levels = all_levels)
+    
+    # Overall accuracy and confusion matrix
+    accuracy <- mean(all_actual_states == all_predicted_states)
+    conf_matrix <- confusionMatrix(all_predicted_states, all_actual_states)
     
     
-  
-    if (is.matrix(params[[1]])) {
-      n_states <- nrow(params[[1]])
-      n_components <- ncol(params[[1]])
-      
-      means <- matrix(0, n_states, n_components)
-      sds <- matrix(0, n_states, n_components)
-      
-      for (i in 1:n_states) {
-        for (j in 1:n_components) {
-          values <- sapply(params, function(p) p[i,j])
-          means[i,j] <- mean(values)
-          sds[i,j] <- sd(values)
+    # Aggregate transition matrices
+
+
+    gamma_matrices <- lapply(cv_models, function(m) m$mle$gamma)
+    mean_gamma <- Reduce('+', gamma_matrices) / length(gamma_matrices)
+    sd_gamma <- sqrt(Reduce('+', lapply(gamma_matrices, function(x) (x - mean_gamma)^2)) / length(gamma_matrices))
+
+
+    # print("!!!!!!!!!!!!!!!!!!!!!!!!!!bbbbbbbbbbbbbbbbbbbbbbbbbbb!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+
+    # cat("\nChecking cv_models structure:\n")
+    # cat("Number of models:", length(cv_models), "\n")
+    # cat("Model names:", names(cv_models), "\n")
+    
+    # # Check each model's transition matrix
+    # cat("\nChecking transition matrices:\n")
+    # for(cow_id in names(cv_models)) {
+    #     cat("\nCow", cow_id, ":\n")
+        
+    #     # str(cv_models[[cow_id]]$mle)
+
+    #     if(is.null(cv_models[[cow_id]])) {
+    #         cat("- Model is NULL\n")
+    #         next
+    #     }
+    #     if(is.null(cv_models[[cow_id]]$mle)) {
+    #         cat("- MLE is NULL\n")
+    #         next
+    #     }
+    #     if(is.null(cv_models[[cow_id]]$mle$gamma)) {
+    #         cat("- Gamma matrix is NULL\n")
+    #         next
+    #     }
+    #     cat("- Gamma matrix dimensions:", dim(cv_models[[cow_id]]$mle$gamma), "\n")
+    #     print(cv_models[[cow_id]]$mle$gamma)
+    # }
+    # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!CLOSE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+
+
+
+    emission_params <- names(cv_models[[1]]$mle)[names(cv_models[[1]]$mle) %in% names(features)]
+    
+    # Process emission parameters dynamically
+    emission_stats <- lapply(emission_params, function(param_name) {
+
+        params <- lapply(cv_models, function(m) m$mle[[param_name]])
+
+        if (is.matrix(params[[1]])) {
+        n_states <- nrow(params[[1]])
+        n_components <- ncol(params[[1]])
+        
+        means <- matrix(0, n_states, n_components)
+        sds <- matrix(0, n_states, n_components)
+        
+        for (i in 1:n_states) {
+            for (j in 1:n_components) {
+            values <- sapply(params, function(p) p[i,j])
+            means[i,j] <- mean(values)
+            sds[i,j] <- sd(values)
+            }
         }
-      }
-      
-      list(mean = means, sd = sds)
-    } else {
-      param_matrix <- do.call(rbind, params)
-      list(
-        mean = colMeans(param_matrix),
-        sd = apply(param_matrix, 2, sd)
-      )
-    }
-  })
-  names(emission_stats) <- emission_params
-  
-  # Calculate per-state statistics
-  states <- levels(all_actual_states)
-  state_stats <- lapply(states, function(state) {
-    actual_binary <- all_actual_states == state
-    pred_binary <- all_predicted_states == state
+        
+        list(mean = means, sd = sds)
+        } else {
+        param_matrix <- do.call(rbind, params)
+        list(
+            mean = colMeans(param_matrix),
+            sd = apply(param_matrix, 2, sd)
+        )
+        }
+    })
+    names(emission_stats) <- emission_params
     
-    TP <- sum(actual_binary & pred_binary)
-    TN <- sum(!actual_binary & !pred_binary)
-    FP <- sum(!actual_binary & pred_binary)
-    FN <- sum(actual_binary & !pred_binary)
+    # Calculate per-state statistics
+    states <- levels(all_actual_states)
+    state_stats <- lapply(states, function(state) {
+        actual_binary <- all_actual_states == state
+        pred_binary <- all_predicted_states == state
+        
+        TP <- sum(actual_binary & pred_binary)
+        TN <- sum(!actual_binary & !pred_binary)
+        FP <- sum(!actual_binary & pred_binary)
+        FN <- sum(actual_binary & !pred_binary)
+        
+        list(
+        State = state,
+        N_Actual = sum(actual_binary),
+        N_Predicted = sum(pred_binary),
+        Specificity = TN/(TN + FP),
+        Sensitivity = TP/(TP + FN),
+        F1 = 2*TP/(2*TP + FP + FN)
+        )
+    })
+    state_stats_df <- do.call(rbind.data.frame, state_stats)
     
-    list(
-      State = state,
-      N_Actual = sum(actual_binary),
-      N_Predicted = sum(pred_binary),
-      Specificity = TN/(TN + FP),
-      Sensitivity = TP/(TP + FN),
-      F1 = 2*TP/(2*TP + FP + FN)
-    )
-  })
-  state_stats_df <- do.call(rbind.data.frame, state_stats)
-  
-  return(list(
-    # test_type = test_type,
-    accuracy = accuracy,
-    state_statistics = state_stats_df,
-    confusion_matrix = conf_matrix$table,
-    transition_matrix = list(
-      mean = mean_gamma,
-      sd = sd_gamma
-    ),
-    emission_parameters = emission_stats,
-    features = features
-  ))
+    return(list(
+        # test_type = test_type,
+        accuracy = accuracy,
+        state_statistics = state_stats_df,
+        confusion_matrix = conf_matrix$table,
+        transition_matrix = list(
+        mean = mean_gamma,
+        sd = sd_gamma
+        ),
+        emission_parameters = emission_stats,
+        features = features
+    ))
 }
 
+
+
+# get_cv_metrics <- function(cv_models, all_actual_states, all_predicted_states, features) {
+#     # Ensure states are factors with same levels
+#     all_levels <- unique(c(levels(all_actual_states), levels(all_predicted_states)))
+#     all_actual_states <- factor(all_actual_states, levels = all_levels)
+#     all_predicted_states <- factor(all_predicted_states, levels = all_levels)
+    
+#     # Overall accuracy and confusion matrix
+#     accuracy <- mean(all_actual_states == all_predicted_states)
+#     conf_matrix <- confusionMatrix(all_predicted_states, all_actual_states)
+    
+#     # Aggregate transition matrices - with error checking
+#     gamma_matrices <- lapply(cv_models, function(m) {
+#         if (is.null(m$mle$gamma)) {
+#             cat("Warning: Missing transition matrix in a model\n")
+#             return(NULL)
+#         }
+#         return(m$mle$gamma)
+#     })
+    
+#     # Remove NULL entries and check if we have any matrices
+#     gamma_matrices <- gamma_matrices[!sapply(gamma_matrices, is.null)]
+    
+#     if (length(gamma_matrices) > 0) {
+#         mean_gamma <- Reduce('+', gamma_matrices) / length(gamma_matrices)
+#         sd_gamma <- sqrt(Reduce('+', lapply(gamma_matrices, function(x) 
+#             (x - mean_gamma)^2)) / length(gamma_matrices))
+#     } else {
+#         cat("Warning: No valid transition matrices found\n")
+#         # Create dummy matrices with NAs
+#         n_states <- length(all_levels)
+#         mean_gamma <- matrix(NA, n_states, n_states)
+#         sd_gamma <- matrix(NA, n_states, n_states)
+#         rownames(mean_gamma) <- colnames(mean_gamma) <- all_levels
+#         rownames(sd_gamma) <- colnames(sd_gamma) <- all_levels
+#     }
+
+#     # Rest of the function remains the same...
+#     emission_params <- names(cv_models[[1]]$mle)[names(cv_models[[1]]$mle) %in% names(features)]
+
+#   # Process emission parameters dynamically
+#   emission_stats <- lapply(emission_params, function(param_name) {
+#     params <- lapply(cv_models, function(m) m$mle[[param_name]])
+    
+    
+  
+#     if (is.matrix(params[[1]])) {
+#       n_states <- nrow(params[[1]])
+#       n_components <- ncol(params[[1]])
+      
+#       means <- matrix(0, n_states, n_components)
+#       sds <- matrix(0, n_states, n_components)
+      
+#       for (i in 1:n_states) {
+#         for (j in 1:n_components) {
+#           values <- sapply(params, function(p) p[i,j])
+#           means[i,j] <- mean(values)
+#           sds[i,j] <- sd(values)
+#         }
+#       }
+      
+#       list(mean = means, sd = sds)
+#     } else {
+#       param_matrix <- do.call(rbind, params)
+#       list(
+#         mean = colMeans(param_matrix),
+#         sd = apply(param_matrix, 2, sd)
+#       )
+#     }
+#   })
+#   names(emission_stats) <- emission_params
+  
+#   # Calculate per-state statistics
+#   states <- levels(all_actual_states)
+#   state_stats <- lapply(states, function(state) {
+#     actual_binary <- all_actual_states == state
+#     pred_binary <- all_predicted_states == state
+    
+#     TP <- sum(actual_binary & pred_binary)
+#     TN <- sum(!actual_binary & !pred_binary)
+#     FP <- sum(!actual_binary & pred_binary)
+#     FN <- sum(actual_binary & !pred_binary)
+    
+#     list(
+#       State = state,
+#       N_Actual = sum(actual_binary),
+#       N_Predicted = sum(pred_binary),
+#       Specificity = TN/(TN + FP),
+#       Sensitivity = TP/(TP + FN),
+#       F1 = 2*TP/(2*TP + FP + FN)
+#     )
+#   })
+#   state_stats_df <- do.call(rbind.data.frame, state_stats)
+  
+#   return(list(
+#     accuracy = accuracy,
+#     state_statistics = state_stats_df,
+#     confusion_matrix = conf_matrix$table,
+#     transition_matrix = list(
+#       mean = mean_gamma,
+#       sd = sd_gamma
+#     ),
+#     emission_parameters = emission_stats,
+#     features = features
+#   ))
+# }
 
 
 
@@ -1117,6 +1646,11 @@ print_cv_results <- function(results) {
     print(format(results$confusion_matrix, digits=3))
     
     cat("\nTransition Matrix (mean +/- sd):\n")
+
+    # print(results$transition_matrix)
+
+    # print(results$transition_matrix$mean)
+    # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
     states <- rownames(results$transition_matrix$mean)
     max_state_length <- max(nchar(states))
     
@@ -1169,77 +1703,4 @@ print_cv_results <- function(results) {
     
     # Flush the output to ensure everything is printed
     flush.console()
-}
-
-
-print_cv_results_old <- function(results) {
-    if (is.null(results$features)) {
-        stop("Features list is required for printing results")
-    }
-    
-    cat("\n=================================================\n")
-    cat("===================== Results ===================\n")
-    cat("=================================================\n")
-    
-    cat("\nOverall Accuracy:", sprintf("%.3f", results$accuracy), "\n")
-    
-    cat("\nState Statistics:\n")
-    print(data.frame(lapply(results$state_statistics, function(x) 
-        if(is.numeric(x)) round(x, 3) else x)))
-    
-    cat("\nConfusion Matrix:\n")
-    print(results$confusion_matrix)
-    
-    cat("\nTransition Matrix (mean ± sd):\n")
-    states <- rownames(results$transition_matrix$mean)
-    max_state_length <- max(nchar(states))
-    
-    # Print transitions
-    cat("From/To:", paste(sprintf("%*s", max_state_length, states), collapse = "  "), "\n")
-    for(i in 1:nrow(results$transition_matrix$mean)) {
-        cat(sprintf("%-*s:  ", max_state_length, states[i]))
-        for(j in 1:ncol(results$transition_matrix$mean)) {
-            cat(sprintf("%*.3f±%.3f  ", 
-                max_state_length,
-                results$transition_matrix$mean[i,j],
-                results$transition_matrix$sd[i,j]))
-        }
-        cat("\n")
-    }
-    
-    # Distribution parameter names mapping
-    dist_param_names <- list(
-        "lnorm" = c("Location (μ)", "Scale (σ)"),
-        "vm" = c("Mean (μ)", "Concentration (κ)"),
-        "gamma" = c("Shape (α)", "Rate (β)"),
-        "norm" = c("Mean (μ)", "SD (σ)"),
-        "exp" = c("Rate (λ)"),
-        "weibull" = c("Shape (k)", "Scale (λ)")
-    )
-    
-    # Print emission parameters dynamically
-    cat("\nEmission Parameters (mean +/- sd):\n")
-
-    for(param_name in names(results$emission_parameters)) {
-        dist_type <- results$features[[param_name]]$dist
-
-        print(param_name)
-        cat(sprintf("\n%s (%s distribution):\n", param_name, dist_type))
-        
-        param_names <- dist_param_names[[dist_type]]
-        
-        param_data <- results$emission_parameters[[param_name]]
-
-        for(i in 1:length(param_names)) {
-            cat(sprintf("\n%s:\n", param_names[i]))
-            for(state in states) {
-                state_idx <- which(states == state)
-                cat(sprintf("  %-*s: %.3f +/- %.3f\n",
-                    max_state_length,
-                    state,
-                    param_data$mean[i, state_idx],
-                    param_data$sd[i, state_idx]))
-            }
-        }
-    }
 }

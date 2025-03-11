@@ -1,0 +1,230 @@
+common:
+  dataset_name: RB_Combined
+  timezone: "America/Denver"
+  gps_sample_interval: 300          # Expected seconds between GPS
+  accel_sample_interval: 60           # Expected seconds between Accelerometer 
+  excluded_devices: [841, 1005, 609, 612, 607, 614, 1021, 1006] 
+  random_seed: 0
+
+
+io:
+  format: "multiple_files"
+  gps_directory: "data/raw/RB_22/gps"
+  accelerometer_directory: "data/raw/RB_22/accelerometer"
+  labeled_data_path: "data/raw/RB_22/labeled/gps_observations_2022.csv"
+  file_pattern: "*.csv"
+
+  # processed_data_path: "data/processed/RB_22/all_cows_labeled_mode.csv"
+  processed_data_path: "data/processed/RB_22/all_cows_labeled.csv"
+  
+  # tag_to_device:
+  #   '6082': '609'
+  #   '6085': '610'
+  #   '6094': '614'
+  #   '5090': '602'
+  #   '5051': '612'
+  #   '5010': '617'
+  #   '3065': '603'
+  #   '3091': '611'
+  #   '0276': '600'
+  #   '0286': '605'
+  #   '0256': '606'
+  #   '0105': '608'
+  #   '0174': '613'
+  #   '0163': '616'
+  #   '0101': '604'
+  #   '0024': '607'
+  #   '0011': '615'
+
+
+  # label_to_value:
+  #   't': 'Traveling'
+  #   'g': 'Grazing'
+  #   's': 'Resting' #'Standing'
+  #   'm': 'Mineral'
+  #   'r': 'Resting'
+  #   'l': 'Resting' # 'Laying'
+  #   'd': 'Drinking'
+  #   'f': 'Fighting'
+
+
+
+validation:
+  start_datetime: "2022-01-15 00:00:00"
+  end_datetime: "2022-03-23 00:00:00"
+  COVERAGE_THRESHOLD: 70            # Minimum ratio of (actual / expected) GPS data needed to include the device
+
+  # New validation rules structure
+  validation_rules:
+    # GPS validation rules
+    latitude:
+      min_value: -90.0
+      max_value: 90.0
+      is_required: true
+      filter_invalid: false
+
+    longitude:
+      min_value: -180.0
+      max_value: 180.0
+      is_required: true
+      filter_invalid: false
+
+    dop:
+      max_value: 10.0
+      is_required: true
+      filter_invalid: true
+
+    satellites:
+      min_value: 0
+      is_required: true
+      filter_invalid: false
+
+    altitude:
+      min_value: 0
+      max_value: 1715
+      is_required: false
+      filter_invalid: false  # Just report violations
+
+    temperature_gps:
+      min_value: -99
+      max_value: 99
+      is_required: true
+      filter_invalid: false
+
+    # Accelerometer validation rules
+    x:
+      min_value: -41
+      max_value: 41
+      is_required: true
+      filter_invalid: false
+
+    y:
+      min_value: -41
+      max_value: 41
+      is_required: true
+      filter_invalid: false
+
+    z:
+      min_value: -41
+      max_value: 41
+      is_required: true
+      filter_invalid: false
+
+    temperature_acc:
+      min_value: -99
+      max_value: 99
+      is_required: true
+      filter_invalid: false
+
+features:
+  enable_axis_features: true        # Compute features for each axes
+  enable_magnitude_features: true   # Compute features for the magnitudes
+  feature_types:
+    - "BASIC_STATS"                 # Mean, variance of the window
+    # - "ZERO_CROSSINGS"              # Count of transitions from - to + or + to -
+    # - "PEAK_FEATURES"               # Statistics covering the peaks of the window
+    # - "ENTROPY"                     # Compute signal entropy features
+    # - "CORRELATION"                 # Compute correlation between axes
+    # - "SPECTRAL"                    # Compute frequency domain features
+ 
+labels:
+  # labeled_agg_method: "MODE"        # The most frequent activity in the window
+  labeled_agg_method: "RAW"           # The activity at the end of the window
+  # labeled_agg_method: "PERCENTILE"  # A weighted choice of activity
+  valid_activities:
+    - "Resting"
+    - "Grazing"
+    - "Traveling"
+    - "Fighting"
+    - "Scratching"
+    - "Drinking"
+    - "Mineral"
+
+# This is the section where options for the momentuHMM can we defined.
+# Ideally, the LSTM config will also live here
+# analysis:
+#   mode: "LOOCV" # Create models where each cow is used as the test cow once. Collect results and print performance statistics.
+#   mode: "PRODUCT" # Create one model based on all available labeled data. Apply the model to the unlabeled data, save the model, and save the labels. 
+
+analysis:
+  # mode: "LOOCV"     # Do LOOCV on the target dataset. 
+  mode: "PRODUCT"   # predict activity labels for a full dataset
+  target_dataset: "data/processed/RB_19_22_Combined/all_cows_labeled_combined.csv"
+
+  
+  # Optional, only for PRODUCT mode. The reference training information. Either `dataset` or `model`
+  # training_info:     
+  # #   training_info_type: "dataset" # A dataset to create a trained model from
+  # #   training_info_path: "data/processed/RB_22/all_cows_labeled_2.csv"
+  #   training_info_type: "model"   # A saved trained model  
+  #   # training_info_path: "data/analysis_results/hmm/PRODUCT/Has_Model_RB_22_20250220_192022/trained_model.rds"
+  #   training_info_path: "data/analysis_results/hmm/PRODUCT/Has_Model_RB_19_20250220_192315/trained_model.rds"
+
+
+  r_executable: "C:/Program Files/R/R-4.3.0/bin/Rscript.exe"
+  enabled_analyses: ["hmm"]
+  # enabled_analyses: ["lstm"]
+  #DELETE data_path: "data/processed/RB_22/all_cows_labeled.csv"
+  output_dir: "data/analysis_results"
+  
+
+
+  hmm:
+    enabled: true
+    # time_covariate: true
+    time_covariate: false
+    states: # The states to use i the HMM
+      - "Grazing"
+      - "Resting"
+      - "Traveling"
+    features:
+
+    # Improve this? while it is kinda nice we could make this cleaner. 
+      - name: "step" # Powerful
+        dist: null
+        dist_type: "regular"
+      - name: "angle" # Ok
+        dist: null
+        dist_type: "circular"
+      - name: "magnitude_mean" # Powerful
+        dist: null 
+        dist_type: "regular"
+      # - name: "x_crest_factor" # OK
+      #   dist: null
+      #   dist_type: "regular"
+      # - name: "x_peak_to_peak" # not impressed
+      #   dist: null
+      #   dist_type: "regular"
+      # - name: "y_peak_to_peak" # Pretty good
+      #   dist: null
+      #   dist_type: "regular"
+      # - name: "x_impulse_factor" # Not Impressive
+      #   dist: null
+      #   dist_type: "regular"
+      - name: "magnitude_var" # Ok
+        dist: null
+        dist_type: "regular"
+
+      # Can kindof add covariates here. They work but break some other reports like transition matrices. 
+      # Need to manaually update the fitHMM formula argument from ~1 to ~temperature_gps  
+      # - name: "temperature_gps"  # Add the covariate
+      #   dist: null
+      #   dist_type: "covariate"  # New dist_type for covariates
+    options:
+      show_dist_plots: true
+      remove_outliers: true   # From the plots
+      show_full_range: true
+      show_correlation: true
+      number_of_retry_fits: 1 # 1
+      distributions:
+        regular:
+          - "LOGNORMAL"
+          - "GAMMA"
+          # - "WEIBULL" # This does not work. Needs To be debugged.
+          - "NORMAL"
+          - "EXPONENTIAL"
+        circular:
+          - "VONMISES"
+          - "WRAPPEDCAUCHY"
+
+# visuals:

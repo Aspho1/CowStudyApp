@@ -42,6 +42,7 @@ output/
 # config/*.yaml
 # !config/default.yaml
 
-# data/*
+data/*
 
+.RDataTmp
 # .workspace

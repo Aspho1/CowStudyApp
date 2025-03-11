@@ -4,18 +4,13 @@ from enum import Enum, auto
 import os
 from pathlib import Path
 import platform
-from typing import Literal, Optional, Dict, List, Set, Union
-from pydantic import BaseModel, DirectoryPath, FilePath, Field, field_validator, ValidationInfo, computed_field
+from typing import Literal, Optional, Dict, List, Set
+from pydantic import BaseModel, DirectoryPath, FilePath, Field, field_validator, ValidationInfo
 import pytz
 import yaml
 from .utils import list_valid_timezones
-from dataclasses import dataclass, field
 
 ##################################### ENUMS #####################################
-class DataFormat(Enum):
-    '''NOT FULLY IMPLEMENTED -- Options of data input'''
-    SINGLE_FILE = "single_file"
-    MULTIPLE_FILES = "multiple_files"
 
 class FeatureType(str, Enum):
     """Types of features available for computation"""
@@ -31,6 +26,13 @@ class LabelAggTypeType(str, Enum):
     MODE = "MODE"
     RAW = "RAW"
     PERCENTILE = "PERCENTILE"  
+
+
+class FeatureDistType(str, Enum):
+    """Types of feature distributions"""
+    REGULAR = "regular"
+    CIRCULAR = "circular"
+    COVARIATE = "covariate"
 
 class DistributionTypes(str, Enum):
     """Types of distributions to fit"""
@@ -56,8 +58,13 @@ class CommonConfig(BaseModel):
     Configurations shared across multiple sub-configurations
     """
     excluded_devices: List[int] = Field(default_factory=list)
-    
     timezone: str = "America/Denver"
+    dataset_name: str = Field("unnamed")
+    random_seed: int = Field(0)
+
+    # Aggregation settings
+    gps_sample_interval: int = Field(default=300)
+    acc_sample_interval: int = Field(default=60)
 
     @field_validator('timezone')
     def validate_timezone(cls, v):
@@ -68,10 +75,6 @@ class CommonConfig(BaseModel):
             list_valid_timezones()
             raise ValueError(f"Unknown timezone: {v}. Please use a timezone from the IANA Time Zone Database.")
         
-    # Aggregation settings
-    gps_sample_interval: int = Field(default=300)
-    acc_sample_interval: int = Field(default=60)
-
 ##################################### Configuation file locator #####################################
 
 class ConfigLocator:
@@ -105,8 +108,15 @@ class ConfigLocator:
             
         return paths
 
-
 ##################################### Function Specific Configurations #####################################
+
+class ValidationRule(BaseModel):
+    """Defines validation rules for a single field"""
+    min_value: Optional[float] = None
+    max_value: Optional[float] = None
+    is_required: bool = True
+    filter_invalid: bool = True  # If False, just report violations without filtering
+
 
 class DataValidationConfig(CommonConfig):
     '''
@@ -115,25 +125,42 @@ class DataValidationConfig(CommonConfig):
     # timezone: str = "America/Denver"
     start_datetime: Optional[datetime] = None
     end_datetime: Optional[datetime] = None
-    
-    # GPS bounds
-    lat_min: float = Field(ge=-90.0, le=90.0)
-    lat_max: float = Field(ge=-90.0, le=90.0)
-    lon_min: float = Field(ge=-180.0, le=180.0)
-    lon_max: float = Field(ge=-180.0, le=180.0)
     COVERAGE_THRESHOLD: float = Field(50) 
     
+    validation_rules: Dict[str, ValidationRule] = Field(
+        default_factory=lambda: {
+            # Default rules if none provided in config
+            'latitude': ValidationRule(min_value=-90.0, max_value=90.0),
+            'longitude': ValidationRule(min_value=-180.0, max_value=180.0),
+            'dop': ValidationRule(max_value=10.0),
+            'satellites': ValidationRule(min_value=0),
+            'altitude': ValidationRule(min_value=0, max_value=5000, filter_invalid=False),
+            'temperature_gps': ValidationRule(min_value=-99, max_value=99),
+            'x': ValidationRule(min_value=-41, max_value=41),
+            'y': ValidationRule(min_value=-41, max_value=41),
+            'z': ValidationRule(min_value=-41, max_value=41),
+            'temperature_acc': ValidationRule(min_value=-99, max_value=99)
+        }
+    )
 
-    # Accelerometer bounds
-    accel_min: float = Field(ge=-41, le= 41, description="Minimum acceptable acceleration (m/s^2)")
-    accel_max: float = Field(ge=-41, le= 41,description="Maximum acceptable acceleration (m/s^2)")
-    temp_min: float = Field(description="Minimum acceptable temperature (C)")
-    temp_max: float = Field(description="Maximum acceptable temperature (C)")
-
-    # Quality filters
-    min_satellites: int = Field(ge=0)
-    max_dop: float = Field(gt=0)
-
+    @field_validator('validation_rules')
+    def validate_rules(cls, v):
+        """Ensure all validation rules are properly formatted"""
+        if not isinstance(v, dict):
+            raise ValueError("validation_rules must be a dictionary")
+        
+        # Convert any dict-like rules to ValidationRule objects
+        validated_rules = {}
+        for field, rule in v.items():
+            if isinstance(rule, dict):
+                validated_rules[field] = ValidationRule(**rule)
+            elif isinstance(rule, ValidationRule):
+                validated_rules[field] = rule
+            else:
+                raise ValueError(f"Invalid validation rule for {field}")
+        
+        return validated_rules
+    
     @field_validator('start_datetime', 'end_datetime')
     def localize_datetime(cls, v, values):
         if v is not None:
@@ -159,16 +186,13 @@ class DataValidationConfig(CommonConfig):
 
 class FeatureConfig(CommonConfig):
     """Configuration for features.py"""
-    # What to compute features on
-    enable_axis_features: bool = Field(False)
-    enable_magnitude_features: bool = Field(True)
-    
-    # Feature types to compute
-    feature_types: Set[FeatureType] = field(
+    enable_axis_features: bool = Field(default=False)
+    enable_magnitude_features: bool = Field(default=True)
+    feature_types: Set[FeatureType] = Field(
         default_factory=lambda: {FeatureType.BASIC_STATS}
     )
-    
-    def __post_init__(self):
+
+    def model_post_init(self, __context):
         """Validate configuration"""
         if not (self.enable_axis_features or self.enable_magnitude_features):
             raise ValueError("Must enable either axis or magnitude features")
@@ -176,37 +200,37 @@ class FeatureConfig(CommonConfig):
             raise ValueError("Must enable at least one feature type")
         if self.gps_sample_interval <= 0:
             raise ValueError("GPS sample interval must be positive")
-        if self.gps_sample_interval <= 0:
+        if self.acc_sample_interval <= 0:
             raise ValueError("Accelerometer sample interval must be positive")
-        
+     
 
 class LabelConfig(CommonConfig):
-    """
-    Configuration for labels.py
-    """
-    
+    """Configuration for labels.py"""
+    valid_activities: List[str] = Field(
+        default_factory=list,
+        description="List of valid activity labels"
+    )
     labeled_agg_method: LabelAggTypeType = Field(
-            default=LabelAggTypeType.RAW
-        )
+        default=LabelAggTypeType.RAW
+    )
 
     
 class IoConfig(CommonConfig):
-    format: DataFormat = DataFormat.MULTIPLE_FILES
     gps_directory: Path
     accelerometer_directory: Path
-    labeled_data_path: Path
-    file_pattern: str = "*.csv"
+    labeled_data_path: Optional[Path] = Field(None, description="Optional path to the labeled data.")
+    cow_info_path: Optional[Path] = Field(default=None, description="Path to the meta information about collars and cows")
     tag_to_device: Optional[Dict[str, str]] = Field(default=None, description="Mapping of tag IDs to device IDs")
     label_to_value: Optional[Dict[str, str]] = Field(default=None, description="Mapping of shorthand activity labels to words")
     processed_data_path: Path
 
 
-    @field_validator('labeled_data_path')
-    @classmethod
-    def validate_file_path(cls, v: Path) -> Path:
-        if not v.exists():
-            raise ValueError(f"Labeled data file `{v}` does not exist.")
-        return v
+    # @field_validator('labeled_data_path')
+    # @classmethod
+    # def validate_file_path(cls, v: Path) -> Path:
+    #     if not v.exists():
+    #         raise ValueError(f"Labeled data file `{v}` does not exist.")
+    #     return v
 
     @field_validator('tag_to_device')
     @classmethod
@@ -247,25 +271,35 @@ class IoConfig(CommonConfig):
             raise ValueError(f"Path is not a directory: {v}")
         return v
 
-    def validate_config(self) -> None:
-        """Validate configuration compatibility"""
-        if self.format == DataFormat.MULTIPLE_FILES:
-            if not (self.gps_directory and self.accelerometer_directory):
-                raise ValueError("Both GPS and accelerometer directories required for multiple_files format")
     
 
 ########################## Analysis ##############################################
 
-class HMMFeatureConfig(BaseModel):
+class AnalysisFeatureConfig(BaseModel):
     name: str
     dist: Optional[str] = Field(None)
-    dist_type: Optional[str] = Field("regular")
+    dist_type: FeatureDistType = Field(default=FeatureDistType.REGULAR)
 
+    @field_validator('dist_type')
+    def validate_dist_type(cls, v):
+        if v not in FeatureDistType:
+            raise ValueError(f"Invalid distribution type: {v}. Must be one of {[e.value for e in FeatureDistType]}")
+        return v
+
+    @field_validator('dist')
+    def validate_dist(cls, v, info: ValidationInfo):
+        # Covariates don't need a distribution
+        if info.data.get('dist_type') == FeatureDistType.COVARIATE:
+            return None
+        return v
 
 class HMMConfig(BaseModel):
-    enabled: bool = True
+    enabled: bool = False
     states: List[str]
-    features: List[HMMFeatureConfig]
+    features: List[AnalysisFeatureConfig]
+    
+    time_covariate:bool = Field(False)
+
     options: dict = Field(default_factory=lambda: {
         "show_dist_plots": True,
         "remove_outliers": True,
@@ -309,21 +343,41 @@ class HMMConfig(BaseModel):
         return v
 
 class TrainingInfo(BaseModel):
-    training_info_type : str = Field('dataset')
-    training_info_path : Optional[str] = None
+    training_info_type: str = Field('dataset')
+    training_info_path: Optional[str] = None
 
+    @field_validator('training_info_type')
+    @classmethod
+    def set_type_from_path(cls, v, info):
+        # In field_validator, we use info.data instead of values
+        if 'training_info_path' in info.data:
+            path = info.data['training_info_path']
+            if path and path.endswith('.rds'):
+                return 'model'
+            elif path and path.endswith('.csv'):
+                return 'dataset'
+        return v
+
+class LSTMConfig(CommonConfig):
+
+    enabled: bool = False
+    states: List[str]
+    features: List[str]
+
+    max_length: int = 20
+    max_time_gap: int = 960
+    epochs: int = 100
 
 class AnalysisConfig(CommonConfig):
     mode: AnalysisModes = AnalysisModes.LOOCV
     target_dataset: Path
-
-    training_info:Optional[TrainingInfo] = None
-
+    training_info: Optional[TrainingInfo] = None
+    day_only: bool = False
     r_executable: Optional[Path] = None
     hmm: Optional[HMMConfig] = None
+    lstm: Optional[LSTMConfig] = None
     output_dir: Path = Field(default=Path("data/analysis_results"))
-
-    enabled_analyses: List[Literal["hmm"]] = ["hmm"]
+    # enabled_analyses: List[Literal["hmm"]] = ["hmm"]
 
 
     # Not compatible with build_processed_data function
@@ -340,10 +394,90 @@ class AnalysisConfig(CommonConfig):
         v.mkdir(parents=True, exist_ok=True)
         return v
 
+    @field_validator('training_info')
+    @classmethod
+    def create_training_info(cls, v):
+        if isinstance(v, str):
+            return TrainingInfo(training_info_path=v)
+        return v
+
     def validate_config(self) -> None:
         """Validate analysis configuration"""
 
+##################################### Visualizations Config #####################################
 
+class RadarConfig(BaseModel):
+    run: bool
+    extension: str
+    show_night: bool
+
+class TemperatureGraphConfig(BaseModel):
+    run: bool
+    minimum_required_values: int
+    extension: Optional[str] = Field(default="")
+
+class CowInfoGraphConfig(BaseModel):
+    run: bool
+    implemented: bool
+    extension: Optional[str] = Field(default="")
+
+class DomainGraphConfig(BaseModel):
+    run: bool
+    implemented: bool
+    labeled_only: bool
+    extension: Optional[str] = Field(default="")
+
+class HeatmapConfig(BaseModel):
+    run: bool
+    filter_weigh_days: bool
+    weigh_days: List[str]
+    extension: Optional[str] = Field(default="")
+
+class VisualsConfig(CommonConfig):
+    predictions_path: Optional[Path] = None
+    visuals_root_path: Path
+    radar: RadarConfig
+    domain: DomainGraphConfig
+    temperature_graph: TemperatureGraphConfig
+    cow_info_graph: CowInfoGraphConfig
+    heatmap: HeatmapConfig
+
+    @field_validator('visuals_root_path')
+    @classmethod
+    def validate_directory(cls, v: Path) -> Path:
+        if not v.exists():
+            raise ValueError(f"Path `{v}` does not exist.")
+        return v
+
+
+
+    @field_validator('predictions_path')
+    @classmethod
+    def validate_file_path(cls, v: Optional[Path]) -> Optional[Path]:
+        if v is not None and not v.exists():
+            print(f"Warning: Path `{v}` does not exist. Visuals will not work "
+                  "without a correctly defined predictions_path")
+        return v
+    
+
+
+    @field_validator('heatmap')
+    def convert_weigh_days(cls, v: HeatmapConfig, values):
+        if v.weigh_days:
+            tz = pytz.timezone(values.data.get('timezone', 'America/Denver'))
+            # Convert string dates to datetime objects
+            converted_dates = []
+            for date_str in v.weigh_days:
+                try:
+                    # Parse the date string and create a datetime at midnight
+                    dt = datetime.strptime(date_str, "%Y-%m-%d")
+                    # Localize the datetime
+                    dt = tz.localize(dt)
+                    converted_dates.append(dt)
+                except ValueError as e:
+                    raise ValueError(f"Invalid date format in weigh_days: {date_str}. Expected format: YYYY-MM-DD")
+            v.weigh_days = converted_dates
+        return v
 
 
 ##################################### Configuration Manager #####################################
@@ -355,14 +489,17 @@ class ConfigManager:
         self.features: Optional[FeatureConfig] = None
         self.labels: Optional[LabelConfig] = None
         self.io: Optional[IoConfig] = None
-        self.analysis: Optional[AnalysisConfig] = None  # Add analysis config
+        self.analysis: Optional[AnalysisConfig] = None
+        self.visuals: Optional[VisualsConfig] = None
 
     def to_dict(self):
         return {
             'validation': self.validation.__dict__,
             'io': self.io.__dict__, 
             'labels': self.labels.__dict__,
-            'features': self.features.__dict__
+            'features': self.features.__dict__,
+            'analysis': self.analysis.__dict__,
+            'visuals': self.visuals.__dict__
         }
 
     # @classmethod
@@ -371,24 +508,36 @@ class ConfigManager:
         with open(path) as f:
             config_dict = yaml.safe_load(f)
         
-        # print(config_dict)
-        # Load each config component
+        # Get common settings that will be inherited
+        common_config = config_dict.get('common', {})
+        
+        # For each config section, merge common settings with section-specific settings
         if 'validation' in config_dict:
-            self.validation = DataValidationConfig(**config_dict.get('validation', {}))
+            merged_validation = {
+                **common_config,  # Base settings from common
+                **config_dict['validation']  # Section-specific settings (will override common if duplicated)
+            }
+            self.validation = DataValidationConfig(**merged_validation)
         
         if 'features' in config_dict:
-            self.features = FeatureConfig(**config_dict.get('features', {}))
+            merged_features = {**common_config, **config_dict['features']}
+            self.features = FeatureConfig(**merged_features)
         
         if 'labels' in config_dict:
-            self.labels = LabelConfig(**config_dict.get('labels', {}))
+            merged_labels = {**common_config, **config_dict['labels']}
+            self.labels = LabelConfig(**merged_labels)
         
         if 'io' in config_dict:
-            self.io = IoConfig(**config_dict.get('io', {}))
+            merged_io = {**common_config, **config_dict['io']}
+            self.io = IoConfig(**merged_io)
 
         if 'analysis' in config_dict:
-            self.analysis = AnalysisConfig(**config_dict.get('analysis', {}))
-        # Validate cross-component dependencies
-        # self.validate()
+            merged_analysis = {**common_config, **config_dict['analysis']}
+            self.analysis = AnalysisConfig(**merged_analysis)
+
+        if 'visuals' in config_dict:
+            merged_visual = {**common_config, **config_dict['visuals']}
+            self.visuals = VisualsConfig(**merged_visual)
         
         return self
 

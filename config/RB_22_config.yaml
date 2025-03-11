@@ -1,0 +1,242 @@
+common:
+  dataset_name: RB_22
+  timezone: "America/Denver"
+  gps_sample_interval: 300          # Expected seconds between GPS
+  accel_sample_interval: 60           # Expected seconds between Accelerometer 
+  # excluded_devices: [841, 1005, 1021, 1006] 
+  excluded_devices: [841, 1005] 
+  random_seed: 0
+
+
+io:
+  gps_directory: "data/raw/RB_22/gps"
+  accelerometer_directory: "data/raw/RB_22/accelerometer"
+  labeled_data_path: "data/raw/RB_22/labeled/gps_observations_2022.csv"
+  cow_info_path: "data/raw/RB_22/cow_info/Aggregate_collar_info.xlsx"
+
+  # processed_data_path: "data/processed/RB_22/all_cows_labeled_mode.csv"
+  processed_data_path: "data/processed/RB_22/all_cows_labeled.csv"
+  
+
+validation:
+  start_datetime: "2022-01-15 00:00:00"
+  end_datetime: "2022-03-23 00:00:00"
+  COVERAGE_THRESHOLD: 70            # Minimum ratio of (actual / expected) GPS data needed to include the device
+
+  # New validation rules structure
+  validation_rules:
+    # GPS validation rules
+    latitude:
+      min_value: -90.0
+      max_value: 90.0
+      is_required: true
+      filter_invalid: false
+
+    longitude:
+      min_value: -180.0
+      max_value: 180.0
+      is_required: true
+      filter_invalid: false
+
+    dop:
+      max_value: 10.0
+      is_required: true
+      filter_invalid: true # FILTERING HERE
+
+    satellites:
+      min_value: 0
+      is_required: true
+      filter_invalid: false
+
+    altitude:
+      min_value: 0
+      max_value: 1715
+      is_required: false
+      filter_invalid: false
+
+    temperature_gps:
+      min_value: -99
+      max_value: 99
+      is_required: true
+      filter_invalid: false
+
+    # Accelerometer validation rules
+    x:
+      min_value: -41
+      max_value: 41
+      is_required: true
+      filter_invalid: false
+
+    y:
+      min_value: -41
+      max_value: 41
+      is_required: true
+      filter_invalid: false
+
+    z:
+      min_value: -41
+      max_value: 41
+      is_required: true
+      filter_invalid: false
+
+    temperature_acc:
+      min_value: -99
+      max_value: 99
+      is_required: true
+      filter_invalid: false
+
+features:
+  enable_axis_features: true        # Compute features for each axes
+  enable_magnitude_features: true   # Compute features for the magnitudes
+  feature_types:
+    - "BASIC_STATS"                 # Mean, variance of the window
+    # - "ZERO_CROSSINGS"              # Count of transitions from - to + or + to -
+    # - "PEAK_FEATURES"               # Statistics covering the peaks of the window
+    # - "ENTROPY"                     # Compute signal entropy features
+    # - "CORRELATION"                 # Compute correlation between axes
+    # - "SPECTRAL"                    # Compute frequency domain features
+ 
+labels:
+  # labeled_agg_method: "MODE"        # The most frequent activity in the window
+  labeled_agg_method: "RAW"           # The activity at the end of the window
+  # labeled_agg_method: "PERCENTILE"  # A weighted choice of activity NOT IMPLEMENTED
+  valid_activities:
+    - "Resting"
+    - "Grazing"
+    - "Traveling"
+    - "Fighting"
+    - "Scratching"
+    - "Drinking"
+    - "Mineral"
+
+analysis:
+  # mode: "LOOCV"     # Do LOOCV on the target dataset. 
+  mode: "PRODUCT"   # predict activity labels for a full dataset
+  target_dataset: "data/processed/RB_22/all_cows_labeled.csv"  # Required The dataset to make predictions on
+  training_info_path: "data/analysis_results/hmm/FinalModels/RB_22_Paper_Model/trained_model.rds" # No CV, no filter cows, no covariate.
+
+
+  r_executable: "C:/Program Files/R/R-4.3.0/bin/Rscript.exe"
+  enabled_analyses: ["hmm"]
+  # enabled_analyses: ["lstm"]
+  #DELETE data_path: "data/processed/RB_22/all_cows_labeled.csv"
+  output_dir: "data/analysis_results"
+  
+  day_only: false
+
+  hmm:
+    enabled: true
+    time_covariate: false
+
+    states: # The states to use in the HMM
+      - "Grazing"
+      - "Resting"
+      - "Traveling"
+    features:
+      - name: "step" # Powerful
+        dist: null
+        dist_type: "regular"
+      - name: "angle" # Ok
+        dist: null
+        dist_type: "circular"
+      - name: "magnitude_mean" # Powerful
+        dist: null 
+        dist_type: "regular"
+      # - name: "x_crest_factor" # OK
+      #   dist: null
+      #   dist_type: "regular"
+      # - name: "x_peak_to_peak" # not impressed
+      #   dist: null
+      #   dist_type: "regular"
+      # - name: "y_peak_to_peak" # Pretty good
+      #   dist: null
+      #   dist_type: "regular"
+      # - name: "x_impulse_factor" # Not Impressive
+      #   dist: null
+      #   dist_type: "regular"
+      - name: "magnitude_var" # Ok
+        dist: null
+        dist_type: "regular"
+
+      # Can kindof add covariates here. They work but break some other reports like transition matrices. 
+      # Need to manaually update the fitHMM formula argument from ~1 to ~temperature_gps  
+      # - name: "temperature_gps"  # Add the covariate
+      #   dist: null
+      #   dist_type: "covariate"  # New dist_type for covariates
+
+    options:
+      show_dist_plots: true
+      remove_outliers: true   # From the plots
+      show_full_range: true
+      show_correlation: true
+      number_of_retry_fits: 1 # 1
+      distributions:
+        regular:
+          - "LOGNORMAL"
+          - "GAMMA"
+          # - "WEIBULL" # This does not work. Needs To be debugged.
+          - "NORMAL"
+          - "EXPONENTIAL"
+        circular:
+          - "VONMISES"
+          - "WRAPPEDCAUCHY"
+
+  lstm:
+    enabled: false
+    states: # The states to use in the LSTM
+      - "Grazing"
+      - "Resting"
+      - "Traveling"
+    features:
+      - "step"
+      - "angle"
+      - "magnitude_mean"
+      - "magnitude_var"
+    max_length: 20
+    max_time_gap: 960
+    epochs: 100
+
+
+visuals:
+  # predictions_path: 'data/analysis_results/hmm/PRODUCT/Preds_22_to_22_20250220_202010/predictions.csv'
+  # predictions_path: 'data/analysis_results/hmm/PRODUCT/RB_22_20250302_185749/predictions.csv' # Good
+  predictions_path: 'data/analysis_results/hmm/FinalPredictions/RB_22_Paper_Model_preds/predictions.csv' 
+  
+  visuals_root_path: "data/visuals/RB_22/"
+
+  radar:
+    run: true
+    extension: 'RadarPlots01/'
+    show_night: true
+
+  temperature_graph:
+    run: true
+    # extension: 'MDT_Plots/'
+    minimum_required_values: 30
+
+  domain:
+    run: true
+    implemented: true
+    labeled_only: true
+
+    # extension: 'cow_info_plots/'
+
+  cow_info_graph:
+    run: true
+    implemented: true
+    # extension: 'cow_info_plots/'
+
+  heatmap:
+    run: true
+    # extension: 'heatmap/'
+
+    filter_weigh_days: true
+    weigh_days:
+      - "2022-01-14"
+      - "2022-01-25"
+      - "2022-01-26"
+      - "2022-02-22"
+      - "2022-02-23"
+      - "2022-03-22"
+      - "2022-03-23"
+    

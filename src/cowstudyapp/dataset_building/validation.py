@@ -1,8 +1,9 @@
 # src/cowstudyapp/validation.py
 from datetime import datetime
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
+import pytz
 from cowstudyapp.utils import from_posix
 
 from ..config import DataValidationConfig
@@ -12,12 +13,12 @@ class DataValidator:
     '''
     This both filters and reports low quality data.
     '''
-    GPS_INTERVAL = 300  # 5 minutes
-    ACC_INTERVAL = 60  # 1 minute
-    MAX_ACC_GAP = 2  # maximum number of minutes to interpolate
+    # MAX_ACC_GAP = 2  # maximum number of minutes to interpolate
     
     def __init__(self, config: DataValidationConfig):
         self.config = config
+        self.ACC_INTERVAL = self.config.acc_sample_interval
+        self.GPS_INTERVAL = self.config.gps_sample_interval
         # self.validation_stats: Dict[str, Any] = {}
 
     # def get_validation_stats(self):
@@ -25,225 +26,113 @@ class DataValidator:
     #     return self.validation_stats
 
 
-    def validate_gps(self, df: pd.DataFrame) -> Optional[pd.DataFrame]:
+    def validate_gps(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]]:
         """Validate GPS data and return cleaned DataFrame"""
         df = df.copy()
-        device_id = df['device_id'].iloc[0]
-        
+
         # Initialize stats dictionary
-        stats = {
-            'device_id': device_id,
-            'initial_records': len(df),
-            'duplicates': {
-                'count': 0,
-                'unique_timestamps': 0,
-                'examples': []
-            },
-            'quality_issues': {
-                'poor_satellite_count': 0,
-                'poor_dop': 0,
-                'examples': []
-            },
-            'coordinate_issues': {
-                'out_of_bounds': 0,
-                'examples': []
-            },
-            'time_coverage': {
-                'expected_records': 0,
-                'actual_records': 0,
-                'coverage_pct': 0,
-                'time_range': {
-                    'start': str(self.config.start_datetime),
-                    'end': str(self.config.end_datetime)
+        stats: Dict[str, Any]= {}
+        
+        # Apply time range filter
+        df, timerange_stats = self._filter_timerange(df)
+        stats['points_outside_of_study'] = timerange_stats
+
+
+        df, zero_stats = self._filter_zero_vals_gps(df)
+        stats['zero_val_stats'] = zero_stats
+        
+        df, frequency_stats = self._validate_time_frequency(df, self.GPS_INTERVAL)
+        stats['frequency_stats'] = frequency_stats
+
+
+
+        # print(df.columns)
+
+        # Validate GPS-specific columns
+        gps_columns = ['latitude', 'longitude', 'dop', 'satellites', 'altitude', 'temperature_gps']
+        df, value_stats = self._validate_and_filter_values(df, gps_columns)
+        stats['value_validation_stats'] = value_stats
+        
+        # print("!!!!!!!!!")
+        # print(df[df.isna().any(axis=1)])
+
+        # 4. Finally analyze gaps and interpolate with clean data only
+        df, gap_statistics = self._gap_analysis_and_interpolation(
+            df, 
+            interval=self.GPS_INTERVAL, 
+            interpolate=False # We could make this be true.... lets see the gaps
+        )
+        stats['gap_stats'] = gap_statistics
+
+        # stats["final_rows"] = len(df)
+
+        return df, stats
+
+    def _filter_zero_vals_gps(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+        """
+        Analyze and filter zero coordinate values in GPS data.
+        
+        Args:
+            df: DataFrame with GPS coordinates
+            
+        Returns:
+            Tuple[DataFrame, Dict]: Filtered DataFrame and statistics about zero coordinates
+        """
+        stats: Dict[str, Any] = {}
+        
+        # Analyze zero coordinates by day
+        zero_coords = (df['latitude'] == 0) & (df['longitude'] == 0)
+        
+        if zero_coords.any():
+            # Convert posix time to local date
+            tz = pytz.timezone(self.config.timezone)
+            df['date'] = pd.to_datetime(df['posix_time'], unit='s', utc=True)\
+                .dt.tz_convert(tz)\
+                .dt.date
+            
+            # Calculate zero coordinates per day
+            daily_zeros = df[zero_coords].groupby('date').size()
+            daily_totals = df.groupby('date').size()
+            daily_zero_pcts = (daily_zeros / daily_totals * 100).round(2)
+            
+            # Get the top 3 days with highest zero coordinate percentages
+            worst_days = daily_zero_pcts.nlargest(3)
+            
+            stats['zero_coordinates'] = {
+                'total_zero_coords': int(zero_coords.sum()),
+                'total_records': len(df),
+                'overall_daily_percentage': float((zero_coords.sum() / len(df) * 100).round(2)),
+                'worst_days': {
+                    str(date): {
+                        'zero_count': int(daily_zeros[date]),
+                        'total_records': int(daily_totals[date]),
+                        'percentage': float(pct)
+                    }
+                    for date, pct in worst_days.items()
                 }
             }
-        }
-
-        print(f"------------------------------{device_id}---------------------------")
-        print(f"Initial GPS records: {stats['initial_records']}")
-
-        # 1. Check duplicates
-        duplicates = df[df.duplicated(['posix_time'], keep=False)]
-        if len(duplicates) > 0:
-            stats['duplicates'].update({
-                'count': len(duplicates),
-                'unique_timestamps': len(duplicates['posix_time'].unique()),
-                'examples': duplicates[['posix_time', 'latitude', 'longitude', 'dop']].head().to_dict('records')
-            })
             
-            print("\nDuplicate GPS fixes found:")
-            print(f"Number of timestamps with duplicates: {stats['duplicates']['unique_timestamps']}")
-            print(f"Total duplicate records: {stats['duplicates']['count']}")
+            print("\nZero coordinate analysis:")
+            print(f"Total zero coordinates: {stats['zero_coordinates']['total_zero_coords']}")
+            print(f"Overall percentage: {stats['zero_coordinates']['overall_daily_percentage']}%")
+            print("\nWorst days for zero coordinates:")
+            for date, day_stats in stats['zero_coordinates']['worst_days'].items():
+                print(f"{date}: {day_stats['percentage']}% "
+                    f"({day_stats['zero_count']}/{day_stats['total_records']} records)")
             
-            # Average duplicates
-            numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-            numeric_cols.remove('posix_time') if 'posix_time' in numeric_cols else None
-            agg_dict = {col: 'mean' if col in numeric_cols else 'first' 
-                       for col in df.columns if col != 'posix_time'}
-            df = df.groupby('posix_time', as_index=False).agg(agg_dict)
+            # Remove the temporary date column
+            df = df.drop(columns=['date'])
             
-            print(f"After averaging duplicates: {len(df)} unique records")
-
-        # 2. Check quality filters
-        poor_satellites = df[df['satellites'] < self.config.min_satellites]
-        poor_dop = df[df['dop'] > self.config.max_dop]
+            # Filter out zero coordinates
+            df = df[~zero_coords]
         
-        stats['quality_issues'].update({
-            'poor_satellite_count': len(poor_satellites),
-            'poor_dop': len(poor_dop),
-            'examples': poor_satellites[['posix_time', 'satellites', 'dop']].head().to_dict('records') +
-                       poor_dop[['posix_time', 'satellites', 'dop']].head().to_dict('records')
-        })
-
-        valid_quality = (
-            (df['satellites'] >= self.config.min_satellites) &
-            (df['dop'] <= self.config.max_dop)
-        )
-        
-        if not valid_quality.all():
-            print(f"\nRemoving {(~valid_quality).sum()} records with poor quality")
-            print(f"- Poor satellite count: {len(poor_satellites)}")
-            print(f"- Poor DOP: {len(poor_dop)}")
-            df = df[valid_quality]
-
-        # 3. Check coordinate bounds
-        invalid_coords = df[
-            ~(df['latitude'].between(self.config.lat_min, self.config.lat_max)) |
-            ~(df['longitude'].between(self.config.lon_min, self.config.lon_max))
-        ]
-        
-        if len(invalid_coords) > 0:
-            stats['coordinate_issues'].update({
-                'out_of_bounds': len(invalid_coords),
-                'examples': invalid_coords[['posix_time', 'latitude', 'longitude']].head().to_dict('records')
-            })
-            
-            print(f"\nRemoving {len(invalid_coords)} records with invalid coordinates")
-            df = df[
-                df['latitude'].between(self.config.lat_min, self.config.lat_max) &
-                df['longitude'].between(self.config.lon_min, self.config.lon_max)
-            ]
-
-        # 4. Apply time range filter and check coverage
-        df = self._filter_timerange(df)
-        
-        if self.config.start_datetime and self.config.end_datetime:
-            start_posix = int(self.config.start_datetime.timestamp())
-            end_posix = int(self.config.end_datetime.timestamp())
-            total_intervals = (end_posix - start_posix) // self.GPS_INTERVAL + 1
-            actual_records = len(df)
-            coverage_pct = (actual_records / total_intervals) * 100
-            
-            stats['time_coverage'].update({
-                'expected_records': total_intervals,
-                'actual_records': actual_records,
-                'coverage_pct': coverage_pct
-            })
-            
-            print(f"\nTime Coverage Analysis:")
-            print(f"Time range: {self.config.start_datetime} to {self.config.end_datetime}")
-            print(f"Expected 5-minute intervals: {total_intervals}")
-            print(f"Actual valid records: {actual_records}")
-            print(f"Coverage: {coverage_pct:.1f}%")
-
-            if coverage_pct < self.config.COVERAGE_THRESHOLD:
-                stats['failed_coverage_threshold'] = True
-                print(f"Insufficient coverage: {coverage_pct:.1f}% < {self.config.COVERAGE_THRESHOLD}%")
-                return None
-
-        print(f"\nFinal GPS records: {len(df)}")
-        self.validation_stats = stats
-        return df
-    
+        return df, stats
 
 
-    def validate_gps_old(self, df: pd.DataFrame) -> Optional[pd.DataFrame]:
-        """Validate GPS data and return cleaned DataFrame"""
-
-        df = df.copy()
-        initial_records = len(df)
-        print(f"------------------------------{df['device_id'].iloc[0]}---------------------------\nInitial GPS records: {initial_records}")
-        
-        # 1. First handle duplicates
-        duplicates = df[df.duplicated(['posix_time'], keep=False)]
-        if len(duplicates) > 0:
-            print("\nDuplicate GPS fixes found:")
-            print(f"Number of timestamps with duplicates: {len(duplicates['posix_time'].unique())}")
-            print(f"Total duplicate records: {len(duplicates)}")
-            
-            # Print example of duplicates
-            print("\nExample of duplicate fixes:")
-            example_time = duplicates['posix_time'].iloc[0]
-            print(df[df['posix_time'] == example_time][
-                ['posix_time', 'latitude', 'longitude', 'altitude', 'dop']
-            ])
-            
-            # Group and average
-            numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-            if 'posix_time' in numeric_cols:
-                numeric_cols.remove('posix_time')
-                
-            agg_dict = {col: 'mean' if col in numeric_cols else 'first' 
-                    for col in df.columns if col != 'posix_time'}
-            
-            df = (df.groupby('posix_time', as_index=False)
-                .agg(agg_dict))
-            
-            print(f"After averaging duplicates: {len(df)} unique records")
-
-        # 2. Apply quality filters to actual data points
-        valid_quality = (
-            (df['satellites'] >= self.config.min_satellites) &
-            (df['dop'] <= self.config.max_dop)
-        )
-        invalid_quality = df[~valid_quality]
-        if len(invalid_quality) > 0:
-            print(f"\nRemoving {len(invalid_quality)} records with poor quality")
-            print("Example of poor quality records:")
-            print(invalid_quality[['posix_time', 'satellites', 'dop']].head())
-            df = df[valid_quality]
-
-        # 3. Apply coordinate bounds
-        valid_coords = (
-            (df['latitude'].between(self.config.lat_min, self.config.lat_max)) &
-            (df['longitude'].between(self.config.lon_min, self.config.lon_max))
-        )
-        invalid_coords = df[~valid_coords]
-        if len(invalid_coords) > 0:
-            print(f"\nRemoving {len(invalid_coords)} records with invalid coordinates")
-            print("Example of invalid coordinates:")
-            print(invalid_coords[['posix_time', 'latitude', 'longitude']].head())
-            df = df[valid_coords]
-
-        # 4. Apply time range filter
-        df = self._filter_timerange(df)
-        
-        # 5. Report time coverage
-        if self.config.start_datetime and self.config.end_datetime:
-            start_posix = int(self.config.start_datetime.timestamp())
-            end_posix = int(self.config.end_datetime.timestamp())
-            total_intervals = (end_posix - start_posix) // self.GPS_INTERVAL + 1
-            actual_records = len(df)
-            coverage_pct = (actual_records / total_intervals) * 100
-            
-            print(f"\nTime Coverage Analysis:")
-            print(f"Time range: {self.config.start_datetime} to {self.config.end_datetime}")
-            print(f"Expected 5-minute intervals: {total_intervals}")
-            print(f"Actual valid records: {actual_records}")
-            print(f"Coverage: {coverage_pct:.1f}%")
-
-            # Is atleast 30% of the data is missing, skip this data. 
-            if coverage_pct < self.config.COVERAGE_THRESHOLD:
-                print(f"Coverage: {coverage_pct:.1f}%")
-                return None
-            
-            # Optional: create full time range with NaN for missing values
-            if False:  # Set to True if you want the missing intervals filled with NaN
-                df, missing_pct = self._validate_time_frequency(df, self.GPS_INTERVAL)
-        
-        print(f"\nFinal GPS records: {len(df)}")
-        return df
-
+    def calculate_expected_records(self, interval:int) -> int:
+        if ((self.config.end_datetime is not None) and (self.config.start_datetime is not None)):
+            return int((self.config.end_datetime - self.config.start_datetime).total_seconds() / interval)
+        raise ValueError("End and Start times must be defined in config")
 
     def validate_accelerometer(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]]:
         """Validate accelerometer data and return cleaned DataFrame"""
@@ -251,182 +140,59 @@ class DataValidator:
         device_id = str(df['device_id'].iloc[0])
         
         # Initialize stats dictionary
-        stats = {
-            'device_id': device_id,
-            'initial_records': len(df),
-            'acceleration_issues': {
-                'x': {'count': 0, 'examples': []},
-                'y': {'count': 0, 'examples': []},
-                'z': {'count': 0, 'examples': []}
-            },
-            'temperature_issues': {
-                'count': 0,
-                'examples': []
-            },
-            'time_coverage': {
-                'expected_records': 0,
-                'actual_records': 0,
-                'coverage_pct': 0,
-                'gaps_interpolated': 0,
-                'time_range': {
-                    'start': str(self.config.start_datetime),
-                    'end': str(self.config.end_datetime)
-                }
-            }
-        }
+        stats: Dict[str, Any]= {}
 
-        print(f"------------------------------{device_id}---------------------------")
-        print(f"Initial accelerometer records: {stats['initial_records']}")
-
-        # 1. Time bounds and frequency validation
-        # df['tz'] = df['posix_time'].apply(from_posix)
-
-        print("Filtered timerange")
-        df = self._filter_timerange(df)
-        # print(df.head())
-
-        print("Adding regular index")
-        df, missing_pct, frequency_stats = self._validate_time_frequency(
-                                            df, 
-                                            self.ACC_INTERVAL, 
-                                            interpolate=True
-        )
-        # print(df.head())
-
-
+        df, timerange_stats = self._filter_timerange(df)
+        stats['points_outside_of_study'] = timerange_stats
+        print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+        print(1, df.head())
+        
+        df, frequency_stats = self._validate_time_frequency(df, self.ACC_INTERVAL)
         stats['frequency_stats'] = frequency_stats
+        print(2, df.head())
 
-        # 2. Check acceleration bounds
-        masks = pd.DataFrame(index=df.index)
-        for axis in ['x', 'y', 'z']:
-            # First check for NaN values
-            nan_mask = df[axis].isna()
-            
-            # Then check for out of bounds values
-            bounds_mask = pd.Series(False, index=df.index)  # Initialize with False
-            valid_data = df[~nan_mask]  # Get non-NaN values
-            if not valid_data.empty:
-                bounds_mask.loc[valid_data.index] = ~valid_data[axis].between(
-                    self.config.accel_min, 
-                    self.config.accel_max
-                )
-            
-            # Combine the masks (no need for reindex since indexes match)
-            masks[axis] = nan_mask | bounds_mask
+        accel_columns = ['x', 'y', 'z', 'temperature_acc']
+        df, value_stats = self._validate_and_filter_values(df, accel_columns)
+        stats['value_validation_stats'] = value_stats
+        print(3, df.head())
 
-        # Create combined mask and find invalid records
-        combined_mask = masks.any(axis=1)
-        invalid_records = df[combined_mask].copy()
-        
-        if len(invalid_records) > 0:
-            print("\nSample of invalid accelerations:")
-            for axis in ['x', 'y', 'z']:
-                # Use loc for proper indexing
-                axis_invalid = invalid_records.loc[masks[axis]]
-                stats['acceleration_issues'][axis].update({
-                    'count': len(axis_invalid),
-                    'examples': axis_invalid.head().to_dict('records'),
-                    'nan_count': axis_invalid[axis].isna().sum(),
-                    'out_of_bounds_count': len(axis_invalid) - axis_invalid[axis].isna().sum()
-                })
-                print(f"Found {len(axis_invalid)} records with invalid {axis} acceleration")
-                print(f"- NaN values: {axis_invalid[axis].isna().sum()}")
-                print(f"- Out of bounds: {len(axis_invalid) - axis_invalid[axis].isna().sum()}")
 
-        # Filter out invalid records
-        df = df[~combined_mask]
-
-        # 3. Check temperature bounds
-        invalid_temp = ~df['temperature_acc'].between(
-            self.config.temp_min, 
-            self.config.temp_max
-        )
-        invalid_temp_records = df[invalid_temp]
-        
-        if len(invalid_temp_records) > 0:
-            stats['temperature_issues'].update({
-                'count': len(invalid_temp_records),
-                'examples': invalid_temp_records[[
-                    'posix_time', 'temperature_acc'
-                ]].head().to_dict('records')
-            })
-            
-            print(f"Found {len(invalid_temp_records)} records with invalid temperature")
-            df = df[~invalid_temp]
-
-        # Update final record count
-        stats['final_records'] = len(df)
-        print(f"\nFinal accelerometer records: {stats['final_records']}")
+        df, gap_statistics = self._gap_analysis_and_interpolation(df, interval=self.ACC_INTERVAL, interpolate=True)
+        stats['gap_stats'] = gap_statistics
+        print(4, df.head())
         
         return df, stats
 
 
-    def validate_accelerometer_OLD(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Validate accelerometer data and return cleaned DataFrame"""
-        df = df.copy()
-        print(f"------------------------------{df['device_id'].iloc[0]}---------------------------\nInitial accelerometer records: {len(df)}")
-        
-        # Time bounds
-        df = self._filter_timerange(df)
-        df, missing_pct = self._validate_time_frequency(
-            df, 
-            self.ACC_INTERVAL, 
-            interpolate=True
-        )
+#########################################################################################################
 
-        if missing_pct > 0:
-            print(f"Accelerometer data missing {missing_pct:.5f}% of expected records")
-            print(f"Expected: 1 record every {self.ACC_INTERVAL} seconds")
-            print(f"Interpolated {int(df.shape[0] * missing_pct * 0.01)} gaps ≤ {self.MAX_ACC_GAP} minutes")
+    def _validate_time_frequency(self, df: pd.DataFrame, interval: int) -> Tuple[pd.DataFrame, Dict]:
+        """Create and merge df to the index of the expected records based on index. 
+        Report statistics on saturation of the expected interval.
 
-        # Acceleration bounds
-        for axis in ['x', 'y', 'z']:
-            valid_accel = df[axis].between(self.config.accel_min, self.config.accel_max)
-            if not valid_accel.all():
-                invalid = df[~valid_accel]
-                print(f"Found {len(invalid)} records with invalid {axis}")
-                df = df[valid_accel]
-
-        # Temperature bounds
-        valid_temp = df['temperature_acc'].between(self.config.temp_min, self.config.temp_max)
-        if not valid_temp.all():
-            invalid = df[~valid_temp]
-            print(f"Found {len(invalid)} records with invalid temperature")
-            df = df[valid_temp]
-
-        return df
-
-
-    def _validate_time_frequency(
-        self, 
-        df: pd.DataFrame, 
-        interval: int,
-        interpolate: bool = False
-    ) -> Tuple[pd.DataFrame, float, Dict]:
-        """
-        Validate and optionally fix time frequency of data based on configured time range.
-        
         Args:
-            df: Input DataFrame
-            interval: Expected interval in seconds
-            interpolate: Whether to interpolate missing values
-            
+            df (pd.DataFrame): DataFrame already filtered to the study period
+            interval (int): The expected time between records
+
         Returns:
-            Tuple of (processed DataFrame, percentage of missing data)
-        """
+            Tuple[pd.DataFrame, Dict]: A DataFrame with the index between start and end time 
+            with intervals interval. Additionally, returns a dictionary of statistics on saturation.
+        """        
+
         frequency_stats: Dict[str,Any] = {}
 
+        tz = pytz.timezone(self.config.timezone)
+        start_posix = int(self.config.start_datetime.astimezone(tz).timestamp()) if self.config.start_datetime else None
+        end_posix = int(self.config.end_datetime.astimezone(tz).timestamp()) if self.config.end_datetime else None
 
-        # Get configured time range
-        if not (self.config.start_datetime and self.config.end_datetime):
-            raise ValueError("start_datetime and end_datetime must be configured for time frequency validation")
+        # start_posix = int(self.config.start_datetime.timestamp()) 
+        # end_posix = int(self.config.end_datetime.timestamp()) 
+        # start_posix = max(int(self.config.start_datetime.timestamp()), df['posix_time'].min())
+        # end_posix = min(int(self.config.end_datetime.timestamp()), df['posix_time'].max())
         
-        start_posix = int(self.config.start_datetime.timestamp())
-        end_posix = int(self.config.end_datetime.timestamp())
-        
-        frequency_stats['start_posix'] = start_posix
-        frequency_stats['end_posix'] = end_posix
-        # Round start to nearest interval
+        if (not (isinstance(start_posix, int) and isinstance(start_posix, int))):
+            raise ValueError("Error in validation -> _validate_time_frequency: start and/or end times not processed.")
+
         start_posix = start_posix - (start_posix % interval)
         
         # Create complete time range
@@ -438,47 +204,35 @@ class DataValidator:
             )
         })
 
-        # Sort by time
         df = df.sort_values('posix_time')
-        # print("DF SORT POSIX")
-        # print(df.head())
-
-        print("\nTime range analysis:")
-        print(f"Data start time: {from_posix(df['posix_time'].min())}")
-        print(f"Data end time: {from_posix(df['posix_time'].max())}")
-        print(f"Required start time: {from_posix(start_posix)}")
-        print(f"Required end time: {from_posix(end_posix)}")
         
         # Handle duplicates
         duplicates = df[df.duplicated(['posix_time'], keep=False)]
-        frequency_stats['duplicates'] = {}
+
         print(f"\nFound {len(duplicates)} duplicate posix_time records")
         if len(duplicates) > 0:
-            frequency_stats['duplicates']['n'] = len(duplicates)
+            frequency_stats['duplicates'] = {}
+            frequency_stats['duplicates']['n'] = duplicates.shape[0]
+
             print(f"Number of unique timestamps with duplicates: {len(duplicates['posix_time'].unique())}")
-            frequency_stats['duplicates']['unique_ts_with_dup'] = len(duplicates['posix_time'].unique())
+            frequency_stats['duplicates']['unique_times_with_dupes'] = len(duplicates['posix_time'].unique())
+            
             print("\nExample duplicates:")
             example_time = duplicates['posix_time'].iloc[0]
             print(df[df['posix_time'] == example_time])
             frequency_stats['duplicates']['example_duplicate'] = df[df['posix_time'] == example_time].to_dict()
+            
             df = df.drop_duplicates('posix_time', keep='first')
             print(f"After removing duplicates: {len(df)} records")
             frequency_stats['duplicates']['n_after_dropping'] = len(df)
 
-        # Set index and reindex
-        # print("\nBefore reindex:")
-        # print(df.head())
-        
+
         # Create a temporary DataFrame with the full time range
         full_df = pd.DataFrame(index=full_index['posix_time'])
         
         # Merge with original data
         df = df.set_index('posix_time')
         df = full_df.join(df)
-        
-        # print("\nAfter reindex:")
-        # print(df.head())
-        
         # Calculate missing percentage
         total_expected = len(full_index)
         records_present = df.notna().any(axis=1).sum()
@@ -486,75 +240,274 @@ class DataValidator:
         missing_pct = (missing / total_expected) * 100
         
         frequency_stats.update({
-            'n_expected': total_expected,
+            # 'n_expected': total_expected,
             'n_available': records_present,
             'n_missing': missing,
             'pct_missing': missing_pct
         })
-
-
-
-
 
         print(f"Time range: {self.config.start_datetime} to {self.config.end_datetime}")
         print(f"Expected records: {total_expected}")
         print(f"Records present: {records_present}")
         print(f"Missing records: {missing}")
         
+        # print(df[df.isna().any(axis=1)])/
+        df.reset_index(inplace=True)
+        return df, frequency_stats
+    
 
 
-        missing_mask = df.isna().all(axis=1)
-        gap_starts = missing_mask[missing_mask].index[:-1]
-        gap_ends = missing_mask[missing_mask].index[1:]
-        gap_lengths = gap_ends - gap_starts
+
+
+
+    def _gap_analysis_and_interpolation(self, df: pd.DataFrame, interval: int, interpolate:bool = False) -> Tuple[pd.DataFrame, Dict]:
+        """
+        Analyze gaps in the data using already identified missing records.
+        Missing records are rows where all relevant columns are NaN.
+        """        
+        stats: Dict[str, Any] = {}
         
-        # Count gaps by length (in intervals)
-        gap_counts = pd.Series(gap_lengths).value_counts().sort_index()
+        # Identify missing records (all NaN rows)
+        missing_records = df[df.isna().any(axis=1)].copy()
         
-        print("\nGap analysis:")
-        print(f"Number of single-interval gaps: {gap_counts.get(interval, 0)}")
-        print("Gap distribution (intervals):")
-        for length, count in gap_counts.items():
-            print(f"{int(length/interval)} intervals: {count} gaps")
+        if len(missing_records) > 0:
+            # Sort by time to find consecutive gaps
+            missing_records = missing_records.sort_values('posix_time')
             
-        frequency_stats['gap_analysis'] = {
-            'single_interval_gaps': gap_counts.get(interval, 0),
-            'gap_distribution': gap_counts.to_dict()
-        }
-
-
-
-
-        if interpolate:
-            # Interpolate small gaps
-            numeric_cols = df.select_dtypes(include=[np.number]).columns
-            for col in numeric_cols:
-                df[col] = df[col].interpolate(
-                    method='linear',
-                    limit=self.MAX_ACC_GAP
-                )
+            # Calculate time differences between consecutive missing records
+            time_diffs = missing_records['posix_time'].diff()
             
-            # Forward fill non-numeric columns
-            non_numeric_cols = df.select_dtypes(exclude=[np.number]).columns
-            for col in non_numeric_cols:
-                df[col] = df[col].ffill(limit=self.MAX_ACC_GAP)
-        
-        # Reset index
-        df = df.reset_index()
-        # print("DF RESET INDEX")
+            # Start new gap when time difference is greater than interval
+            gap_breaks = time_diffs > interval
+            gap_groups = gap_breaks.cumsum()
+            
+            # Group consecutive missing times into gaps
+            gaps = []
+            for group_id, group in missing_records.groupby(gap_groups):
+                gap = {
+                    'start_time': from_posix(group['posix_time'].iloc[0]).strftime("%Y-%m-%d %H:%M:%S"),
+                    'end_time': from_posix(group['posix_time'].iloc[-1]).strftime("%Y-%m-%d %H:%M:%S"),
+                    'gap_length_seconds': int(group['posix_time'].iloc[-1] - group['posix_time'].iloc[0] + interval),
+                    'gap_length_intervals': len(group),
+                    'missing_times': group['posix_time'].tolist()
+                }
+                gaps.append(gap)
+            
+            # Print gap analysis
+            gap_lengths = [gap['gap_length_intervals'] for gap in gaps]
+            gap_counts = pd.Series(gap_lengths).value_counts().sort_index()
+            # for gap in gaps:
+            #     print(f"\nGap from {gap['start_time']} to {gap['end_time']}")
+            #     print(f"Length: {gap['gap_length_intervals']} intervals ({gap['gap_length_seconds']} seconds)")
+            # Calculate gap distribution
+            print(f"\nFound {len(gaps)} gaps:")
+            print(gap_counts)
+            
+            # printable_gaps = gaps
+            # printable_gaps['start_time'] = printable_gaps['start_time'].strftime("%Y-%m-%d %H:%M:%S")
+            # printable_gaps['end_time'] = printable_gaps['end_time'].strftime("%Y-%m-%d %H:%M:%S")
+
+            stats['gap_analysis'] = {
+                'total_gaps': len(gaps),
+                'total_missing_records': len(missing_records),
+                'gap_distribution': gap_counts.to_dict(),
+                'gaps': gaps
+            }
+
+
+            if interpolate:
+                # Only interpolate single-interval gaps
+                single_interval_gaps = [
+                    gap for gap in gaps 
+                    if gap['gap_length_intervals'] == 1
+                ]
+                
+                n_interpolated = 0
+                for gap in single_interval_gaps:
+                    gap_time = gap['missing_times'][0]
+                    gap_idx = df[df['posix_time'] == gap_time].index[0]
+                    
+                    # Get values before and after the gap
+                    before_time = gap_time - interval
+                    after_time = gap_time + interval
+                    
+                    before_row = df[df['posix_time'] == before_time]
+                    after_row = df[df['posix_time'] == after_time]
+
+                    # Check if we have actual data (not just posix_time) in before and after rows
+                    has_before_data = not before_row.drop('posix_time', axis=1).isna().all(axis=1).iloc[0]
+                    has_after_data = not after_row.drop('posix_time', axis=1).isna().all(axis=1).iloc[0]
+                    
+                    if has_before_data and has_after_data:
+
+                        # Forward fill categorical and ID columns
+                        categorical_cols = df.select_dtypes(include=['object']).columns
+                        id_cols = [col for col in df.columns if 'id' in col.lower()]
+                        for col in categorical_cols.union(id_cols):
+                            if col != 'posix_time':  # Skip timestamp column
+                                df.loc[gap_idx, col] = before_row[col].iloc[0]
+                        
+                        # Average numeric columns
+                        numeric_cols = df.select_dtypes(include=np.number).columns
+                        numeric_cols = numeric_cols.drop(['posix_time'])  # Skip timestamp column
+                        
+                        for col in numeric_cols:
+                            before_val = before_row[col].iloc[0]
+                            after_val = after_row[col].iloc[0]
+                            if not (pd.isna(before_val) or pd.isna(after_val)):
+                                df.loc[gap_idx, col] = (before_val + after_val) / 2
+                        
+                        n_interpolated += 1
+                
+                stats['interpolated_gaps'] = n_interpolated
+        # # print("!!!!!!!!!")
+        stats['dropped_na_records'] = df.isna().any(axis=0).sum()
+        # print(len(df[df.isna().any(axis=1)]))      
+
         # print(df.head())
-        return df, missing_pct, frequency_stats
+        df = df.dropna(how='any', axis=0) 
+        # print(df.head())
+        
+        return df, stats
 
 
 
-    def _filter_timerange(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _validate_and_filter_values(self, df: pd.DataFrame, columns: List[str]) -> Tuple[pd.DataFrame, Dict]:
+        """
+        Validate and optionally filter values based on configured rules.
+        
+        Args:
+            df: DataFrame to validate
+            columns: List of column names to validate
+        
+        Returns:
+            Tuple of (filtered DataFrame, validation statistics)
+        """
+        stats: Dict[str, Any] = {
+            'value_issues': {},
+            'filtered_records': 0
+        }
+        
+        # Create mask for records to filter
+        filter_mask = pd.Series(False, index=df.index)
+        
+        for column in columns:
+            if column not in self.config.validation_rules:
+                continue
+                
+            rule = self.config.validation_rules[column]
+            column_stats = {
+                'total_violations': 0,
+                'nan_count': 0,
+                'out_of_bounds_count': 0,
+                'bound_violation_examples': []  # Changed from 'examples' to be more specific
+            }
+            
+            # Check for NaN values
+            nan_mask = df[column].isna()
+            column_stats['nan_count'] = nan_mask.sum()
+            
+            # Check for out of bounds values
+            bounds_mask = pd.Series(False, index=df.index)
+            valid_data = df[~nan_mask]
+            
+            if not valid_data.empty:
+                lower_bound_mask = pd.Series(False, index=df.index)
+                upper_bound_mask = pd.Series(False, index=df.index)
+            
+                # Apply min bound if configured
+                if rule.min_value is not None:
+                    lower_bound_mask = pd.Series(
+                        (valid_data[column] < rule.min_value),
+                        index=valid_data.index
+                    )
+                    bounds_mask.loc[lower_bound_mask.index] |= lower_bound_mask
+                    
+                # Apply max bound if configured
+                if rule.max_value is not None:
+                    upper_bound_mask = pd.Series(
+                        (valid_data[column] > rule.max_value),
+                        index=valid_data.index
+                    )
+                    bounds_mask.loc[upper_bound_mask.index] |= upper_bound_mask
+            
+            # Combine violations and update statistics
+            violation_mask = nan_mask | bounds_mask
+            column_stats['total_violations'] = violation_mask.sum()
+            column_stats['out_of_bounds_count'] = bounds_mask.sum()
+            
+            # Collect examples of bound violations only (not NaN)
+            if bounds_mask.any():
+                # Get examples of lower bound violations
+                if rule.min_value is not None and lower_bound_mask.any():
+                    lower_examples = df.loc[lower_bound_mask.index[lower_bound_mask]].head(2)
+                    for _, row in lower_examples.iterrows():
+                        column_stats['bound_violation_examples'].append({
+                            'posix_time': row['posix_time'],
+                            'value': row[column],
+                            'violation': f"below minimum ({rule.min_value})"
+                        })
+                
+                # Get examples of upper bound violations
+                if rule.max_value is not None and upper_bound_mask.any():
+                    upper_examples = df.loc[upper_bound_mask.index[upper_bound_mask]].head(2)
+                    for _, row in upper_examples.iterrows():
+                        column_stats['bound_violation_examples'].append({
+                            'posix_time': row['posix_time'],
+                            'value': row[column],
+                            'violation': f"above maximum ({rule.max_value})"
+                        })
+                
+                print(f"\nValidation issues for {column}:")
+                print(f"- NaN values: {column_stats['nan_count']}")
+                print(f"- Out of bounds: {column_stats['out_of_bounds_count']}")
+                
+                # Print bound violation examples
+                if column_stats['bound_violation_examples']:
+                    print("Examples of bound violations:")
+                    for example in column_stats['bound_violation_examples']:
+                        print(f"  Time: {from_posix(example['posix_time'])}, "
+                            f"Value: {example['value']:.2f}, "
+                            f"Issue: {example['violation']}")
+                
+                # Update filter mask if rule requires filtering
+                if rule.filter_invalid:
+                    # filter_mask |= violation_mask
+                    filter_mask |= bounds_mask
+            
+            stats['value_issues'][column] = column_stats
+        
+        # Apply filtering if needed
+        if filter_mask.any():
+            original_count = len(df)
+            df = df[~filter_mask]
+            filtered_count = original_count - len(df)
+            stats['filtered_records'] = filtered_count
+            print(f"\nFiltered {filtered_count} records due to validation rules")
+        
+        return df, stats
+
+
+    def _filter_timerange(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]]:
         """Apply time range filters if configured"""
+        
         if 'posix_time' not in df.columns:
             raise ValueError("DataFrame must have 'posix_time' column")
+
+        stats: Dict[str, Any] = {}
 
         # Convert config datetime to POSIX if provided
         start_time = int(self.config.start_datetime.timestamp()) if self.config.start_datetime else None
         end_time = int(self.config.end_datetime.timestamp()) if self.config.end_datetime else None
+
+        # Check records outside interval
+        after_start = df['posix_time'] >= start_time
+        if sum(~after_start) > 0:
+            stats['before_study'] = sum(~after_start)
+
+        before_end = df['posix_time'] <= end_time
+        if sum(~before_end) > 0:
+            stats['after_study'] = sum(~before_end)
 
         # Filter using POSIX times
         if start_time:
@@ -562,4 +515,16 @@ class DataValidator:
         if end_time:
             df = df[df['posix_time'] <= end_time]
 
-        return df
+
+        print("\nTime range analysis:")
+        print(f"Data start time: {from_posix(df['posix_time'].min())}")
+        print(f"Data end time: {from_posix(df['posix_time'].max())}")
+        print(f"Expected start time: {from_posix(start_time)}")
+        print(f"Expected end time: {from_posix(end_time)}")
+
+        # Record first and last timestamps in filtered data
+        if not df.empty:
+            stats['first_record_in_study'] = from_posix(int(df['posix_time'].min()))
+            stats['last_record_in_study'] = from_posix(int(df['posix_time'].max()))
+
+        return df, stats

@@ -43,6 +43,8 @@ class LabelAggregation:
         }).reset_index()
 
     def compute_labels(self, df : pd.DataFrame) -> pd.DataFrame:
+        
+        df['posix_time_5min'] = (df['posix_time'] // self.config.gps_sample_interval) * self.config.gps_sample_interval
 
         grouped_df = df.groupby(['device_id','posix_time_5min'])
         

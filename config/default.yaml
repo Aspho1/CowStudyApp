@@ -1,7 +1,7 @@
 common:
   timezone: "America/Denver"
   gps_sample_interval: 300          # Expected seconds between GPS
-  gps_sample_interval: 60           # Expected seconds between Accelerometer 
+  accel_sample_interval: 60           # Expected seconds between Accelerometer 
   excluded_devices: [841, 1005] 
 
 
@@ -11,6 +11,8 @@ io:
   accelerometer_directory: "data/raw/RB_22/accelerometer"
   labeled_data_path: "data/raw/RB_22/labeled/gps_observations_2022.csv"
   file_pattern: "*.csv"
+
+  processed_data_path: "data/processed/RB_22/all_cows_labeled_mode.csv"
 
 validation:
   start_datetime: "2022-01-15 00:00:00"

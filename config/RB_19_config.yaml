@@ -1,18 +1,19 @@
 common:
+  dataset_name: "RB_19"
   timezone: "America/Denver"
   gps_sample_interval: 300          # Expected seconds between GPS
-  gps_sample_interval: 60           # Expected seconds between Accelerometer 
+  accel_sample_interval: 60           # Expected seconds between Accelerometer 
+  # excluded_devices: [609, 612, 607, 614] 
   excluded_devices: [609, 612] 
-
+  # excluded_devices: [602, 607, 609, 612] 
+  random_seed: 0
 
 io:
-  format: "multiple_files"
   gps_directory: "data/raw/RB_19/gps"
   accelerometer_directory: "data/raw/RB_19/accelerometer"
   labeled_data_path: "data/raw/RB_19/labeled/rb_2018_activity_observ.csv"
-  file_pattern: "*.csv"
 
-  processed_data_path: "data/processed/RB_19/all_cows_labeled_mode.csv"
+  processed_data_path: "data/processed/RB_19/all_cows_labeled.csv"
   
   tag_to_device:
     '6082': '609'
@@ -37,91 +38,132 @@ io:
   label_to_value:
     't': 'Traveling'
     'g': 'Grazing'
-    's': 'Standing'
+    's': 'Resting' # 'Standing'
     'm': 'Mineral'
-    'r': 'Resting'
-    'l': 'Laying'
+    'r': 'Grooming'  
+    'l': 'Resting' # 'Laying'
     'd': 'Drinking'
     'f': 'Fighting'
-
-
 
 validation:
   start_datetime: "2018-11-17 00:00:00" #"2022-01-15 00:00:00"  
   end_datetime: "2019-02-09 00:00:00" #"2022-03-22 23:59:59"
-  lat_min: -90
-  lat_max: 90
-  lon_min: -180
-  lon_max: 180
-  accel_min: -41
-  accel_max: 41
-  temp_min: -99
-  temp_max: 99
-  min_satellites: 0
-  max_dop: 10.0
   COVERAGE_THRESHOLD: 70            # Minimum ratio of (actual / expected) GPS data needed to include the device
+
+
+  validation_rules:
+    latitude:
+      min_value: -90.0
+      max_value: 90.0
+      is_required: true
+      filter_invalid: false
+
+    longitude:
+      min_value: -180.0
+      max_value: 180.0
+      is_required: true
+      filter_invalid: false
+
+    dop:
+      max_value: 10.0
+      is_required: true
+      filter_invalid: true
+
+    satellites:
+      min_value: 0
+      is_required: true
+      filter_invalid: false
+
+    altitude:
+      min_value: 0
+      max_value: 1715
+      is_required: false
+      filter_invalid: false
+
+    temperature_gps:
+      min_value: -99
+      max_value: 99
+      is_required: true
+      filter_invalid: false
+
+    # Accelerometer validation rules
+    x:
+      min_value: -41
+      max_value: 41
+      is_required: true
+      filter_invalid: false
+
+    y:
+      min_value: -41
+      max_value: 41
+      is_required: true
+      filter_invalid: false
+
+    z:
+      min_value: -41
+      max_value: 41
+      is_required: true
+      filter_invalid: false
+
+    temperature_acc:
+      min_value: -99
+      max_value: 99
+      is_required: true
+      filter_invalid: false
+
 
 features:
   enable_axis_features: true        # Compute features for each axes
   enable_magnitude_features: true   # Compute features for the magnitudes
   feature_types:
     - "BASIC_STATS"                 # Mean, variance of the window
-    - "ZERO_CROSSINGS"              # Count of transitions from - to + or + to -
-    - "PEAK_FEATURES"               # Statistics covering the peaks of the window
+    # - "ZERO_CROSSINGS"              # Count of transitions from - to + or + to -
+    # - "PEAK_FEATURES"               # Statistics covering the peaks of the window
     # - "ENTROPY"                     # Compute signal entropy features
-    - "CORRELATION"                 # Compute correlation between axes
+    # - "CORRELATION"                 # Compute correlation between axes
     # - "SPECTRAL"                    # Compute frequency domain features
  
 labels:
-  labeled_agg_method: "MODE"        # The most frequent activity in the window
-  # labeled_agg_method: "RAW"           # The activity at the end of the window
+  # labeled_agg_method: "MODE"        # The most frequent activity in the window
+  labeled_agg_method: "RAW"           # The activity at the end of the window
   # labeled_agg_method: "PERCENTILE"  # A weighted choice of activity
 
-
-
-
-  # valid_activities:
-  #   - "Resting"
-  #   - "Grazing"
-  #   - "Traveling"
-  #   - "Fighting"
-  #   - "Scratching"
-  #   - "Drinking"
-  #   - "Mineral"
-
-# This is the section where options for the momentuHMM can we defined.
-# Ideally, the LSTM config will also live here
-# analysis:
-#   mode: "LOOCV" # Create models where each cow is used as the test cow once. Collect results and print performance statistics.
-#   mode: "PRODUCT" # Create one model based on all available labeled data. Apply the model to the unlabeled data, save the model, and save the labels. 
+  valid_activities:
+    - "Resting"
+    - "Grazing"
+    - "Traveling"
+    - "Fighting"
+    - "Grooming"
+    - "Drinking"
+    - "Mineral"
 
 analysis:
-  # mode: "LOOCV"     # Do LOOCV on the target dataset. 
-  mode: "PRODUCT"   # predict activity labels for a full dataset
-  target_dataset: "data/processed/RB_19/all_cows_labeled_mode.csv"  # Required The dataset to make predictions on
+  target_dataset: "data/processed/RB_19/all_cows_labeled_final.csv"  # Required The dataset to make predictions on
   
-  # Optional, only for PRODUCT mode. The reference training information. Either `dataset` or `model`
-  # training_info:     
-    # training_info_type: "dataset" # A dataset to create a trained model from
-    # training_info_path: "cowstudyapp/data/processed/dataset2.csv"
-    # training_info_type: "model"   # A saved trained model  
-    # training_info_path: "data/analysis_results/hmm/PRODUCT/20250212_005053/trained_model.rds"
+  mode: "LOOCV"     # Do LOOCV on the target dataset. 
+  # mode: "PRODUCT"   # predict activity labels for a full dataset
+  # training_info: "data/analysis_results/hmm/PRODUCT/RB_Combined_20250302_185007/trained_model.rds" # filtered out bad cows
+  # training_info_path: "data/analysis_results/hmm/PRODUCT/Has_Model_RB_22_20250220_192022/trained_model.rds"
+  # training_info_path: "data/analysis_results/hmm/PRODUCT/Has_Model_Combined_20250221_120017/trained_model.rds"
+  # training_info_path: "data/analysis_results/hmm/PRODUCT/RB_Combined_20250301_224933/trained_model.rds" # Ok
+  # training_info_path: "data/analysis_results/hmm/PRODUCT/RB_Combined_19_preds_CV_20250302_165123/trained_model.rds" # Time covariates and filtered out bad cows
 
 
+  day_only: true
   r_executable: "C:/Program Files/R/R-4.3.0/bin/Rscript.exe"
-  enabled_analyses: ["hmm"]
+  # enabled_analyses: ["hmm"]
   #DELETE data_path: "data/processed/RB_22/all_cows_labeled.csv"
   output_dir: "data/analysis_results"
   
   hmm:
-    enabled: true
-    states: # The states to use i the HMM
+    enabled: false
+    time_covariate: false
+
+    states: # The states to use in the HMM
       - "Grazing"
       - "Resting"
       - "Traveling"
     features:
-
-    # Improve this? while it is kinda nice we could make this cleaner. 
       - name: "step" # Powerful
         dist: null
         dist_type: "regular"
@@ -131,21 +173,15 @@ analysis:
       - name: "magnitude_mean" # Powerful
         dist: null 
         dist_type: "regular"
-      # - name: "x_crest_factor" # OK
-      #   dist: null
-      #   dist_type: "regular"
-      # - name: "x_peak_to_peak" # not impressed
-      #   dist: null
-      #   dist_type: "regular"
-      # - name: "y_peak_to_peak" # Pretty good
-      #   dist: null
-      #   dist_type: "regular"
-      # - name: "x_impulse_factor" # Not Impressive
-      #   dist: null
-      #   dist_type: "regular"
       - name: "magnitude_var" # Ok
         dist: null
         dist_type: "regular"
+
+      # Can kindof add covariates here. They work but break some other reports like transition matrices. 
+      # Need to manaually update the fitHMM formula argument from ~1 to ~temperature_gps  
+      # - name: "temperature_gps"
+      #   dist: null
+      #   dist_type: "covariate"
     options:
       show_dist_plots: true
       remove_outliers: true   # From the plots
@@ -162,3 +198,58 @@ analysis:
         circular:
           - "VONMISES"
           - "WRAPPEDCAUCHY"
+  
+  lstm:
+    enabled: false
+    states: # The states to use in the LSTM
+      - "Grazing"
+      - "Resting"
+      - "Traveling"
+    features:
+      - "step"
+      - "angle"
+      - "magnitude_mean"
+      - "magnitude_var"
+    max_length: 20
+    max_time_gap: 960
+    epochs: 100
+
+
+
+visuals:
+  predictions_path: 'data/analysis_results/hmm/PRODUCT/RB_19_20250306_013021/predictions.csv'
+  visuals_root_path: "data/visuals/RB_19/"
+
+  radar:
+    run: true
+    extension: 'RadarPlots01/'
+    show_night: false
+
+  temperature_graph:
+    run: false
+    # extension: 'MDT_Plots/'
+    minimum_required_values: 30
+
+  domain:
+    run: true
+    implemented: true
+    labeled_only: true
+    # extension: 'domain_plots/'
+
+  cow_info_graph:
+    run: false
+    implemented: false
+    # extension: 'cow_info_plots/'
+
+  heatmap:
+    run: true
+    # extension: 'heatmap/'
+
+    filter_weigh_days: false
+    weigh_days:
+      # - "2018-11-16"
+    #   - "2018-12-13"
+    #   - "2019-01-10"
+    #   - "2019-02-07"
+      - "2019-02-08"
+      - "2019-02-09"
