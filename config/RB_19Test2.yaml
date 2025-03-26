@@ -1,0 +1,142 @@
+"analysis":
+  "day_only": false
+  "enabled_analyses":
+  - "hmm"
+  "hmm":
+    "enabled": true
+    "features": []
+    "states":
+    - "Grazing"
+    - "Resting"
+    - "Traveling"
+    "time_covariate": false
+  "mode": "PRODUCT"
+  "output_dir": "data/analysis_results"
+  "target_dataset": "dataprocessed/RB_19/all_cows_labeled.csv"
+  "training_info_path": ""
+"common":
+  "accel_sample_interval": 60
+  "dataset_name": "RB_19Test2"
+  "do_analysis": true
+  "do_processing": true
+  "do_visuals": true
+  "excluded_devices":
+  - 609
+  - 612
+  "gps_sample_interval": 300
+  "random_seed": 0
+  "timezone": "America/Denver"
+"features":
+  "enable_axis_features": true
+  "enable_magnitude_features": true
+  "feature_types":
+  - "BASIC_STATS"
+"io":
+  "accelerometer_directory": "data/rawdata/website_admin/RB_19Test/accelerometer"
+  "gps_directory": "data/rawdata/website_admin/RB_19Test/gps"
+  "label_to_value":
+    "d": "Drinking"
+    "f": "Fighting"
+    "g": "Grazing"
+    "l": "Resting"
+    "m": "Mineral"
+    "r": "Grooming"
+    "s": "Resting"
+    "t": "Traveling"
+  "labeled_data_path": "data/rawdata/website_admin/RB_19Test/labeled/rb_2018_activity_observ.csv"
+  "tag_to_device":
+    "0011": "615"
+    "0024": "607"
+    "0101": "604"
+    "0105": "608"
+    "0163": "616"
+    "0174": "613"
+    "0256": "606"
+    "0276": "600"
+    "0286": "605"
+    "3065": "603"
+    "3091": "611"
+    "5010": "617"
+    "5051": "612"
+    "5090": "602"
+    "6082": "609"
+    "6085": "610"
+    "6094": "614"
+"labels":
+  "labeled_agg_method": "RAW"
+  "valid_activities":
+  - "Drinking"
+  - "Fighting"
+  - "Grazing"
+  - "Resting"
+  - "Mineral"
+  - "Grooming"
+  - "Traveling"
+"validation":
+  "COVERAGE_THRESHOLD": 70
+  "end_datetime": "2019-02-09 00:00:00"
+  "start_datetime": "2018-11-17 00:00:00"
+  "validation_rules":
+    "altitude":
+      "filter_invalid": false
+      "is_required": true
+      "max_value": 1715
+      "min_value": 1415
+    "dop":
+      "filter_invalid": true
+      "is_required": true
+      "max_value": 10
+    "latitude":
+      "filter_invalid": false
+      "is_required": true
+      "max_value": 90
+      "min_value": -90
+    "longitude":
+      "filter_invalid": false
+      "is_required": true
+      "max_value": 180
+      "min_value": -180
+    "satellites":
+      "filter_invalid": false
+      "is_required": true
+      "min_value": 0
+    "temperature_acc":
+      "filter_invalid": false
+      "is_required": true
+      "max_value": 99
+      "min_value": -99
+    "temperature_gps":
+      "filter_invalid": false
+      "is_required": true
+      "max_value": 99
+      "min_value": -99
+    "x":
+      "filter_invalid": false
+      "is_required": true
+      "max_value": 41
+      "min_value": -41
+    "y":
+      "filter_invalid": false
+      "is_required": true
+      "max_value": 41
+      "min_value": -41
+    "z":
+      "filter_invalid": false
+      "is_required": true
+      "max_value": 41
+      "min_value": -41
+"visuals":
+  "cow_info_graph":
+    "run": true
+  "domain":
+    "labeled_only": true
+    "run": true
+  "heatmap":
+    "filter_weigh_days": true
+    "run": true
+  "radar":
+    "run": true
+    "show_night": false
+  "temperature_graph":
+    "minimum_required_values": 30
+    "run": true
