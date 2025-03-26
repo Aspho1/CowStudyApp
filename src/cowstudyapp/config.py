@@ -418,12 +418,17 @@ class TemperatureGraphConfig(BaseModel):
 
 class CowInfoGraphConfig(BaseModel):
     run: bool
-    implemented: bool
+    # implemented: bool
+    extension: Optional[str] = Field(default="")
+
+class MoonPhasesConfig(BaseModel):
+    run: bool
+    # implemented: bool
     extension: Optional[str] = Field(default="")
 
 class DomainGraphConfig(BaseModel):
     run: bool
-    implemented: bool
+    # implemented: bool
     labeled_only: bool
     extension: Optional[str] = Field(default="")
 
@@ -439,6 +444,7 @@ class VisualsConfig(CommonConfig):
     radar: RadarConfig
     domain: DomainGraphConfig
     temperature_graph: TemperatureGraphConfig
+    moon_phases: MoonPhasesConfig
     cow_info_graph: CowInfoGraphConfig
     heatmap: HeatmapConfig
 

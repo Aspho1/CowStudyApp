@@ -229,7 +229,7 @@ class HeatMapMaker:
         print(np.mean(heatmap_data))
 
         heatmap_data = heatmap_data.sort_index(ascending=True)
-        fig, ax = plt.subplots(layout='constrained')
+        fig, ax = plt.subplots(layout='constrained', figsize=(20,12))
         
         # sns.heatmap(heatmap_data, annot=True, fmt=".0f", cmap="coolwarm", cbar=False, ax=ax, center=100/3)
         c = 100/3
