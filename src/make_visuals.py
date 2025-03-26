@@ -71,19 +71,37 @@ def generate_plots(config, predictions_dataset, target_dataset):
         gvc.compare_cow_info(df=predictions_dataset)
     
     
-    # #############################################################################
+    ##############################################################################
     if config.visuals.temperature_graph.run:
-        from cowstudyapp.visuals.show_temp_vs_activity import GrazingVersusTemperature
-        gvt = GrazingVersusTemperature(config=config)
-        gvt.compare_temp_behavior(df=predictions_dataset)
+        # from cowstudyapp.visuals.show_temp_vs_activity import GrazingVersusTemperature
+        # gvt = GrazingVersusTemperature(config=config)
+        # gvt.compare_temp_behavior(df=predictions_dataset)
+
+        from cowstudyapp.visuals.show_temp_vs_grazing_new import ActivityVersusTemperatureNew
+        gvt = ActivityVersusTemperatureNew(config=config, fit_method='best', degree=5, state='Grazing')
+        # gvt = GrazingVersusTemperatureNew(config=config, fit_method='gpr')
+        # gvt.plot_3d_surface(predictions_dataset, state='Traveling')
+        
+        
+        # Analyze the fitted surface
+        model, pivot_state = gvt.plot_fitted_surface(predictions_dataset)
+        gvt.analyze_fitted_surface(model, pivot_state)
+
+
+    
+    ##############################################################################
+    if config.visuals.moon_phases.run:
+        from cowstudyapp.visuals.show_moon_versus_grazing import MoonPhasesGrazing
+        mpg = MoonPhasesGrazing(config=config)
+        mpg.compare_moon_behavior(df=predictions_dataset)
     
     
 
 
 if __name__ == "__main__":
     # Load configuration
-    # config_path = Path("config/RB_22_config.yaml")
-    config_path = Path("config/RB_19_config.yaml")
+    config_path = Path("config/RB_22_config.yaml")
+    # config_path = Path("config/RB_19_config.yaml")
     config = ConfigManager.load(config_path)
 
 

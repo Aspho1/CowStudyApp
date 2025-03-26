@@ -110,16 +110,15 @@ labels:
     - "Mineral"
 
 analysis:
-  # mode: "LOOCV"     # Do LOOCV on the target dataset. 
-  mode: "PRODUCT"   # predict activity labels for a full dataset
+  mode: "LOOCV"     # Do LOOCV on the target dataset. 
+  # mode: "PRODUCT"   # predict activity labels for a full dataset
   target_dataset: "data/processed/RB_22/all_cows_labeled.csv"  # Required The dataset to make predictions on
   training_info_path: "data/analysis_results/hmm/FinalModels/RB_22_Paper_Model/trained_model.rds" # No CV, no filter cows, no covariate.
 
 
-  r_executable: "C:/Program Files/R/R-4.3.0/bin/Rscript.exe"
-  enabled_analyses: ["hmm"]
-  # enabled_analyses: ["lstm"]
-  #DELETE data_path: "data/processed/RB_22/all_cows_labeled.csv"
+  r_executable: "C:/Program Files/R/R-4.4.1/bin/Rscript.exe"
+  # r_executable: "C:/Program Files/R/R-4.3.0/bin/Rscript.exe"
+
   output_dir: "data/analysis_results"
   
   day_only: false
@@ -205,7 +204,7 @@ visuals:
   visuals_root_path: "data/visuals/RB_22/"
 
   radar:
-    run: true
+    run: false
     extension: 'RadarPlots01/'
     show_night: true
 
@@ -214,20 +213,24 @@ visuals:
     # extension: 'MDT_Plots/'
     minimum_required_values: 30
 
+  moon_phases:
+    run: false
+    extension: 'moon_phases_plots/'
+
   domain:
-    run: true
+    run: false
     implemented: true
     labeled_only: true
 
     # extension: 'cow_info_plots/'
 
   cow_info_graph:
-    run: true
+    run: false
     implemented: true
     # extension: 'cow_info_plots/'
 
   heatmap:
-    run: true
+    run: false
     # extension: 'heatmap/'
 
     filter_weigh_days: true

@@ -1,38 +1,41 @@
-from matplotlib import pyplot as plt, cm
-
-from typing import List, Optional
+import statsmodels.api as sm
+from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import os
-
-from matplotlib.dates import MO, DateFormatter, WeekdayLocator, DayLocator
-import matplotlib.patches as mpatches
 import seaborn as sns
-
 from pathlib import Path
-import logging
-from datetime import datetime
-
 from scipy import stats
-from statsmodels.stats.multicomp import pairwise_tukeyhsd
-import statsmodels.api as sm
-
 from cowstudyapp.utils import from_posix_col
 from cowstudyapp.config import ConfigManager
 
+# Add helper function
+def format_p_value(p):
+    if p < 0.001:
+        return "<0.001"
+    elif p < 0.01:
+        return "<0.01"
+    elif p < 0.05:
+        return "<0.05"
+    else:
+        return f"={p:.3f}"
+
+
+fontsizes = {
+    1: 16,
+    2: 18,
+    3: 20,
+    4: 24,
+    5: 28
+}
+
 class GrazingVersusCowInfo:
     def __init__(self, config: ConfigManager):
-        self.config=config
-
+        self.config = config
 
     def _prepare_data(self, df):
-
         df['mt'] = from_posix_col(df['posix_time'], self.config.analysis.timezone)
-
         df["date"] = df["mt"].dt.date
-
-        # df = df[~df['date'].isin(self.config.visuals.weigh_days)]
         return df
 
     def _get_cow_info(self):
@@ -41,380 +44,261 @@ class GrazingVersusCowInfo:
             
         return pd.read_excel(self.config.io.cow_info_path)
 
+    def compare_cow_info(self, df, min_records=180):
 
+        def age_rules(x):
+            if x <= 5:
+                return "3-5"
+            elif x <= 8:
+                return "6-8"
+            return "9+"
 
-
-    # def make_graph(self, min_records=180) -> None:
-    def compare_cow_info(self, df, min_records = 180):
         df = self._prepare_data(df)
         cow_info = self._get_cow_info()
 
+        # Calculate activity counts per cow per day
         cow_day_cts = df.groupby(["ID", "date"])\
             .agg(
                 **{
                     f"{state}_count": ('predicted_state', lambda x, s=state: (x == s).sum())
                     for state in self.config.analysis.hmm.states
                 },
-                total_count=('predicted_state', 'count')  # or just 'size' would work too
+                total_count=('predicted_state', 'count')
             ).reset_index()
 
+        # Calculate age
         cow_info['age'] = 2022 - cow_info['year_b']
 
+        cow_info['age_group'] = cow_info['age'].apply(lambda x: age_rules(x))
+        print(cow_info.head())
+
+
+
+        # Merge cow info with activity data
         analysis_df = cow_day_cts.merge(
             cow_info, 
             left_on="ID", 
             right_on="collar_id", 
             how="inner"
-        ).drop(columns=["collar_id", "cow_id"])
+        ).drop(columns=["collar_id", "cow_id", "TRT"])  # Remove TRT column
 
+        # Filter for minimum records and valid body weight
         analysis_df = analysis_df[analysis_df["total_count"] >= min_records]
         analysis_df = analysis_df[analysis_df["BW_preg"] > 0]
 
-
+        # Calculate percentages for each activity state
         for state in self.config.analysis.hmm.states:
             analysis_df[f'{state}_percentage'] = (analysis_df[f'{state}_count'] / analysis_df['total_count']) * 100
 
-        # Melt the DataFrame to get it into the same format as the old analysis
+        # Melt the DataFrame for easier analysis
         melted_df = pd.melt(
             analysis_df,
-            id_vars=['ID', 'date', 'TRT', 'age', 'BW_preg', 'BCS_preg', 'sex'],
+            id_vars=['ID', 'date', 'age', 'age_group', 'BW_preg', 'sex'],  # Removed BCS_preg
             value_vars=[f'{state}_percentage' for state in self.config.analysis.hmm.states],
             var_name='activity',
             value_name='percentage'
         )
 
-        # Clean up activity names by removing '_percentage'
+        # Clean up activity names
         melted_df['activity'] = melted_df['activity'].str.replace('_percentage', '')
 
-        # Calculate mean percentages per collar (same as collar_means in old code)
-        collar_means = melted_df.groupby(['ID', 'activity', 'TRT', 'age', 'BW_preg', 'BCS_preg', 'sex'])['percentage'].mean().reset_index()
-
-        # Create separate figures for each activity
+        # Calculate mean percentages per cow
+        collar_means = melted_df.groupby(['ID', 'activity', 'age', 'age_group', 'BW_preg', 'sex'])['percentage'].mean().reset_index()
+        
+        # Create separate plots for each activity type
+        # This completely avoids the subplot spacing issue
         activities = self.config.analysis.hmm.states
-        # First, adjust the figure layout to leave room for annotations
-        fig, axes = plt.subplots(len(activities), 4, figsize=(20, 15))
-        # Add more space at the bottom of the figure
-        plt.subplots_adjust(bottom=0.2)
+        
+        # Set a clean style with high contrast
 
-        fig.suptitle('Cow Characteristics vs Daily Activity Patterns')
+        # Use more distinguishable colors
+        box_color = '#3498db'  # Bright blue
+        line_color = '#c0392b'  # Dark red
+        scatter_color = '#2ecc71'  # Green
+        
+        # Create a directory for individual plots if it doesn't exist
+        plots_dir = os.path.join(self.config.visuals.visuals_root_path, 'cow_activity_plots')
+        os.makedirs(plots_dir, exist_ok=True)
+        
+        # Create a master figure for all plots
+        master_fig, master_axes = plt.subplots(len(activities), 2, figsize=(20, 9*len(activities)))
+        
+        plt.subplots_adjust(hspace=0.4, wspace=0.3)
+
+        sns.set_style("white")
+        
+        # For better readability
+        # plt.rcParams.update({
+        #     'font.size': 18,
+
+        #     'axes.labelsize': 20,
+        #     'axes.titlesize': 20,
+        #     'xtick.labelsize': 28,
+        #     'ytick.labelsize': 18,
+        #     'legend.fontsize': 18,
+        # })
+
+
+        master_fig.suptitle('Cow Characteristics vs Daily Activity Patterns'
+                            , fontsize=fontsizes[4]
+                            , fontweight='bold'
+                            , y=0.95)
+        
         for idx, activity in enumerate(activities):
             activity_data = collar_means[collar_means['activity'] == activity]
             
-
-            # melted_df['age'] = 2022 - melted_df['year_b']  # or whatever your study year is
-
-            # In the plotting section, replace year_b with age
-            # Birth Year Analysis becomes Age Analysis
-            sns.boxplot(data=activity_data, x='age', y='percentage', ax=axes[idx,0])
-
-            # Add mean and CI
-            sns.pointplot(data=activity_data, x='age', y='percentage', 
-                        color='red', ci=95, markers='_', 
-                        scale=0.5, ax=axes[idx,0])
-
-            axes[idx,0].set_title(f'Age vs {activity}')
-            axes[idx,0].set_xlabel('Age (years)')
-            axes[idx,0].set_ylabel(f'Average % Day {activity}')
-
-            # You might also want to sort the x-axis in ascending order of age
-            activity_data = activity_data.sort_values('age')
+            # Create subplot for Age
+            # Sort by age for better visualization
+            age_order = sorted(activity_data['age_group'].unique())
 
 
-            # 1. Birth Year Analysis with Effect Size
-            # sns.boxplot(data=activity_data, x='year_b', y='percentage', ax=axes[idx,0])
+            sns.boxplot(data=activity_data, x='age_group', y='percentage', ax=master_axes[idx, 0],
+                       color=box_color, width=0.6, order=age_order)
+
+            # Add mean points with more visible markers
+            sns.pointplot(data=activity_data, x='age_group', y='percentage',
+                        color=line_color, ci=95, markers='D',
+                        scale=0.8, join=True, order=age_order, ax=master_axes[idx, 0])
+
+            master_axes[idx, 0].set_title(f'Age Group vs {activity}'
+                                          , fontsize=fontsizes[4]
+                                          , fontweight='bold')
+            master_axes[idx, 0].set_xlabel('Age Group (years)'
+                                           , fontsize=fontsizes[3]
+                                           , fontweight='bold')
+            master_axes[idx, 0].set_ylabel(f'% Time {activity}'
+                                           , fontsize=fontsizes[3]
+                                           , fontweight='bold')
             
-            # # Add mean and CI
-            # sns.pointplot(data=activity_data, x='year_b', y='percentage', 
-            #             color='red', ci=95, markers='_', 
-            #             scale=0.5, ax=axes[idx,0])
-            
-            # axes[idx,0].set_title(f'Birth Year vs {activity}')
-            # axes[idx,0].set_xlabel('Birth Year')
-            # axes[idx,0].set_ylabel(f'Average % Day {activity}')
-            
-            # Calculate effect size (eta-squared) for birth year
-            ages = activity_data['age'].unique()
-            if len(ages) > 1:  # Only calculate if we have multiple years
+            # Make tick labels darker and larger
+            master_axes[idx, 0].tick_params(axis='both', colors='black', labelsize=fontsizes[2])
+            for label in master_axes[idx, 0].get_xticklabels() + master_axes[idx, 0].get_yticklabels():
+                label.set_fontweight('bold')
+                
+            # Add grid for better readability
+            master_axes[idx, 0].grid(True, linestyle='--', alpha=0.7)
+
+            # Calculate p-value for age and add interpretation
+            age_groups = activity_data['age_group'].unique()
+            if len(age_groups) > 1:
                 f_stat, p_val = stats.f_oneway(*[
-                    activity_data[activity_data['age'] == age]['percentage'] 
-                    for age in ages
+                    activity_data[activity_data['age_group'] == age_group]['percentage']
+                    for age_group in age_groups
                 ])
-                df_between = len(ages) - 1
-                df_total = len(activity_data) - 1
-                eta_sq = (df_between * f_stat) / (df_between * f_stat + df_total)
-                # axes[idx,0].text(0.5, -0.15, f'p = {p_val:.4f}\nη² = {eta_sq:.3f}', 
-                #             ha='center', transform=axes[idx,0].transAxes)
+                
+                # Interpret the statistical significance
+                if p_val < 0.05:
+                    sig_text = f"1-way ANOVA\n(p{format_p_value(p_val)})"
+                else:
+                    sig_text = f"No significant effect\n(p{format_p_value(p_val)})"
+                
+                # Place the annotation at the bottom of the plot, not using transform
+                y_min, y_max = master_axes[idx, 0].get_ylim()
+                text_y = y_min - (y_max - y_min) * 0.15  # Position below the x-axis
+                master_axes[idx, 0].text(
+                    (len(age_order)-1)*.5,  # Center of x-axis
+                    text_y, 
+                    sig_text, 
+                    ha='center',
+                    fontsize=fontsizes[3],
+                    bbox=dict(facecolor='white', edgecolor='gray', alpha=0.9, boxstyle='round,pad=0.5')
+                )
+                # Extend y-axis limits to include the annotation
+                master_axes[idx, 0].set_ylim(text_y - (y_max - y_min) * 0.1, y_max)
 
-                axes[idx,0].text(0.5, -0.35, 
-                                f'One-way ANOVA:\np = {p_val:.4f}\nη² = {eta_sq:.3f}', 
-                                ha='center', 
-                                transform=axes[idx,0].transAxes)
-
-
-            # 2. Body Weight Analysis
+            # Create subplot for Weight
             activity_data_weight = activity_data.dropna(subset=['BW_preg'])
-            sns.regplot(data=activity_data_weight, 
-                        x='BW_preg', 
-                        y='percentage', 
-                        ax=axes[idx,1],
-                        scatter_kws={'alpha':0.5},
-                        line_kws={'color': 'red'})
+            
+            # Higher contrast plotting
+            scatter = master_axes[idx, 1].scatter(
+                activity_data_weight['BW_preg'],
+                activity_data_weight['percentage'],
+                c=scatter_color,
+                s=80,
+                alpha=0.7,
+                edgecolor='black'
+            )
+            
+            # Add regression line
+            slope, intercept, r_value, p_value, std_err = stats.linregress(
+                activity_data_weight['BW_preg'],
+                activity_data_weight['percentage']
+            )
+            
+            x_range = np.linspace(
+                activity_data_weight['BW_preg'].min(),
+                activity_data_weight['BW_preg'].max(),
+                100
+            )
+            master_axes[idx, 1].plot(
+                x_range,
+                intercept + slope * x_range,
+                color=line_color,
+                linewidth=3
+            )
+            
+            # Add confidence band
+            from statsmodels.sandbox.regression.predstd import wls_prediction_std
+            X = sm.add_constant(activity_data_weight['BW_preg'])
+            model = sm.OLS(activity_data_weight['percentage'], X).fit()
+            
+            x_pred = sm.add_constant(x_range)
+            y_pred = model.predict(x_pred)
+            _, lower, upper = wls_prediction_std(model, x_pred, alpha=0.05)
+            
+            master_axes[idx, 1].fill_between(
+                x_range,
+                lower,
+                upper,
+                color=line_color,
+                alpha=0.2
+            )
                         
-            axes[idx,1].set_title(f'Body Weight vs {activity}')
-            axes[idx,1].set_xlabel('Body Weight (lbs)')
-            axes[idx,1].set_ylabel(f'Average % Day {activity}')
-
-            # Weight correlation and effect size
-            # corr, p_val = stats.pearsonr(activity_data_weight['BW_preg'], 
-            #                             activity_data_weight['percentage'])
-            # # Calculate R-squared
-            # r_squared = corr ** 2
-
-            # axes[idx,1].text(0.5, -0.35, 
-            #     f'p = {p_val:.4f}\nR² = {r_squared:.3f}', 
-            #     ha='center', 
-            #     transform=axes[idx,1].transAxes)
+            master_axes[idx, 1].set_title(f'Body Weight vs {activity}'
+                                          , fontsize=fontsizes[4]
+                                          , fontweight='bold')
+            master_axes[idx, 1].set_xlabel('Body Weight (lbs)'
+                                           , fontsize=fontsizes[3]
+                                           , fontweight='bold')
+            master_axes[idx, 1].set_ylabel(f'% Time {activity}'
+                                           , fontsize=fontsizes[3]
+                                           , fontweight='bold')
             
-
-            pearson_corr, pearson_p = stats.pearsonr(activity_data_weight['BW_preg'], 
-                                                    activity_data_weight['percentage'])
-            spearman_corr, spearman_p = stats.spearmanr(activity_data_weight['BW_preg'], 
-                                                    activity_data_weight['percentage'])
-
-            axes[idx,1].text(0.5, -0.35, 
-                f'Pearson:\nR²={pearson_corr**2:.3f}\np={pearson_p:.4f}\n', 
-                ha='center', 
-                transform=axes[idx,1].transAxes)
-
-            # axes[idx,1].text(0.5, -0.35, 
-            #     f'Pearson: r={pearson_corr:.3f}, p={pearson_p:.4f}\n' + 
-            #     f'Spearman: ρ={spearman_corr:.3f}, p={spearman_p:.4f}', 
-            #     ha='center', 
-            #     transform=axes[idx,1].transAxes)
-
-
-
-
-            # 3. BCS Analysis
-            activity_data_bcs = activity_data.dropna(subset=['BCS_preg'])
-            sns.regplot(data=activity_data_bcs, 
-                        x='BCS_preg', 
-                        y='percentage', 
-                        ax=axes[idx,2],
-                        scatter_kws={'alpha':0.5},
-                        line_kws={'color': 'red'})
-
-            axes[idx,2].set_title(f'Body Condition Score vs {activity}')
-            axes[idx,2].set_xlabel('BCS')
-            axes[idx,2].set_ylabel(f'Average % Day {activity}')
-
-            # # BCS correlation and effect size
-            # bcs_corr, bcs_p = stats.pearsonr(activity_data_bcs['BCS_preg'], 
-            #                                 activity_data_bcs['percentage'])
-            # # Calculate R-squared
-            # bcs_r_squared = bcs_corr ** 2
-
-            # # axes[idx,2].text(0.5, -0.15, 
-            # #                 f'r = {bcs_corr:.3f}\np = {bcs_p:.4f}\nR² = {bcs_r_squared:.3f}', 
-            # #                 ha='center', 
-            # #                 transform=axes[idx,2].transAxes)
-
-            # axes[idx,2].text(0.5, -0.35, 
-            #     f'p = {bcs_p:.4f}\nR² = {bcs_r_squared:.3f}', 
-            #     ha='center', 
-            #     transform=axes[idx,2].transAxes)
-            
-
-
-            bcs_pearson_corr, bcs_pearson_p = stats.pearsonr(activity_data_bcs['BCS_preg'], 
-                                                            activity_data_bcs['percentage'])
-            bcs_spearman_corr, bcs_spearman_p = stats.spearmanr(activity_data_bcs['BCS_preg'], 
-                                                                activity_data_bcs['percentage'])
-
-            axes[idx,2].text(0.5, -0.35, 
-                f'Pearson:\nR²={bcs_pearson_corr**2:.3f}\np={bcs_pearson_p:.4f}\n', 
-                ha='center', 
-                transform=axes[idx,2].transAxes)
-
-
-
-
-
-
-            # 4. Treatment Analysis with Effect Size
-            axes[idx,3].set_title(f'Treatment vs {activity}')  # Add missing title
-            sns.boxplot(data=activity_data, x='TRT', y='percentage', ax=axes[idx,3])
-            
-            # Add mean and CI
-            sns.pointplot(data=activity_data, x='TRT', y='percentage', 
-                        color='red', ci=95, markers='_', 
-                        scale=0.5, ax=axes[idx,3])
-            
-            # Calculate effect size (Cohen's d) between treatments
-            treatments = sorted(activity_data['TRT'].unique())
-            if len(treatments) > 1:
-                # Calculate pairwise Cohen's d
-                cohens_d_dict = {}
-                for i, trt1 in enumerate(treatments):
-                    for trt2 in treatments[i+1:]:
-                        group1 = activity_data[activity_data['TRT'] == trt1]['percentage']
-                        group2 = activity_data[activity_data['TRT'] == trt2]['percentage']
-                        
-                        # Pooled standard deviation
-                        n1, n2 = len(group1), len(group2)
-                        s1, s2 = np.var(group1, ddof=1), np.var(group2, ddof=1)
-                        s_pooled = np.sqrt(((n1-1)*s1 + (n2-1)*s2) / (n1+n2-2))
-                        
-                        # Cohen's d
-                        d = (np.mean(group1) - np.mean(group2)) / s_pooled
-                        cohens_d_dict[f'{trt1}-{trt2}'] = d
-
-                # Add Cohen's d to plot
-                treatments = activity_data['TRT'].unique()
+            # Make tick labels darker and larger
+            master_axes[idx, 1].tick_params(axis='both', colors='black', labelsize=fontsizes[2])
+            for label in master_axes[idx, 1].get_xticklabels() + master_axes[idx, 1].get_yticklabels():
+                label.set_fontweight('bold')
                 
-                
-                h_stat, p_val = stats.kruskal(*[
-                    activity_data[activity_data['TRT'] == trt]['percentage'] 
-                    for trt in treatments
-                ])
+            # Add grid for better readability
+            master_axes[idx, 1].grid(True, linestyle='--', alpha=0.7)
 
-                # axes[idx,3].text(0.5, -0.15, f'p = {p_val:.4f}', ha='center', transform=axes[idx,3].transAxes)
-                d_text = '\n'.join([f'{k}: d={v:.2f}' for k,v in cohens_d_dict.items()]) + f"\nKruskal p = {p_val:.4f}"
-
-                # d_text = '\n'.join([f'{k}: d={v:.2f}' for k,v in cohens_d_dict.items()])
-                axes[idx,3].text(0.5, -0.35, 
-                                d_text, 
-                                ha='center', 
-                                transform=axes[idx,3].transAxes)
-
-
-
-
-        plt.tight_layout(pad=3.0, h_pad=2.0, w_pad=1.0)
-        plt.savefig(os.path.join(self.config.visuals.visuals_root_path, 'activity_analysis.png'))
-        plt.close()
-
-        # Enhanced printing of statistics
-        for activity in activities:
-            activity_data = collar_means[collar_means['activity'] == activity]
-            print(f"\n=== {activity} Analysis ===")
+            weight_range = activity_data_weight['BW_preg'].max() - activity_data_weight['BW_preg'].min()
+            effect_magnitude = abs(slope * weight_range)
             
-            # Print effect sizes along with other statistics
-            print(f"\n{activity} Treatment Effects:")
-            for trt1 in treatments:
-                for trt2 in treatments:
-                    if trt1 < trt2:
-                        group1 = activity_data[activity_data['TRT'] == trt1]['percentage']
-                        group2 = activity_data[activity_data['TRT'] == trt2]['percentage']
-                        
-                        # Calculate Cohen's d
-                        n1, n2 = len(group1), len(group2)
-                        s1, s2 = np.var(group1, ddof=1), np.var(group2, ddof=1)
-                        s_pooled = np.sqrt(((n1-1)*s1 + (n2-1)*s2) / (n1+n2-2))
-                        d = (np.mean(group1) - np.mean(group2)) / s_pooled
-                        
-                        print(f"{trt1} vs {trt2}:")
-                        print(f"  Cohen's d: {d:.3f}")
-                        print(f"  Mean difference: {np.mean(group1) - np.mean(group2):.3f}%")
-                        print(f"  95% CI: [{np.percentile(group1-group2, 2.5):.3f}, {np.percentile(group1-group2, 97.5):.3f}]")
+            if p_value < 0.05:
+                weight_text = f"Significant relationship\n(p{format_p_value(p_value)}, R²={r_value**2:.3f})"
+            else:
+                weight_text = f"No significant effect\n(p{format_p_value(p_value)})"
+                
+            # Place the annotation at the bottom of the plot, not using transform
+            y_min, y_max = master_axes[idx, 1].get_ylim()
+            text_y = y_min - (y_max - y_min) * 0.15  # Position below the x-axis
+            master_axes[idx, 1].text(
+                (activity_data_weight['BW_preg'].max() + activity_data_weight['BW_preg'].min()) / 2,  # Center of x-axis
+                text_y, 
+                weight_text, 
+                ha='center',
+                fontsize=fontsizes[3],
+                bbox=dict(facecolor='white', edgecolor='gray', alpha=0.9, boxstyle='round,pad=0.5')
+            )
+            # Extend y-axis limits to include the annotation
+            master_axes[idx, 1].set_ylim(text_y - (y_max - y_min) * 0.1, y_max)
+
+        # Save the master figure
+        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        # # Create separate figures for each activity
-        # activities = ['Grazing', 'Resting', 'Traveling']
-        # fig, axes = plt.subplots(len(activities), 4, figsize=(20, 15))
-        # fig.suptitle('Cow Characteristics vs Daily Activity Patterns')
         
-        # for idx, activity in enumerate(activities):
-        #     activity_data = collar_means[collar_means['activity'] == activity]
-            
-        #     # 1. Birth Year Analysis
-        #     sns.boxplot(data=activity_data, x='year_b', y='percentage', ax=axes[idx,0])
-        #     axes[idx,0].set_title(f'Birth Year vs {activity}')
-        #     axes[idx,0].set_xlabel('Birth Year')
-        #     axes[idx,0].set_ylabel(f'Average % Day {activity}')
-            
-        #     # Birth year stats
-        #     years = activity_data['year_b'].unique()
-        #     h_stat, p_val = stats.kruskal(*[
-        #         activity_data[activity_data['year_b'] == year]['percentage'] 
-        #         for year in years
-        #     ])
-        #     axes[idx,0].text(0.5, -0.15, f'p = {p_val:.4f}', ha='center', transform=axes[idx,0].transAxes)
-
-        #     # 2. Body Weight Analysis
-        #     activity_data_weight = activity_data.dropna(subset=['BW_preg'])
-        #     sns.regplot(data=activity_data_weight, x='BW_preg', y='percentage', ax=axes[idx,1])
-        #     axes[idx,1].set_title(f'Body Weight vs {activity}')
-        #     axes[idx,1].set_xlabel('Body Weight (lbs)')
-        #     axes[idx,1].set_ylabel(f'Average % Day {activity}')
-            
-        #     # Weight correlation
-        #     corr, p_val = stats.pearsonr(activity_data_weight['BW_preg'], activity_data_weight['percentage'])
-        #     axes[idx,1].text(0.5, -0.15, f'r = {corr:.3f}\np = {p_val:.4f}', ha='center', transform=axes[idx,1].transAxes)
-
-        #     # 3. BCS Analysis
-        #     activity_data_bcs = activity_data.dropna(subset=['BCS_preg'])
-        #     sns.regplot(data=activity_data_bcs, x='BCS_preg', y='percentage', ax=axes[idx,2])
-        #     axes[idx,2].set_title(f'Body Condition Score vs {activity}')
-        #     axes[idx,2].set_xlabel('BCS')
-        #     axes[idx,2].set_ylabel(f'Average % Day {activity}')
-            
-        #     # BCS correlation
-        #     bcs_corr, bcs_p = stats.pearsonr(activity_data_bcs['BCS_preg'], activity_data_bcs['percentage'])
-        #     axes[idx,2].text(0.5, -0.15, f'r = {bcs_corr:.3f}\np = {bcs_p:.4f}', ha='center', transform=axes[idx,2].transAxes)
-
-        #     # 4. Treatment Analysis
-        #     sns.boxplot(data=activity_data, x='TRT', y='percentage', ax=axes[idx,3])
-        #     axes[idx,3].set_title(f'Treatment vs {activity}')
-        #     axes[idx,3].set_xlabel('Treatment')
-        #     axes[idx,3].set_ylabel(f'Average % Day {activity}')
-            
-        #     # Treatment stats
-        #     treatments = activity_data['TRT'].unique()
-        #     h_stat, p_val = stats.kruskal(*[
-        #         activity_data[activity_data['TRT'] == trt]['percentage'] 
-        #         for trt in treatments
-        #     ])
-        #     axes[idx,3].text(0.5, -0.15, f'p = {p_val:.4f}', ha='center', transform=axes[idx,3].transAxes)
-
-        # plt.tight_layout()
-        # plt.savefig(os.path.join(self.config.visuals.visuals_path, 'activity_analysis.png'))
-        # plt.close()
-
-        # # Print summary statistics for each activity
-        # for activity in activities:
-        #     activity_data = collar_means[collar_means['activity'] == activity]
-            
-        #     print(f"\n=== {activity} Analysis ===")
-        #     print(f"\n{activity} Percentage by Birth Year:")
-        #     print(activity_data.groupby('year_b')['percentage'].describe())
-            
-        #     print(f"\n{activity} Percentage by Treatment:")
-        #     print(activity_data.groupby('TRT')['percentage'].describe())
-            
-        #     # Weight correlation
-        #     activity_data_weight = activity_data.dropna(subset=['BW_preg'])
-        #     corr, p_val = stats.pearsonr(activity_data_weight['BW_preg'], activity_data_weight['percentage'])
-        #     print(f"\nBody Weight vs {activity}: r={corr:.3f}, p={p_val:.4f}")
-            
-        #     # BCS correlation
-        #     activity_data_bcs = activity_data.dropna(subset=['BCS_preg'])
-        #     bcs_corr, bcs_p = stats.pearsonr(activity_data_bcs['BCS_preg'], activity_data_bcs['percentage'])
-        #     print(f"BCS vs {activity}: r={bcs_corr:.3f}, p={bcs_p:.4f}")
+        plt.savefig(os.path.join(self.config.visuals.visuals_root_path, 'cow_characteristics_vs_activity.png'),
+                   dpi=300, bbox_inches='tight')
+        plt.close(master_fig)
