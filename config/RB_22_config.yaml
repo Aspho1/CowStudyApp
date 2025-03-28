@@ -210,8 +210,13 @@ visuals:
 
   temperature_graph:
     run: true
+    daynight: 'both' #'day' #'night' 'both'
+    show_curve: true
     # extension: 'MDT_Plots/'
     minimum_required_values: 30
+    show_table: true  # Whether to print a comparison table
+    export_excel: true  # Whether to export results to Excel
+
 
   moon_phases:
     run: false
@@ -242,4 +247,6 @@ visuals:
       - "2022-02-23"
       - "2022-03-22"
       - "2022-03-23"
+
+
     

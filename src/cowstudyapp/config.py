@@ -415,6 +415,20 @@ class TemperatureGraphConfig(BaseModel):
     run: bool
     minimum_required_values: int
     extension: Optional[str] = Field(default="")
+    daynight: str
+    show_curve: bool = False
+    show_table: bool = False
+    export_excel: bool = False
+
+
+    @field_validator('daynight')
+    @classmethod
+    def validate_daynight_sel(cls, v: str) -> Path:
+        if v.lower() not in ['day', 'night', 'both']:
+            raise ValueError(f"config.visuals.temerature_graph.daynight"
+                             "selection `{v}` does not exist.")
+        return v
+
 
 class CowInfoGraphConfig(BaseModel):
     run: bool

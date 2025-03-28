@@ -90,7 +90,8 @@ def check_r_packages(r_executable):
         "grid",
         "gridExtra",
         "movMF",
-        "suncalc"
+        "suncalc",
+        "lme4"
     ]
 
     # Step 1: Just get installed packages
