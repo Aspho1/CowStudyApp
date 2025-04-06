@@ -209,8 +209,8 @@ visuals:
     show_night: true
 
   temperature_graph:
-    run: true
-    daynight: 'both' #'day' #'night' 'both'
+    run: false
+    daynight: 'day' #'day' #'night' 'both'
     show_curve: true
     # extension: 'MDT_Plots/'
     minimum_required_values: 30
@@ -219,7 +219,7 @@ visuals:
 
 
   moon_phases:
-    run: false
+    run: true
     extension: 'moon_phases_plots/'
 
   domain:

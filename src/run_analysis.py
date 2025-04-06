@@ -21,10 +21,10 @@ def find_r_executable():
     if platform.system() == "Windows":
         # Common R installation paths on Windows
         possible_paths = [
-            r"C:\Program Files\R\R-4.3.2\bin\Rscript.exe",  # Adjust version as needed
-            r"C:\Program Files\R\R-4.3.2\bin\x64\Rscript.exe",
-            r"C:\Program Files\R\R-4.3.0\bin\Rscript.exe",
-            # Add other possible paths
+            r"C:\Program Files\R\R-4.4.3\bin\Rscript.exe",
+            # r"C:\Program Files\R\R-4.4.0\bin\Rscript.exe",
+            # r"C:\Program Files\R\R-4.3.2\bin\Rscript.exe",
+            # r"C:\Program Files\R\R-4.3.0\bin\Rscript.exe",
         ]
 
         # Check R_HOME environment variable
@@ -236,7 +236,7 @@ def run_hmm_analysis(config: ConfigManager, target_data_path: Path, output_dir: 
     """Run the HMM analysis using R scripts"""
 
     analysis = config.analysis
-    r_executable = analysis.r_executable or find_r_executable()
+    r_executable = find_r_executable() or analysis.r_executable
     check_r_packages(r_executable)
 
     # Ensure R script directory exists

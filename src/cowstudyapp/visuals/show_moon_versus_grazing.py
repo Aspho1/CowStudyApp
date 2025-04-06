@@ -306,10 +306,10 @@ class MoonPhasesGrazing:
             ax.set_xlabel("Moon Phase")
             ax.set_ylabel("Proportion of Time Spent Grazing")
             ax.set_ylim(0, 1)
-            ax.set_xticklabels(['Regular Moon', 'Full Moon'])
+            ax.set_xticklabels(['Non Full Moon', 'Full Moon'])
             ax.grid(True, alpha=0.2)
         
-        fig.suptitle("Effect of Moon Phase on Grazing Behavior\n* p<0.05, ** p<0.01, *** p<0.001", 
+        fig.suptitle("Effect of Full Moon on Grazing Behavior\n* p<0.05, ** p<0.01, *** p<0.001", 
                      fontsize=20, y=0.98)
         
         # # Add text explaining findings
@@ -351,7 +351,7 @@ class MoonPhasesGrazing:
         # Create custom legend handles with explicit colors
         from matplotlib.patches import Patch
         legend_elements = [
-            Patch(facecolor='#34495e', edgecolor='black', label='Regular Moon'),
+            Patch(facecolor='#34495e', edgecolor='black', label='Non Full Moon'),
             Patch(facecolor='#f39c12', edgecolor='black', label='Full Moon')
         ]
         
@@ -365,10 +365,10 @@ class MoonPhasesGrazing:
         )
         
         # Customize plot
-        plt.title('Individual Cow Nighttime Grazing Responses to Moon Phase', fontsize=18)
+        plt.title('Individual Cow Nighttime Grazing Responses to Full Moons', fontsize=18)
         plt.xlabel('Cow ID', fontsize=16)
         plt.ylabel('Proportion of Time Spent Grazing', fontsize=16)
-        plt.ylim(0, 0.6)
+        plt.ylim(0, 0.65)
         # plt.grid(axis='y', alpha=0.4)
         plt.grid(axis='x', alpha=0.4)
         
@@ -387,7 +387,7 @@ class MoonPhasesGrazing:
                         if p < 0.001: 
                             sig = '***'
                     # Position stars slightly lower to avoid legend overlap
-                    ax.annotate(sig, xy=(i, 0.50), ha='center', fontsize=14)
+                    ax.annotate(sig, xy=(i, 0.5), ha='center', fontsize=14)
                     # ax.annotate(sig, xy=(i, full.quantile(.80) + 0.05), ha='center', fontsize=14)
                     # ax.annotate(sig, xy=(i, 0.95), ha='center', fontsize=14)
         

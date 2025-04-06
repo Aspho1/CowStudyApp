@@ -66,8 +66,11 @@ def generate_plots(config, predictions_dataset, target_dataset):
 
     #############################################################################
     if config.visuals.cow_info_graph.run:
+
+        
         from cowstudyapp.visuals.show_cow_info_vs_pred import GrazingVersusCowInfo
         gvc = GrazingVersusCowInfo(config=config)
+        gvc.pairplot_cow_info(df=predictions_dataset)
         gvc.compare_cow_info(df=predictions_dataset)
     
     
@@ -80,17 +83,21 @@ def generate_plots(config, predictions_dataset, target_dataset):
         # gvt.compare_temp_behavior(df=predictions_dataset)
 
 
-        from cowstudyapp.visuals.show_temp_vs_activity_Bayes import GrazingVersusTemperatureBayes
-        gvt = GrazingVersusTemperatureBayes(config=config)
-        gvt.analyze_binomial_glmm(df=predictions_dataset)
+        # from cowstudyapp.visuals.show_temp_vs_activity_Bayes import GrazingVersusTemperatureBayes
+        # gvt = GrazingVersusTemperatureBayes(config=config)
+        # gvt.analyze_binomial_glmm(df=predictions_dataset)
+
+        from cowstudyapp.visuals.show_effects_glmm import BehaviorAnalyzer
+        BA = BehaviorAnalyzer(config = config)
+        BA.analyze(df=predictions_dataset)
 
 
 
         ######################## 3D Plot ########################
         # from cowstudyapp.visuals.show_temp_vs_grazing_new import ActivityVersusTemperatureNew
         # gvt = ActivityVersusTemperatureNew(config=config, fit_method='best', degree=5, state='Grazing')
-        # gvt = GrazingVersusTemperatureNew(config=config, fit_method='gpr')
-        # gvt.plot_3d_surface(predictions_dataset, state='Traveling')
+        # # gvt = GrazingVersusTemperatureNew(config=config, fit_method='gpr')
+        # gvt.plot_3d_surface(predictions_dataset)
         
         
         # Analyze the fitted surface

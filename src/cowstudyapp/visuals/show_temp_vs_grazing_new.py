@@ -61,7 +61,7 @@ class ActivityVersusTemperatureNew:
         df['date'] = df['mt'].dt.date
 
         if self.config.visuals.heatmap.filter_weigh_days:
-            weigh_days = self.config.visuals.heatmap.weigh_days
+            weigh_days = pd.to_datetime(self.config.visuals.heatmap.weigh_days)
             if weigh_days is None:
                 raise ValueError("Weigh Days must be defined in the config.")
             
@@ -97,24 +97,27 @@ class ActivityVersusTemperatureNew:
         date_mapping = {date: i for i, date in enumerate(dates)}
         df['day_num'] = df['date'].map(date_mapping)
         
+        # print(df.describe())
+
         # Create pivot tables
         pivot_state = df.pivot_table(
             index='day_num',
             columns='minute',
             values='predicted_state',
             aggfunc=lambda x: (x == self.state).mean()
-        ).fillna(0)
-        
+        ).ffill().bfill()
+
         pivot_temp = df.pivot_table(
             index='day_num',
             columns='minute',
             values='temperature',
             aggfunc='mean'
-        ).ffill().bfill()
+        ).bfill().ffill()
+        #.ffill().bfill()
         
         return pivot_state, pivot_temp, dates
 
-    def _smooth_surfaces(self, Z_state, Z_temp, sigma=2.0):
+    def _smooth_surfaces(self, Z_state, Z_temp, sigma=2):
         """Apply Gaussian smoothing to surfaces"""
         import scipy.ndimage as ndimage
         Z_smooth = ndimage.gaussian_filter(Z_state, sigma=sigma)
@@ -151,9 +154,9 @@ class ActivityVersusTemperatureNew:
         ax.set_yticklabels(day_labels)
         
         # Set labels
-        ax.set_xlabel('Time of Day', fontsize=fontsize, labelpad=10)
-        ax.set_ylabel('Date', fontsize=fontsize, labelpad=10)
-        ax.set_zlabel('Proportion', fontsize=fontsize, labelpad=10)
+        ax.set_xlabel('Time of Day', fontsize=fontsize, labelpad=20)
+        ax.set_ylabel('Date', fontsize=fontsize, labelpad=20)
+        ax.set_zlabel('Proportion', fontsize=fontsize, labelpad=20)
 
     def plot_3d_surface(self, df, ID=None):
         """Create 3D surface plot with temperature coloring"""
@@ -211,7 +214,8 @@ class ActivityVersusTemperatureNew:
         plt.title(title + '\nHeight: proportion, Color: temperature', fontsize=14, pad=20)
         
         # Rotate view
-        ax.view_init(elev=30, azim=45)
+        # ax.view_init(elev=0, azim=0)
+        ax.view_init(30,-90,30)
         
         plt.show()
         

@@ -44,6 +44,77 @@ class GrazingVersusCowInfo:
             
         return pd.read_excel(self.config.io.cow_info_path)
 
+
+
+
+    def pairplot_cow_info(self, df):
+        cow_info = self._get_cow_info()
+        cow_info['age'] = 2022 - cow_info['year_b']
+        cow_info.rename(columns={'BW_preg':'weight_lbs'}, inplace=True)
+        cow_info = cow_info[cow_info.weight_lbs > 0]
+        cow_info['weight_kg'] = cow_info['weight_lbs'] * 0.4535924
+        cow_info = cow_info[['age', 'weight_kg', 'TRT']]
+
+        # Create figure with better spacing
+        fig, axs = plt.subplots(2, 2, figsize=(7, 7))
+        plt.subplots_adjust(hspace=0.3, wspace=0.3)
+
+        for rowi, row in enumerate(axs):
+            R = ['weight_kg', 'age'][rowi]
+            for coli, ax in enumerate(row):
+                C = ['weight_kg', 'age'][coli]
+                
+                if rowi == 0 and coli == 1:
+                    ax.remove()  # Remove the unused axis
+                    continue
+                elif R == C:
+                    # Improve histogram appearance
+                    # Use different bins depending on the variable
+                    if R == 'age':
+                        bins = range(int(cow_info[R].min()), int(cow_info[R].max()) + 2)  # +2 to include the last value
+                    else:
+                        bins = 15
+                        
+                    ax.hist(cow_info[R], bins=bins, edgecolor='black', alpha=0.7)
+                    ax.grid(True, alpha=0.3)
+                    
+                    # Add mean line
+                    mean_val = cow_info[R].mean()
+                    ax.axvline(mean_val, color='red', linestyle='--', alpha=0.8)
+                    ax.text(mean_val, ax.get_ylim()[1],
+                        f'Mean: {mean_val:.1f}',
+                        rotation=0, color='red',
+                        ha='center', va='bottom')
+                    
+                    # Add "Count" label for histograms
+                    ax.set_ylabel('Count', fontsize=10)
+                    
+                else:
+                    # Improve scatter plot appearance
+                    ax.scatter(cow_info[R], cow_info[C], alpha=0.6)
+                    ax.grid(True, alpha=0.3)
+                    
+                    # Add trend line
+                    z = np.polyfit(cow_info[R], cow_info[C], 1)
+                    p = np.poly1d(z)
+                    ax.plot(cow_info[R], p(cow_info[R]), "r--", alpha=0.8)
+                    
+                    # Set ylabel for scatter plots
+                    ax.set_ylabel(f'{C} {"(kg)" if "weight" in C else "(years)"}', fontsize=10)
+                
+                ax.set_xlabel(f'{R} {"(kg)" if "weight" in R else "(years)"}', fontsize=10)
+                ax.spines['top'].set_visible(False)
+                ax.spines['right'].set_visible(False)
+                ax.tick_params(labelsize=9)
+
+        fig.suptitle("Comparison of Cow Attributes",
+                    fontweight='bold',
+                    fontsize=16,
+                    y=0.95)
+        
+        plt.show()
+
+
     def compare_cow_info(self, df, min_records=180):
 
         def age_rules(x):
