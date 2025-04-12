@@ -6,8 +6,6 @@ library(patchwork)
 
 
 
-
-
 features <- c('step', 'magnitude_mean', 'magnitude_var')
 
 # rb19_model <- readRDS("~/1.Education/CowStudyApp/data/analysis_results/hmm/PRODUCT/Has_Model_RB_19_20250220_192315/trained_model.rds")

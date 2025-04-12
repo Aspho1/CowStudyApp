@@ -1277,9 +1277,9 @@ class BehaviorAnalyzer:
         # Calculate probabilities across the day for each temperature
         time_values = np.linspace(0, 1440, 100)  # Full day in minutes
         temp_values = np.linspace(
-            means['temp'] - 2 * stds['temp'],
-            means['temp'] + 2 * stds['temp'],
-            5
+            means['temp'] - 4 * stds['temp'],
+            means['temp'] + 4 * stds['temp'],
+            9
         )
         
         aucs = []
@@ -1302,7 +1302,7 @@ class BehaviorAnalyzer:
         print(f"{'Temperature':>12} {'AUC':>10} {'% Change':>10}")
         print("-" * 32)
         
-        baseline_auc = aucs[2]  # Middle temperature
+        baseline_auc = aucs[4]  # Middle temperature
         for temp, auc in zip(temp_values, aucs):
             pct_change = ((auc - baseline_auc) / baseline_auc) * 100
             print(f"{temp:>12.1f}°C {auc:>10.3f} {pct_change:>10.1f}%")
