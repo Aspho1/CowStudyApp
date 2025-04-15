@@ -18,7 +18,13 @@ class LSTM_Model:
 
     def __init__(self, config: AnalysisConfig):
 
-        self.config = config
+        if config is not None:
+            if config.lstm is not None:
+                self.config = config
+            else:
+                raise ValueError("Missing config.analysis.lstm section")
+        else:
+            raise ValueError("Missing config.analysis section")
 
         tf.random.set_seed(self.config.random_seed)
         np.random.seed(self.config.random_seed)
@@ -29,18 +35,38 @@ class LSTM_Model:
         print("target dataset got")
         self.add_step_and_angle()
 
-        self.normalize_features()
+        # self.normalize_features()
 
-        self.build_sequences_ops()
+        # self.build_sequences_ops()
 
         # self.k_fold_validation()
         # self.loocv_ops()
 
-        self.lmocv_ops_multi()
+        # self.lmocv_ops_multi()
 
 
     def get_target_dataset(self):
-        self.df = pd.read_csv(self.config.target_dataset)
+        df = pd.read_csv(self.config.target_dataset)
+
+        start_idx:int = self.df['posix_time'].min()
+        step_size:int = self.config.gps_sample_interval//60
+        stop_idx:int = self.df['posix_time'].max()
+
+
+
+        full_index = np.arange(
+                start=start_idx, 
+                step=step_size,
+                stop=stop_idx + step_size
+                )
+        
+        print(len(full_index))
+        
+        for cow_id, cow_data in self.df.groupby("device_id"):
+
+
+
+        return
 
     def add_step_and_angle(self):
         """Add step size and turning angle columns to the dataframe"""
@@ -127,7 +153,7 @@ class LSTM_Model:
         print("\nRows before dropping NA:", len(self.df))
         
         # Drop rows with NA values
-        self.df = self.df.dropna(subset=self.config.features)
+        self.df = self.df.dropna(subset=self.config.lstm.features)
         
         print("Rows after dropping NA:", len(self.df))
         
@@ -137,14 +163,22 @@ class LSTM_Model:
         # print(self.df[self.config.features].describe())
         
         # Normalize features
-        normalized_data = scaler.fit_transform(self.df[self.config.features])
-        self.df[self.config.features] = normalized_data
+        normalized_data = scaler.fit_transform(self.df[self.config.lstm.features])
+        self.df[self.config.lstm.features] = normalized_data
         
         # print("\nFeature Statistics After Normalization:")
         # print(self.df[self.config.features].describe())
         
         # Store scaler
         self.scaler = scaler
+
+
+    def build_sequences_opo(self):
+        max_length = self.config.lstm.max_length
+        # should we add in missing values, or just ignore them?
+
+        #
+
 
     def build_sequences_ops(self, max_length=None):
         """
@@ -154,7 +188,7 @@ class LSTM_Model:
         """
 
         if not max_length:
-            max_length = self.config.max_length
+            max_length = self.config.lstm.max_length
         self.sequences = {}
         
         for ID, data in self.df.groupby("ID"):
@@ -165,12 +199,12 @@ class LSTM_Model:
             for i in range(len(data)):
                 row = data.iloc[i]
                 # Get feature values for current observation
-                current_features = [row[f] for f in self.config.features]
+                current_features = [row[f] for f in self.config.lstm.features]
                 
                 # Start new sequence if:
                 # 1. First record
                 # 2. Time gap too large (using posix_time)
-                if (i == 0) or (data.iloc[i]['posix_time'] - data.iloc[i-1]['posix_time'] > self.config.max_time_gap):
+                if (i == 0) or (data.iloc[i]['posix_time'] - data.iloc[i-1]['posix_time'] > self.config.lstm.max_time_gap):
                     current_sequence = []
                 
                 # Add current observation to sequence
@@ -181,7 +215,7 @@ class LSTM_Model:
                     current_sequence = current_sequence[-max_length:]
                 
                 # Create padded sequence
-                padded_sequence = np.zeros((max_length, len(self.config.features)))
+                padded_sequence = np.zeros((max_length, len(self.config.lstm.features)))
                 start_idx = max_length - len(current_sequence)
                 padded_sequence[start_idx:] = current_sequence
                 
@@ -260,8 +294,8 @@ class LSTM_Model:
         print(classification_report(
             all_actual_labels, 
             all_predicted_labels,
-            labels=range(len(self.config.activity_labels)),
-            target_names=self.config.activity_labels,
+            labels=range(len(self.config.lstm.activity_labels)),
+            target_names=self.config.lstm.activity_labels,
             zero_division=0,
             digits=3
         ))
@@ -318,8 +352,8 @@ class LSTM_Model:
             report = classification_report(
                 y_test, 
                 pred_labels,
-                labels=range(len(self.config.activity_labels)),
-                target_names=self.config.activity_labels,
+                labels=range(len(self.config.lstm.activity_labels)),
+                target_names=self.config.lstm.activity_labels,
                 zero_division=0
             )
             
@@ -410,8 +444,8 @@ class LSTM_Model:
         print(classification_report(
             all_actual_labels, 
             all_predicted_labels,
-            labels=range(len(self.config.activity_labels)),
-            target_names=self.config.activity_labels,
+            labels=range(len(self.config.lstm.activity_labels)),
+            target_names=self.config.lstm.activity_labels,
             zero_division=0,
             digits=3
         ))
@@ -428,9 +462,9 @@ class LSTM_Model:
 
     def build_many_to_one_model(self, train_x, train_y, test_x, test_y):
         """Build RNN model that predicts single activity from sequence"""
-        sequence_length = self.config.max_length
-        n_features = len(self.config.features)
-        n_classes = len(self.config.activity_map.keys())
+        sequence_length = self.config.lstm.max_length
+        n_features = len(self.config.lstm.features)
+        n_classes = len(self.config.lstm.states)
 
 
         print("\nClass distribution in training data:")

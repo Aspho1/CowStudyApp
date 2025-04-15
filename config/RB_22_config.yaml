@@ -124,7 +124,7 @@ analysis:
   day_only: false
 
   hmm:
-    enabled: true
+    enabled: false
     time_covariate: false
 
     states: # The states to use in the HMM
@@ -181,7 +181,7 @@ analysis:
           - "WRAPPEDCAUCHY"
 
   lstm:
-    enabled: false
+    enabled: true
     states: # The states to use in the LSTM
       - "Grazing"
       - "Resting"
