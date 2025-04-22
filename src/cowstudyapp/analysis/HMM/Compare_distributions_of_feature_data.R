@@ -23,7 +23,8 @@ features <- c('step', 'magnitude_mean', 'magnitude_var')
 valid_states <- c("Resting","Grazing", "Traveling")
 
 # target_dataset <- selected_model$model$data
-target_dataset <- read.csv("~/1.Education/CowStudyApp/data/analysis_results/hmm/FinalModels/RB_22_Paper_Model_preds/predictions.csv")
+target_dataset <- read.csv("~/1.Education/CowStudyApp/data/analysis_results/hmm/FinalModels/RB_22_Paper_Model/predictions.csv")
+# target_dataset <- read.csv("~/1.Education/CowStudyApp/data/processed/RB_22/all_cows_labeled.csv")
 
 head(target_dataset)
 str(target_dataset)
