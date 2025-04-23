@@ -221,12 +221,15 @@ class HeatMapMaker:
         
     def make_graph(self, grazing_pct:pd.DataFrame):
 
+
+        print(grazing_pct.describe())
         heatmap_data = grazing_pct.pivot(
             index='ID',
             columns='day',
             values='grazing_percentage'
         )
         print(np.mean(heatmap_data))
+
 
         heatmap_data = heatmap_data.sort_index(ascending=True)
         fig, ax = plt.subplots(layout='constrained', figsize=(20,12))

@@ -45,9 +45,11 @@ def generate_plots(config, predictions_dataset, target_dataset):
 
     #############################################################################
     # if config.visuals.!!!!!!!!!!!!!!.run:
-    #     from cowstudyapp.visuals.show_feature_distr import Feature_Plotter
-    #     fp = Feature_Plotter(config=config)
-    #     fp.generate_plot(predictions_dataset, output_dir=output_dir)
+    from cowstudyapp.visuals.show_feature_distr import Feature_Plotter
+    fp = Feature_Plotter(config=config)
+    # fp.generate_plot(predictions_dataset, output_dir=output_dir)
+    # fp.plot_ecdf_comparison(predictions_dataset, output_dir=output_dir)
+    fp.plot_publication_cdf_comparison(predictions_dataset, output_dir=output_dir)
 
 
     #############################################################################

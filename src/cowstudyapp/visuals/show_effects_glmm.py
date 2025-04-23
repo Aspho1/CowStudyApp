@@ -5,7 +5,6 @@ import pandas as pd
 import numpy as np
 import os
 import ephem
-from pymer4.models import Lmer
 import multiprocessing
 import sys
 import gc
@@ -17,7 +16,9 @@ import seaborn as sns
 from cowstudyapp.utils import from_posix_col
 from cowstudyapp.config import ConfigManager
 
+os.environ['R_HOME'] = 'C:\Program Files\R\R-4.4.1'
 
+from pymer4.models import Lmer
 
 
 
@@ -318,9 +319,76 @@ class BehaviorModelBuilder:
             z_name = f'{effect}_z'
             clean_df[z_name] = (df[effect] - means[effect]) / stds[effect]
 
+
+
+
+
+        # Testing orthogonal polynomials
+
+        # Generate orthogonal polynomial terms for time
+        if any(term.startswith('time_z') for term in selected_terms):
+            # Find highest polynomial degree needed
+            max_degree = 1
             for suffix, degree in self.degree_map.items():
-                if f'{z_name}{suffix}' in selected_terms:
-                    clean_df[f'{z_name}{suffix}'] = clean_df[z_name] ** degree
+                if f'time_z{suffix}' in selected_terms:
+                    max_degree = max(max_degree, degree)
+            
+            # Generate orthogonal polynomial basis
+            from numpy.polynomial import polynomial as P
+            time_values = clean_df['time_z'].values
+            
+            # Create orthogonal polynomial terms
+            ortho_polys = np.zeros((len(time_values), max_degree + 1))
+            
+            # First term is just the constant
+            ortho_polys[:, 0] = 1.0
+            
+            if max_degree >= 1:
+                # Scale to [-1, 1] for numerical stability
+                scaled_time = 2 * (time_values - time_values.min()) / (time_values.max() - time_values.min()) - 1
+                
+                # Get orthogonal polynomial values
+                legendre_values = np.polynomial.legendre.legvander(scaled_time, max_degree)
+                
+                # Add to the array, skip first column (constant term)
+                ortho_polys[:, 1:] = legendre_values[:, 1:]
+            
+            # Store original time variable
+            original_time_z = clean_df['time_z'].copy()
+            
+            # Replace polynomial terms with orthogonal versions
+            for degree in range(1, max_degree + 1):
+                suffix = '' if degree == 1 else ('_sq' if degree == 2 else ('_cub' if degree == 3 else '_qrt'))
+                col_name = f'time_z{suffix}'
+                if col_name in selected_terms:
+                    clean_df[col_name] = ortho_polys[:, degree]
+            
+            # Store mapping for interpretation
+            clean_df.attrs['ortho_time_mapping'] = {
+                'original_time': original_time_z,
+                'ortho_basis': ortho_polys,
+                'max_degree': max_degree
+            }
+        
+
+
+
+
+
+
+
+
+        # END
+        # Handle all other polynomial terms normally
+        for effect in self.base_effects:
+            if effect != 'time':  # Skip time as we handled it specially
+                z_name = f'{effect}_z'
+                for suffix, degree in self.degree_map.items():
+                    if f'{z_name}{suffix}' in selected_terms:
+                        clean_df[f'{z_name}{suffix}'] = clean_df[z_name] ** degree
+
+
+
 
 
         # Add indicator variables for each state
@@ -616,7 +684,7 @@ class BehaviorAnalyzer:
         
         # Sample data if necessary
         if len(prepared_df) > 50000:
-            sample_frac = .2
+            sample_frac = .5
             print(f"Using a {sample_frac*100:.0f}% random sample ({len(prepared_df)} -> {int(len(prepared_df)*sample_frac)} rows)")
             prepared_df = prepared_df.sample(frac=sample_frac, random_state=42)
         
@@ -634,7 +702,7 @@ class BehaviorAnalyzer:
                 'temp': True, 
                 # 'temp^2': True, 
                 # 'age': True, 
-                'hod': True,
+                # 'hod': True,
                 # 'weight': True,
                 'time': True,
                 'time^2': True,
@@ -766,6 +834,52 @@ class BehaviorAnalyzer:
             'time_domain': [time_min, time_max]
         }
         
+
+
+
+
+
+
+
+
+        #################### TEMPORARY ORTHOGONAL POLYNOMIALS
+
+        # # Generate orthogonal polynomial terms
+        # poly_terms = np.polynomial.polynomial.polyvander(clean_df['time_z'], 4)
+        # q, _ = np.linalg.qr(poly_terms)  # QR decomposition to orthogonalize terms
+
+        # # q columns are orthogonal polynomial predictors
+        # clean_df['time_z'] = q[:, 1]
+        # clean_df['time_z_sq'] = q[:, 2]
+        # clean_df['time_z_cub'] = q[:, 3]
+        # clean_df['time_z_qrt'] = q[:, 4]
+        #################### END ORTHOGONAL POLYNOMIALS
+
+        #################### TEMPORARY VIF CALCULATIONS
+        print(clean_df.head())
+        print(clean_df.columns)
+        X = clean_df[['temp_z', 'time_z', 'time_z_sq', 'time_z_cub', 'time_z_qrt', 'hod_z']]
+        X['temp_time'] = X['time_z'] * X['temp_z']
+        X['temp_time_4'] = X['time_z_qrt'] * X['temp_z']
+        import statsmodels.api as sm
+        X = sm.add_constant(X)
+
+        # Calculate VIF
+        from statsmodels.stats.outliers_influence import variance_inflation_factor
+        vif_df = pd.DataFrame()
+        vif_df['Variable'] = X.columns
+        vif_df['VIF'] = [variance_inflation_factor(X.values, i) for i in range(X.shape[1])]
+        print(vif_df)
+
+        # return
+
+        #################### END VIF
+
+
+
+
+
+
         # Analyze each behavior state
         for state in self.config.analysis.hmm.states:
             print(f"\n{'-'*40}")
@@ -1309,37 +1423,80 @@ class BehaviorAnalyzer:
 
 
 
-    def _calculate_logit(self, time_z, by, b_z, model_result):        
+    def _calculate_logit(self, time_z, by, b_z, model_result, orthogonal_data=None):
+        """Calculate logit value for a given time and predictor value using model coefficients"""
         logit = model_result.loc['(Intercept)', 'Estimate']
         
-        coef_patterns = {
-            f'{by}_z': b_z,
-            f'{by}_z_sq': b_z ** 2,
-            'time_z': time_z,
-            'time_z_sq': time_z ** 2,
-            'time_z_cub': time_z ** 3,
-            'time_z_qrt': time_z ** 4,
-            f'{by}_z:time_z': b_z * time_z,
-            f'{by}_z_sq:time_z': (b_z ** 2) * time_z,
-            f'{by}_z:time_z_sq': b_z * (time_z ** 2),
-            f'{by}_z:time_z_cub': b_z * (time_z ** 3),
-            f'{by}_z:time_z_qrt': b_z * (time_z ** 4)
-        }
-        
-        # print(by, b_z, time_z)
-        # print(coef_patterns)
-        # print(f"For variable by=`{by}`")
-        # print(model_result.index)
-        # Apply each coefficient if it exists in the model
-        for coef_name, coef_value in coef_patterns.items():
-            if coef_name in model_result.index:
-                # print("Adding ", coef_name)
-                logit += model_result.loc[coef_name, 'Estimate'] * coef_value
-            # else:
-            #     print("NOT Adding ", coef_name)
+        # Handle time polynomials with orthogonal polynomials if available
+        if orthogonal_data is not None:
+            max_degree = orthogonal_data['max_degree']
+            
+            # Scale time_z to [-1, 1] for Legendre polynomial calculation
+            # Need to use the original time range for proper scaling
+            orig_min = orthogonal_data['original_time'].min()
+            orig_max = orthogonal_data['original_time'].max()
+            scaled_time = 2 * (time_z - orig_min) / (orig_max - orig_min) - 1
+            
+            # Calculate orthogonal polynomial values for this time point
+            time_polys = np.polynomial.legendre.legval(scaled_time, np.eye(max_degree + 1))
+            
+            # Add main time polynomial terms
+            for degree in range(1, max_degree + 1):
+                suffix = '' if degree == 1 else ('_sq' if degree == 2 else ('_cub' if degree == 3 else '_qrt'))
+                term = f'time_z{suffix}'
+                if term in model_result.index:
+                    logit += model_result.loc[term, 'Estimate'] * time_polys[degree]
+            
+            # Add the by variable (temperature, etc.) main effect
+            if f'{by}_z' in model_result.index:
+                logit += model_result.loc[f'{by}_z', 'Estimate'] * b_z
+                
+            # Add quadratic term for by variable if it exists
+            if f'{by}_z_sq' in model_result.index:
+                logit += model_result.loc[f'{by}_z_sq', 'Estimate'] * (b_z ** 2)
+            
+            # Add interaction terms between by variable and orthogonal time polynomials
+            for degree in range(1, max_degree + 1):
+                suffix = '' if degree == 1 else ('_sq' if degree == 2 else ('_cub' if degree == 3 else '_qrt'))
+                interaction_term = f'{by}_z:time_z{suffix}'
+                rev_interaction_term = f'time_z{suffix}:{by}_z'
+                
+                # Check both possible orderings of the interaction term
+                if interaction_term in model_result.index:
+                    logit += model_result.loc[interaction_term, 'Estimate'] * b_z * time_polys[degree]
+                elif rev_interaction_term in model_result.index:
+                    logit += model_result.loc[rev_interaction_term, 'Estimate'] * b_z * time_polys[degree]
+                
+                # Also check for interactions with squared by variable
+                sq_interaction = f'{by}_z_sq:time_z{suffix}'
+                rev_sq_interaction = f'time_z{suffix}:{by}_z_sq'
+                
+                if sq_interaction in model_result.index:
+                    logit += model_result.loc[sq_interaction, 'Estimate'] * (b_z ** 2) * time_polys[degree]
+                elif rev_sq_interaction in model_result.index:
+                    logit += model_result.loc[rev_sq_interaction, 'Estimate'] * (b_z ** 2) * time_polys[degree]
+        else:
+            # Use regular polynomial terms
+            coef_patterns = {
+                f'{by}_z': b_z,
+                f'{by}_z_sq': b_z ** 2,
+                'time_z': time_z,
+                'time_z_sq': time_z ** 2,
+                'time_z_cub': time_z ** 3,
+                'time_z_qrt': time_z ** 4,
+                f'{by}_z:time_z': b_z * time_z,
+                f'{by}_z_sq:time_z': (b_z ** 2) * time_z,
+                f'{by}_z:time_z_sq': b_z * (time_z ** 2),
+                f'{by}_z:time_z_cub': b_z * (time_z ** 3),
+                f'{by}_z:time_z_qrt': b_z * (time_z ** 4)
+            }
+            
+            # Apply each coefficient if it exists in the model
+            for coef_name, coef_value in coef_patterns.items():
+                if coef_name in model_result.index:
+                    logit += model_result.loc[coef_name, 'Estimate'] * coef_value
 
         return logit
-
 
     def plot_state_probabilities(self, results: Dict, save_path: Optional[str] = None, by:str='temp'):
         """
@@ -1451,7 +1608,7 @@ class BehaviorAnalyzer:
                     
                 # Set y-axis limits for probability
                 ax.set_ylim(0, 1)
-                
+                orthogonal_data = None
                 # Only plot if we have model results for this state
                 if (state in period_results['states'] and 
                     'model' in period_results['states'][state] and 
@@ -1460,6 +1617,11 @@ class BehaviorAnalyzer:
                     model = period_results['states'][state]['model']
                     model_result = period_results['states'][state]['fit_result']
                     
+                    
+                    if hasattr(model, 'data') and hasattr(model.data, 'attrs') and 'ortho_time_mapping' in model.data.attrs:
+                        orthogonal_data = model.data.attrs['ortho_time_mapping']
+                        print("HAS ORTHOGONAL")
+                        print(orthogonal_data)
 
                     # Update this for non temperature 'by'
                     # Create legend labels with actual temperature values
@@ -1474,13 +1636,14 @@ class BehaviorAnalyzer:
                     for j, b in enumerate(by_values):
                         # Standardize tby variable
                         b_z = (b - means[by]) / stds[by]
+
                         
                         # Calculate probabilities for this temperature across time range
                         probabilities = []
                         for time in time_values:
                             # Standardize time
                             time_z = (time - means['time']) / stds['time']
-                            logit = self._calculate_logit(time_z, by, b_z, model_result)
+                            logit = self._calculate_logit(time_z, by, b_z, model_result, orthogonal_data)
                             prob = 1 / (1 + np.exp(-logit))
                             probabilities.append(prob)
                         # Plot this temperature line (using hour_values for x-axis)
