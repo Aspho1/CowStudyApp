@@ -95,7 +95,7 @@ class Feature_Plotter:
         df.loc[df['magnitude_mean'] < self.mag_mean_lower, 'magnitude_mean'] = np.nan
         # df['magnitude_mean'] = df['magnitude_mean'].clip(lower=self.mag_mean_lower)
 
-        self.mag_var_upper = np.percentile(df['magnitude_var'].dropna(), 95)
+        self.mag_var_upper = np.percentile(df['magnitude_var'].dropna(), 80)
         df.loc[df['magnitude_var'] > self.mag_var_upper, 'magnitude_var'] = np.nan
         # df.loc[df['magnitude_var'] < self.mag_var_upper, 'magnitude_var'] = np.nan
         # df['magnitude_var'] = df['magnitude_var'].clip(upper=self.mag_var_upper)
@@ -303,10 +303,10 @@ class Feature_Plotter:
         
         # Calculate width for a full-page figure (190mm is standard journal width)
         width_in_inches = 190/25.4  # Convert mm to inches
-        height_in_inches = width_in_inches / 2.5  # Make it shorter for a row layout
+        height_in_inches = width_in_inches /2.5  # Make it shorter for a row layout
         
         # Create figure with 3 subplots in a row for non-circular distributions
-        fig, axs = plt.subplots(1, 3, figsize=(width_in_inches, height_in_inches), layout='constrained')
+        fig, axs = plt.subplots(3, 1, figsize=(width_in_inches, height_in_inches), layout='constrained')
         
         # Custom linestyles for different states (for grayscale compatibility)
         linestyles = {'Grazing': '-', 'Resting': '--', 'Traveling': '-.'}
@@ -518,11 +518,274 @@ class Feature_Plotter:
         # print(f"Circular distribution saved to {circular_output_path_png}")
 
 
+    def plot_publication_cdf_comparison_all_4(self, df: pd.DataFrame, output_dir: Path) -> None:
+        """Create a publication-quality CDF comparison plot for all features including angle in Cartesian coordinates"""
+        df = self._prepare_data(df)
+        states = ['Grazing', 'Resting', 'Traveling']
+        colors = {'Grazing': 'forestgreen', 'Resting': 'navy', 'Traveling': 'firebrick'}
+        
+        # Use publication-quality figure settings
+        plt.rcParams.update({
+            'font.family': 'serif',
+            'font.size': 11,
+            'axes.titlesize': 12,
+            'axes.labelsize': 11,
+            'xtick.labelsize': 10,
+            'ytick.labelsize': 10,
+            'legend.fontsize': 10,
+            'figure.dpi': 300
+        })
+        
+        # Calculate width for a full-page figure (190mm is standard journal width)
+        width_in_inches = 190/25.4  # Convert mm to inches
+        height_in_inches = width_in_inches * (4/5)  # Make it shorter for a row layout
+        
+        # Create figure with 2x2 subplots layout
+        fig, axs = plt.subplots(2, 2, figsize=(width_in_inches, height_in_inches), layout='constrained')
+        
+        # Custom linestyles for different states (for grayscale compatibility)
+        linestyles = {'Grazing': '-', 'Resting': '--', 'Traveling': '-.'}
+        
+        # Add panel labels (a, b, c, d) for publication
+        panel_labels = ['a', 'b', 'c', 'd']
+        
+        # Dictionary to store KS statistics and p-values for printing
+        ks_results = {}
+        
+        # Process each feature
+        for ax_idx, (fname, fdata) in enumerate(self.features.items()):
+            ax = axs.flatten()[ax_idx]
+            
+            # Add panel label in upper left corner
+            ax.text(0.03, 0.97, panel_labels[ax_idx], transform=ax.transAxes,
+                    fontsize=12, fontweight='bold', va='top')
+            
+            # Set descriptive titles with distribution type
+            ax.set_title(f"{fdata['title']} ({fdata['distribution']})")
+            ax.set_xlabel(f"{fdata['unit']}")
+            
+
+            if fname == 'angle':
+                ax.set_ylabel("Probability Density")
+            else:
+                ax.set_ylabel("Cumulative Probability")
+            
+            # Special handling for angle (circular data)
+            # if fname == 'angle':
+            #     # Create x-range for angle
+            #     x = np.linspace(-np.pi, np.pi, 200)
+                
+            #     # Store results for angle
+            #     ks_results[fname] = {}
+                
+            #     # Plot each state
+            #     for i, state in enumerate(states):
+            #         state_data = df[df['activity'] == state][fname].dropna()
+                    
+            #         # Create histogram for the data
+            #         hist, bins = np.histogram(state_data, bins=36, range=(-np.pi, np.pi), density=True)
+            #         bin_centers = (bins[:-1] + bins[1:]) / 2
+                    
+            #         # Plot histogram as points
+            #         ax.bar(bin_centers, hist, width=(bins[1]-bins[0]), alpha=0.3, 
+            #             color=colors[state], label=f"{state} observed")
+                    
+            #         # Plot fitted von Mises curve
+            #         y_fitted = stats.wrapcauchy.pdf(x, 
+            #                                     c=fdata['concentration'][i],
+            #                                     loc=fdata['mean'][i])
+            #         y_fitted = stats.vonmises.pdf(x, 
+            #                                     kappa=fdata['concentration'][i],
+            #                                     loc=fdata['mean'][i])
+                    
+            #         # # Scale to match histogram
+            #         # scale_factor = np.max(hist) / np.max(y_fitted) if np.max(hist) > 0 else 1
+            #         # y_fitted = y_fitted * scale_factor
+                    
+            #         ax.plot(x, y_fitted, color=colors[state], linestyle='-',
+            #                 linewidth=2.0, label=f"{state} fitted")
+                    
+            #         # Store parameters for reporting
+            #         ks_results[fname][state] = {
+            #             'mean': fdata['mean'][i],
+            #             'concentration': fdata['concentration'][i]
+            #         }
+                
+            #     # Set angle-specific limits and labels
+            #     ax.set_xlim(-np.pi, np.pi)
+            #     ax.set_xticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi])
+            #     ax.set_xticklabels([r'$-\pi$', r'$-\pi/2$', '0', r'$\pi/2$', r'$\pi$'])
+                
 
 
 
 
 
+
+
+
+
+            # For the angle feature (in plot_publication_cdf_comparison_all_4)
+            if fname == 'angle':
+                # Create x-range for angle with more points to ensure smoothness
+                x = np.linspace(-np.pi, np.pi, 500)
+                
+                # Store results for angle
+                ks_results[fname] = {}
+                
+                # Plot each state
+                for i, state in enumerate(states):
+                    state_data = df[df['activity'] == state][fname].dropna()
+                    
+                    # Create histogram for the data with proper normalization
+                    hist, bins = np.histogram(state_data, bins=36, range=(-np.pi, np.pi), density=True)
+                    bin_centers = (bins[:-1] + bins[1:]) / 2
+                    bin_width = bins[1] - bins[0]
+                    
+                    # Plot histogram as bars
+                    ax.bar(bin_centers, hist, width=bin_width, alpha=0.3, 
+                        color=colors[state], label=f"{state} observed")
+                    
+                    # Implement a proper wrapped Cauchy density function manually
+                    # Formula: f(x) = (1-c^2) / (2*pi*(1+c^2-2*c*cos(x-loc)))
+                    c = fdata['concentration'][i]
+                    loc = fdata['mean'][i]
+                    
+                    # Normalize x to be relative to the location parameter
+                    x_shifted = x - loc
+                    
+                    # Ensure x_shifted is in [-π, π]
+                    x_shifted = np.mod(x_shifted + np.pi, 2*np.pi) - np.pi
+                    
+                    # Calculate wrapped Cauchy density
+                    numerator = 1 - c**2
+                    denominator = 2 * np.pi * (1 + c**2 - 2*c*np.cos(x_shifted))
+                    y_fitted = numerator / denominator
+                    
+                    # Plot the PDF without scaling
+                    ax.plot(x, y_fitted, color=colors[state], linestyle='-',
+                            linewidth=2.0, label=f"{state} fitted")
+                    
+                    # Store parameters for reporting
+                    ks_results[fname][state] = {
+                        'mean': fdata['mean'][i],
+                        'concentration': fdata['concentration'][i]
+                    }
+                
+                # Set angle-specific limits and labels
+                ax.set_xlim(-np.pi, np.pi)
+                ax.set_xticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi])
+                ax.set_xticklabels([r'$-\pi$', r'$-\pi/2$', '0', r'$\pi/2$', r'$\pi$'])
+            else:
+                # Handle non-circular data (CDFs)
+                # Create x-range appropriate for the data
+                x_min = 0
+                x_max = np.percentile(df[fname].dropna(), 99)
+                x = np.linspace(x_min, x_max, 300)  # More points for smoother curves
+                
+                # Store KS results for this feature
+                ks_results[fname] = {}
+                
+                # Plot each state
+                for i, state in enumerate(states):
+                    state_data = df[df['activity'] == state][fname].dropna()
+                    
+                    # ECDF: Sort data and calculate cumulative probabilities
+                    sorted_data = np.sort(state_data)
+                    ecdf = np.arange(1, len(sorted_data) + 1) / len(sorted_data)
+                    
+                    # Plot empirical CDF with thinner lines
+                    ax.step(sorted_data, ecdf, where='post', 
+                        color=colors[state], linestyle=linestyles[state],
+                        linewidth=1.2, alpha=0.7, 
+                        label=f"{state} observed")
+                    
+                    # Calculate theoretical CDF
+                    if fdata['distribution'] == 'lognormal':
+                        theoretical_cdf = stats.lognorm.cdf(x, s=fdata['scale'][i], 
+                                                        scale=np.exp(fdata['location'][i]))
+                    elif fdata['distribution'] == 'gamma':
+                        mean_val = fdata['mean'][i]
+                        sd_val = fdata['sd'][i]
+                        alpha = (mean_val / sd_val)**2
+                        beta = mean_val / (sd_val**2)
+                        theoretical_cdf = stats.gamma.cdf(x, a=alpha, scale=1/beta)
+                    
+                    # Plot theoretical CDF
+                    ax.plot(x, theoretical_cdf, color=colors[state], linestyle='-',
+                        linewidth=2.0, alpha=0.9, label=f"{state} fitted")
+                    
+                    # Calculate and store Kolmogorov-Smirnov statistic for goodness-of-fit
+                    if len(state_data) > 5:  # Only calculate if we have enough data
+                        if fdata['distribution'] == 'lognormal':
+                            ks_stat, p_val = stats.kstest(
+                                state_data, 
+                                lambda x: stats.lognorm.cdf(x, s=fdata['scale'][i], 
+                                                        scale=np.exp(fdata['location'][i]))
+                            )
+                        elif fdata['distribution'] == 'gamma':
+                            mean_val = fdata['mean'][i]
+                            sd_val = fdata['sd'][i]
+                            alpha = (mean_val / sd_val)**2
+                            beta = mean_val / (sd_val**2)
+                            ks_stat, p_val = stats.kstest(
+                                state_data,
+                                lambda x: stats.gamma.cdf(x, a=alpha, scale=1/beta)
+                            )
+                        
+                        # Store results
+                        ks_results[fname][state] = {'KS': ks_stat, 'p': p_val}
+                
+                # Set appropriate limits for each feature
+                if fname == 'step':
+                    ax.set_xlim(0, min(self.step_upper, x_max*1.05))
+                elif fname == 'magnitude_var':
+                    ax.set_xlim(0, min(self.mag_var_upper, x_max*1.05))
+                elif fname == 'magnitude_mean':
+                    ax.set_xlim(max(self.mag_mean_lower, 0), 
+                            min(self.mag_mean_upper, x_max*1.05))
+                
+                ax.set_ylim(0, 1.05)
+            
+            # Add grid to all plots
+            ax.grid(True, alpha=0.3, linestyle=':')
+        
+        # Add a single legend for all subplots
+        handles = []
+        for state in states:
+            handles.append(Line2D([0], [0], color=colors[state], linestyle='-',
+                                linewidth=2, label=f"{state} fitted"))
+            handles.append(Line2D([0], [0], color=colors[state], linestyle=linestyles[state] if fname != 'angle' else '-',
+                                linewidth=1.2, alpha=0.7, label=f"{state} observed"))
+        
+        # Place legend below the subplots
+        fig.legend(handles=handles, loc='lower center', 
+                bbox_to_anchor=(0.5, 0), ncol=3)
+        
+        plt.tight_layout()
+        plt.subplots_adjust(bottom=0.18, hspace=.4)  # Make room for the legend
+        
+        # # Save the plot if needed
+        # output_path = output_dir / "feature_distributions.pdf"
+        # fig.savefig(output_path, dpi=300, bbox_inches='tight')
+        output_path_png = output_dir / "feature_distributions.png"
+        fig.savefig(output_path_png, dpi=300, bbox_inches='tight')
+        
+        plt.show()
+        
+        # Print the statistics for reporting
+        print("\n=== Distribution Parameters and Test Results ===")
+        for feature, state_results in ks_results.items():
+            if feature != 'angle':
+                print(f"\n{self.features[feature]['title']} ({self.features[feature]['distribution']})")
+                for state, results in state_results.items():
+                    print(f"{state}: KS={results['KS']:.3f}, p={results['p']:.3f}")
+            else:
+                print(f"\nTurning Angle Parameters (wrapped_cauchy)")
+                for state, results in state_results.items():
+                    print(f"{state}: mean={results['mean']:.3f}, concentration={results['concentration']:.3f}")
+        
+        # print(f"\nPlots saved to {output_path_png}")
 
 
 

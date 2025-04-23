@@ -49,7 +49,8 @@ def generate_plots(config, predictions_dataset, target_dataset):
     fp = Feature_Plotter(config=config)
     # fp.generate_plot(predictions_dataset, output_dir=output_dir)
     # fp.plot_ecdf_comparison(predictions_dataset, output_dir=output_dir)
-    fp.plot_publication_cdf_comparison(predictions_dataset, output_dir=output_dir)
+    # fp.plot_publication_cdf_comparison(predictions_dataset, output_dir=output_dir)
+    fp.plot_publication_cdf_comparison_all_4(predictions_dataset, output_dir=output_dir)
 
 
     #############################################################################

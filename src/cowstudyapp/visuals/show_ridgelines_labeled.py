@@ -26,7 +26,7 @@ x_ticks = {
 
 # Define feature labels with units
 feature_labels = {
-    'step': 'step (m)',
+    'step': 'Step Size (m)',
     'magnitude_mean': 'MeanSVM (m/s²)',
     'magnitude_var': 'VarSVM (m²/s⁴)'
 }
