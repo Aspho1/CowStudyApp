@@ -36,29 +36,37 @@ class Feature_Plotter:
                 "unit": "Meters",
                 "distribution": "lognormal",
                 "title": "Step Length",
-                "location" : [2.9658136, 2.065888, 4.7846135],
-                "scale" : [0.7423612, 1.020416, 0.8717496],
+                "location" : [],
+                "scale" : [],
+                # "location" : [2.9658136, 2.065888, 4.7846135],
+                # "scale" : [0.7423612, 1.020416, 0.8717496],
             },
             "magnitude_mean" : {
                 "unit": "m/s²",
                 "distribution": "lognormal",
                 "title": "MeanSVM",
-                "location" : [2.1666345, 2.09016918, 2.1162559],
-                "scale" :    [0.1100728, 0.07333718, 0.1308942],
+                "location" : [],
+                "scale" :    [],
+                # "location" : [2.1666345, 2.09016918, 2.1162559],
+                # "scale" :    [0.1100728, 0.07333718, 0.1308942],
             },
             "magnitude_var" : {
-                "unit": "(m/s²)²",
+                "unit": "ln(1 + (m/s²)²)",
                 "distribution": "gamma",
                 "title": "VarSVM",
-                "mean" : [1.0658029, 0.1164454, 0.8657320],
-                "sd" :   [0.8112104, 0.1704795, 0.7310639],
+                "mean" : [],
+                "sd" :   [],
+                # "mean" : [1.0658029, 0.1164454, 0.8657320],
+                # "sd" :   [0.8112104, 0.1704795, 0.7310639],
             },
             "angle" : {
                 "unit": "Radians",
                 "distribution": "wrapped_cauchy",
                 "title": "Turning Angle",
-                "mean" :          [-0.2490977, 2.9681273, -0.6582004],
-                "concentration" : [ 0.3884124, 0.3602101,  0.6856821],
+                "mean" :          [],
+                "concentration" : [],
+                # "mean" :          [-0.2490977, 2.9681273, -0.6582004],
+                # "concentration" : [ 0.3884124, 0.3602101,  0.6856821],
             },
         }
 
@@ -70,6 +78,24 @@ class Feature_Plotter:
         #     )
         # }
         
+    def _get_model_params(self):
+        params_file = Path(self.config.visuals.predictions_path).parent / 'model_parameters.txt'
+
+        with open(params_file, 'r') as f:
+            lines = f.readlines()
+        for i in range(len(lines)):
+            if lines[i].replace(":","").strip() in self.features:
+                feature = lines[i].replace(":","").strip()
+                for j in range(i+2,i+5):
+                    param_data = lines[j].split()
+                    if (len(param_data) > 0):
+                        if param_data[0] in self.features[feature]:
+                            values = [float(p) for p in param_data[1:4]]
+                            self.features[feature][param_data[0]] = values
+        # print(self.features) 
+        print(f"Updated features from {params_file}.")           
+            
+
     def _prepare_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Prepare the dataset for visualization.
@@ -81,8 +107,9 @@ class Feature_Plotter:
             pd.DataFrame: Processed DataFrame
         """
 
-
+        df['magnitude_var'] = np.log(df['magnitude_var']+1)
         df.dropna(axis=0, subset=['activity'], inplace=True)
+
 
         self.step_upper = np.percentile(df['step'].dropna(), 99.5)
         df.loc[df['step'] > self.step_upper, 'step'] = np.nan
@@ -95,21 +122,19 @@ class Feature_Plotter:
         df.loc[df['magnitude_mean'] < self.mag_mean_lower, 'magnitude_mean'] = np.nan
         # df['magnitude_mean'] = df['magnitude_mean'].clip(lower=self.mag_mean_lower)
 
-        self.mag_var_upper = np.percentile(df['magnitude_var'].dropna(), 80)
+        # self.mag_var_upper = np.percentile(df['magnitude_var'].dropna(), 80)
+        self.mag_var_upper = np.percentile(df['magnitude_var'].dropna(), 99.5)
         df.loc[df['magnitude_var'] > self.mag_var_upper, 'magnitude_var'] = np.nan
         # df.loc[df['magnitude_var'] < self.mag_var_upper, 'magnitude_var'] = np.nan
         # df['magnitude_var'] = df['magnitude_var'].clip(upper=self.mag_var_upper)
 
-
         return df
 
 
-
-
-
-
-
     def generate_plot(self, df: pd.DataFrame, output_dir: Path) -> None:
+
+        self._get_model_params()
+        # return
         df = self._prepare_data(df)
         
         # Create one figure per state, with subplots for each feature
@@ -215,7 +240,6 @@ class Feature_Plotter:
             plt.close(fig)  
     
 
-
     def plot_ecdf_comparison(self, df: pd.DataFrame, output_dir: Path) -> None:
         """Plot ECDF vs theoretical CDF for better comparison"""
         df = self._prepare_data(df)
@@ -277,10 +301,6 @@ class Feature_Plotter:
         fig.suptitle("CDF Comparison by Behavioral State", fontsize=16, y=0.98)
         # plt.savefig(output_dir / "features_cdf_comparison.png", bbox_inches='tight', dpi=300)
         plt.show()
-
-
-
-
 
 
     def plot_publication_cdf_comparison(self, df: pd.DataFrame, output_dir: Path) -> None:
@@ -520,6 +540,9 @@ class Feature_Plotter:
 
     def plot_publication_cdf_comparison_all_4(self, df: pd.DataFrame, output_dir: Path) -> None:
         """Create a publication-quality CDF comparison plot for all features including angle in Cartesian coordinates"""
+        self._get_model_params()
+        # return
+        
         df = self._prepare_data(df)
         states = ['Grazing', 'Resting', 'Traveling']
         colors = {'Grazing': 'forestgreen', 'Resting': 'navy', 'Traveling': 'firebrick'}
@@ -570,62 +593,7 @@ class Feature_Plotter:
             else:
                 ax.set_ylabel("Cumulative Probability")
             
-            # Special handling for angle (circular data)
-            # if fname == 'angle':
-            #     # Create x-range for angle
-            #     x = np.linspace(-np.pi, np.pi, 200)
-                
-            #     # Store results for angle
-            #     ks_results[fname] = {}
-                
-            #     # Plot each state
-            #     for i, state in enumerate(states):
-            #         state_data = df[df['activity'] == state][fname].dropna()
-                    
-            #         # Create histogram for the data
-            #         hist, bins = np.histogram(state_data, bins=36, range=(-np.pi, np.pi), density=True)
-            #         bin_centers = (bins[:-1] + bins[1:]) / 2
-                    
-            #         # Plot histogram as points
-            #         ax.bar(bin_centers, hist, width=(bins[1]-bins[0]), alpha=0.3, 
-            #             color=colors[state], label=f"{state} observed")
-                    
-            #         # Plot fitted von Mises curve
-            #         y_fitted = stats.wrapcauchy.pdf(x, 
-            #                                     c=fdata['concentration'][i],
-            #                                     loc=fdata['mean'][i])
-            #         y_fitted = stats.vonmises.pdf(x, 
-            #                                     kappa=fdata['concentration'][i],
-            #                                     loc=fdata['mean'][i])
-                    
-            #         # # Scale to match histogram
-            #         # scale_factor = np.max(hist) / np.max(y_fitted) if np.max(hist) > 0 else 1
-            #         # y_fitted = y_fitted * scale_factor
-                    
-            #         ax.plot(x, y_fitted, color=colors[state], linestyle='-',
-            #                 linewidth=2.0, label=f"{state} fitted")
-                    
-            #         # Store parameters for reporting
-            #         ks_results[fname][state] = {
-            #             'mean': fdata['mean'][i],
-            #             'concentration': fdata['concentration'][i]
-            #         }
-                
-            #     # Set angle-specific limits and labels
-            #     ax.set_xlim(-np.pi, np.pi)
-            #     ax.set_xticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi])
-            #     ax.set_xticklabels([r'$-\pi$', r'$-\pi/2$', '0', r'$\pi/2$', r'$\pi$'])
-                
-
-
-
-
-
-
-
-
-
-            # For the angle feature (in plot_publication_cdf_comparison_all_4)
+            # For the angle feature 
             if fname == 'angle':
                 # Create x-range for angle with more points to ensure smoothness
                 x = np.linspace(-np.pi, np.pi, 500)
@@ -648,19 +616,26 @@ class Feature_Plotter:
                     
                     # Implement a proper wrapped Cauchy density function manually
                     # Formula: f(x) = (1-c^2) / (2*pi*(1+c^2-2*c*cos(x-loc)))
-                    c = fdata['concentration'][i]
-                    loc = fdata['mean'][i]
+                    c: float = fdata['concentration'][i]
+                    loc: float = fdata['mean'][i]
                     
                     # Normalize x to be relative to the location parameter
                     x_shifted = x - loc
                     
-                    # Ensure x_shifted is in [-π, π]
+                    # Ensure x_shifted is in [-np.pi, np.pi]
                     x_shifted = np.mod(x_shifted + np.pi, 2*np.pi) - np.pi
                     
                     # Calculate wrapped Cauchy density
                     numerator = 1 - c**2
                     denominator = 2 * np.pi * (1 + c**2 - 2*c*np.cos(x_shifted))
                     y_fitted = numerator / denominator
+                    
+
+                    # ################### Can we do a CDF for wrapped cauchy? if it is unreasonable to do and, uncommon to do in circular statistics, let me know.
+                    # def WC_CDF(p, x, c):
+                    #     numerator = ((p**2 - 1) * np.atanh(((np.pi * p**2 + p + np.pi) * np.tan(x/2)) / np.sqrt(-np.pi**2 * p**4 + (1 - 2 * np.pi**2) * p**2 - np.pi**2)))
+                    #     denominator = np.sqrt(-np.pi**2 * p**4 + (1 - 2 * np.pi**2) * p**2 - np.pi**2)
+                    #     return (numerator/denominator) + c
                     
                     # Plot the PDF without scaling
                     ax.plot(x, y_fitted, color=colors[state], linestyle='-',
@@ -681,7 +656,7 @@ class Feature_Plotter:
                 # Create x-range appropriate for the data
                 x_min = 0
                 x_max = np.percentile(df[fname].dropna(), 99)
-                x = np.linspace(x_min, x_max, 300)  # More points for smoother curves
+                x = np.linspace(x_min, x_max, 300)
                 
                 # Store KS results for this feature
                 ks_results[fname] = {}

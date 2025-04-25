@@ -44,14 +44,14 @@ class RadarPlotOfCow:
 
         # Generate 24 tick positions (one for each hour)
         self.theta_ticks = np.linspace(num=24, start=0, stop=2 * np.pi, endpoint=False)
-        self.time_labels = [(f"{i:02d}:00") for i in range(len(self.theta_ticks))]
+        self.time_labels = [(f"{i:02d}h") for i in range(len(self.theta_ticks))]
 
 
         # Generate labels for each hour, starting from 21:00 at 0 radians and going counterclockwise
         # self.time_labels = [(f"{(21 + i) % 24:02d}:00") for i in range(24)]
 
         # self.time_labels = [(f"{int(i*(24/(2*np.pi))):02d}:00") for i in self.theta_ticks]
-        self.time_labels = [(f"{i:02d}:00") for i in range(len(self.theta_ticks))]
+        # self.time_labels = [(f"{i:02d}:00") for i in range(len(self.theta_ticks))]
         
         # print("theta ticks", self.theta_ticks)
         # print("theta labels", self.time_labels)
@@ -110,6 +110,19 @@ class RadarPlotOfCow:
         self.plot_single_cow_radar(ID=ID,ax=ax,df=df)
         self.end_plot(fig=fig, end_format=end_format, ID=ID)
 
+
+    def make_radar_TWO_cows(self, IDs = [837, 1022], df=None, end_format="png",show=False) -> None:
+        df = self._prepare_data(df)
+        width_in_inches = 190/25.4
+        height_in_inches = width_in_inches * (.6)
+
+        fig,axs = plt.subplots( ncols=2, figsize=(width_in_inches,height_in_inches)
+                               , subplot_kw={'projection': 'polar'}, dpi=300,layout='constrained')
+        
+        for ax,id in zip(axs.flatten(), IDs):
+            self.plot_single_cow_radar(ID=id,ax=ax,df=df)
+        self.end_plot(fig=fig, end_format=end_format, ID="_".join([str(id) for id in IDs]))
+
         
     def end_plot(self, fig, end_format = None, ID = None, show=False):
         handles = [plt.Line2D([0], [0], marker='o', color='w', label=label, markersize=8, markerfacecolor=color) 
@@ -117,15 +130,27 @@ class RadarPlotOfCow:
         if show:
             plt.show()
         
-        fig.legend(handles=handles, loc="lower right", title="Activity")
-        plt.subplots_adjust(
-            left=.05,
-            right=.95,
-            top=0.93,
-            bottom=0.05,
-            wspace=0,
-            hspace=.9
-        )
+        # fig.legend(handles=handles, loc="lower center", title="Activity")
+        
+        leg = fig.legend(handles=handles, 
+                        loc="lower center",  # Keep lower center position
+                        title="Activity",
+                        fontsize=8,
+                        title_fontsize=10,
+                        frameon=True,
+                        framealpha=0.8,
+                        edgecolor='black',
+                        ncol=3)  # Display in 3 columns for compactness
+        
+
+        # plt.subplots_adjust(
+        #     left=.05,
+        #     right=.95,
+        #     top=0.93,
+        #     bottom=0.05,
+        #     wspace=0,
+        #     hspace=.9
+        # )
         if ID is None:
             # print(ID)
             raise ValueError(f"The ID MUST be passed to end_plot.")
@@ -137,7 +162,10 @@ class RadarPlotOfCow:
             plt.savefig(f"{self.dest}/radar_{ID}.svg", format="svg")
         
         elif end_format == "jpeg":
-            plt.savefig(f"{self.dest}/radar_{ID}.jpg", format="jpeg", dpi=200)
+            plt.savefig(f"{self.dest}/radar_{ID}.jpg", format="jpeg", dpi=300)
+        
+        elif end_format == "png":
+            plt.savefig(f"{self.dest}/radar_{ID}.png",dpi=300)
         
         else:
             raise NotImplementedError(f"The output format of `{end_format}` is not yet supported")
@@ -148,7 +176,7 @@ class RadarPlotOfCow:
 
 
     def plot_single_cow_radar(self, ID:int, ax:plt.Axes, df:pd.DataFrame):
-        ax.set_title(f"ID: {ID}", fontweight="bold", pad=25, fontsize=12)
+        ax.set_title(f"Cow ID: {ID}", fontweight="bold", pad=25, fontsize=10)
         ax.set_yticklabels([])
         ax.set_xticks(self.theta_ticks, self.time_labels)
 
@@ -156,8 +184,8 @@ class RadarPlotOfCow:
         
         # Calculate point sizes that increase with radius
         # Map days_after_start to a size range of 0.5 to 3
-        min_s = 0.5
-        max_s = 8
+        min_s = 0.2
+        max_s = 5
 
         sizes = df["days_after_start"].apply(lambda x: min_s + (x/self.maxdays) * (max_s-min_s))
         
@@ -166,7 +194,7 @@ class RadarPlotOfCow:
                 df["days_after_start"],
                 c=df["activity_color"], 
                 s=sizes, 
-                alpha=0.7)
+                alpha=0.8)
 
         ax.set_theta_direction(-1)
         ax.set_theta_offset(np.pi / 2)

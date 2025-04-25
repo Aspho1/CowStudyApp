@@ -452,11 +452,21 @@ class HeatmapConfig(BaseModel):
     weigh_days: List[str]
     extension: Optional[str] = Field(default="")
 
+class FeatureDists(BaseModel):
+    run: bool
+
+class ConvolutionSurface(BaseModel):
+    run: bool
+
+
+
 class VisualsConfig(CommonConfig):
     predictions_path: Optional[Path] = None
     visuals_root_path: Path
     radar: RadarConfig
     domain: DomainGraphConfig
+    feature_dists: FeatureDists
+    convolution_surface: ConvolutionSurface
     temperature_graph: TemperatureGraphConfig
     moon_phases: MoonPhasesConfig
     cow_info_graph: CowInfoGraphConfig

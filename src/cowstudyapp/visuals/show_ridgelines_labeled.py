@@ -16,7 +16,7 @@ valid_states = ["Grazing", "Resting", "Traveling"]
 
 # Load data
 # Modify this path to match your environment
-target_dataset = pd.read_csv("data/analysis_results/hmm/FinalModels/RB_22_Paper_Model/predictions.csv")
+target_dataset = pd.read_csv("data/analysis_results/hmm/FinalPredictions/RB_Paper_Model_Preds_logmagvar/predictions.csv")
 
 x_ticks = {
     'step': [0, 50, 100, 150, 200, 250, 300], 
@@ -28,7 +28,7 @@ x_ticks = {
 feature_labels = {
     'step': 'Step Size (m)',
     'magnitude_mean': 'MeanSVM (m/s²)',
-    'magnitude_var': 'VarSVM (m²/s⁴)'
+    'magnitude_var': 'VarSVM ln(1+(m²/s⁴))'
 }
 
 # Define custom bandwidths for each feature

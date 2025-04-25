@@ -21,7 +21,8 @@ io:
 validation:
   start_datetime: "2022-01-15 00:00:00"
   end_datetime: "2022-03-23 00:00:00"
-  COVERAGE_THRESHOLD: 70            # Minimum ratio of (actual / expected) GPS data needed to include the device
+  # Minimum ratio of (actual / expected) GPS data needed to include the device
+  COVERAGE_THRESHOLD: 70
 
   # New validation rules structure
   validation_rules:
@@ -110,13 +111,14 @@ labels:
     - "Mineral"
 
 analysis:
-  mode: "LOOCV"     # Do LOOCV on the target dataset. 
-  # mode: "PRODUCT"   # predict activity labels for a full dataset
+  # mode: "LOOCV"     # Do LOOCV on the target dataset. 
+  mode: "PRODUCT"   # predict activity labels for a full dataset
   target_dataset: "data/processed/RB_22/all_cows_labeled.csv"  # Required The dataset to make predictions on
-  training_info_path: "data/analysis_results/hmm/FinalModels/RB_22_Paper_Model/trained_model.rds" # No CV, no filter cows, no covariate.
+  # training_info_path: "data/analysis_results/hmm/FinalModels/RB_22_Paper_Model/trained_model.rds" # No CV, no filter cows, no covariate.
 
 
-  r_executable: "C:/Program Files/R/R-4.4.1/bin/Rscript.exe"
+  # r_executable: "C:/Program Files/R/R-4.4.1/bin/Rscript.exe"
+  r_executable: "C:/Program Files/R/R-4.4.3/bin/Rscript.exe"
   # r_executable: "C:/Program Files/R/R-4.3.0/bin/Rscript.exe"
 
   output_dir: "data/analysis_results"
@@ -124,7 +126,7 @@ analysis:
   day_only: false
 
   hmm:
-    enabled: false
+    enabled: true
     time_covariate: false
 
     states: # The states to use in the HMM
@@ -181,7 +183,7 @@ analysis:
           - "WRAPPEDCAUCHY"
 
   lstm:
-    enabled: true
+    enabled: false
     states: # The states to use in the LSTM
       - "Grazing"
       - "Resting"
@@ -199,7 +201,8 @@ analysis:
 visuals:
   # predictions_path: 'data/analysis_results/hmm/PRODUCT/Preds_22_to_22_20250220_202010/predictions.csv'
   # predictions_path: 'data/analysis_results/hmm/PRODUCT/RB_22_20250302_185749/predictions.csv' # Good
-  predictions_path: 'data/analysis_results/hmm/FinalPredictions/RB_22_Paper_Model_preds/predictions.csv' 
+  # predictions_path: 'data/analysis_results/hmm/FinalPredictions/RB_22_Paper_Model_Preds/predictions.csv' 
+  predictions_path: 'data/analysis_results/hmm/FinalPredictions/RB_Paper_Model_Preds_logmagvar/predictions.csv'
   
   visuals_root_path: "data/visuals/RB_22/"
 
@@ -209,14 +212,19 @@ visuals:
     show_night: true
 
   temperature_graph:
-    run: false
+    run: true
     daynight: 'day' #'day' #'night' 'both'
     show_curve: true
     # extension: 'MDT_Plots/'
     minimum_required_values: 30
     show_table: true  # Whether to print a comparison table
-    export_excel: true  # Whether to export results to Excel
+    export_excel: false  # Whether to export results to Excel
 
+  feature_dists:
+    run: false
+
+  convolution_surface:
+    run: false
 
   moon_phases:
     run: false

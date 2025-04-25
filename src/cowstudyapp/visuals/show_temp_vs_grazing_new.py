@@ -223,8 +223,139 @@ class ActivityVersusTemperatureNew:
 
 
 
+    def plot_3d_surface_publication(self, df, ID=None):
+        """Create publication-ready 3D surface plot with two views of the same data"""
+        # Process data
+        df = self._add_cols(df)
+        
+        # Filter by ID if specified
+        if ID is not None:
+            df = df[df.ID == ID].copy()
+            print(f"Analyzing cow {ID}: {len(df)} observations")
+        else:
+            print(f"Analyzing {len(df.ID.unique())} cows: {len(df)} observations")
+        
+        # Create pivot tables
+        pivot_state, pivot_temp, dates = self._create_pivot_tables(df)
+        
+        # Print some diagnostics
+        print(f"\nState proportions summary:")
+        print(f"Mean: {pivot_state.values.mean():.3f}")
+        print(f"Max: {pivot_state.values.max():.3f}")
+        print(f"Non-zero values: {(pivot_state.values > 0).sum()}")
+        
+        # Smooth surfaces
+        Z_smooth, Z_temp_smooth = self._smooth_surfaces(pivot_state.values, pivot_temp.values)
+        
+        # Create meshgrid
+        X, Y = self._create_meshgrid(pivot_state)
+        
+        # Set up plot - use 190mm width for publication (converted to inches)
+        width_in_inches = 190/25.4  # Convert mm to inches
+        height_in_inches = width_in_inches * 0.5  # 2:1 aspect ratio
+        
+        fig = plt.figure(figsize=(width_in_inches, height_in_inches), dpi=300)
+        
+        # Create colormap
+        cmap = plt.cm.RdYlBu_r
+        norm = plt.Normalize(Z_temp_smooth.min(), Z_temp_smooth.max())
+        
+        # Create left panel (side view)
+        ax1 = fig.add_axes([0.05, 0.15, 0.55, 0.80], projection='3d')
+        ax2 = fig.add_axes([0.50, 0.15, 0.40, 0.80], projection='3d')
 
-    def fit_surface(self, pivot_state, pivot_temp, model_type='best'):
+        surf1 = ax1.plot_surface(X, Y, Z_smooth,
+                            facecolors=cmap(norm(Z_temp_smooth)),
+                            edgecolor='none', alpha=0.9,
+                            rcount=100, ccount=100)  # Higher resolution
+        
+        # Format first axis - only show time labels, hide date labels
+        ax1.set_xlabel('Time of Day', fontsize=9, labelpad=10)
+        ax1.set_ylabel('', fontsize=0)  # Empty label
+        ax1.set_zlabel('Proportion', fontsize=9, labelpad=10)
+        # Set minute ticks (2-hour intervals)
+        hour_minutes = list(range(0, 1441, 180))
+        hour_labels = [f"{h//60:02d}:00" for h in hour_minutes]
+        ax1.set_xticks(hour_minutes)
+        ax1.set_xticklabels(hour_labels, rotation=45, ha='right', fontsize=8)
+        ax1.tick_params(axis='x', which='major', pad=-5)
+        
+        # Hide y-axis ticks and labels
+        ax1.set_yticks([])
+        ax1.set_yticklabels([])
+        
+        # Set z-ticks with appropriate fontsize
+        ax1.tick_params(axis='z', labelsize=8)
+        
+        # Set side view for left panel
+        ax1.view_init(elev=0, azim=-90)
+        
+        # Adjust axis limits for better visibility
+        ax1.set_zlim(0, min(1.0, Z_smooth.max() * 1.2))
+        
+        # Create right panel (perspective view)
+
+        surf2 = ax2.plot_surface(X, Y, Z_smooth,
+                            facecolors=cmap(norm(Z_temp_smooth)),
+                            edgecolor='none', alpha=0.9,
+                            rcount=100, ccount=100)
+        
+        # Format second axis with full labels
+        ax2.set_xlabel('Time of Day', fontsize=9, labelpad=4)
+        ax2.set_ylabel('Date', fontsize=9, labelpad=6)
+        ax2.set_zlabel('Proportion', fontsize=9, labelpad=-6)
+        
+        # Set minute ticks
+        ax2.set_xticks(hour_minutes)
+        ax2.set_xticklabels(hour_labels, rotation=45, ha='right', fontsize=8)
+        
+        # Set day ticks
+        day_step = max(1, len(dates) // 5)  # Show ~5 dates on axis
+        day_ticks = list(range(0, len(dates), day_step))
+        day_labels = [dates[i].strftime('%m/%d') for i in day_ticks]
+        ax2.set_yticks(day_ticks)
+        ax2.set_yticklabels(day_labels, fontsize=8, rotation = -45)
+        
+        # Set z-ticks with appropriate fontsize
+        ax2.tick_params(axis='x', which='major', pad=-8)
+        ax2.tick_params(axis='y', which='major', pad=-6)
+        ax2.tick_params(axis='z', labelsize=8, pad=-2)
+        
+        # Adjust viewing angle to better show dates (less extreme tilt)
+        ax2.view_init(elev=20, azim=140, roll=0)
+        
+        # Adjust axis limits
+        ax2.set_zlim(0, min(1.0, Z_smooth.max() * 1.2))
+        
+        # Add colorbar to the figure
+        cbar_ax = fig.add_axes([0.96, 0.15, 0.02, 0.70])  # [left, bottom, width, height]
+        sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+        sm.set_array([])
+        cbar = fig.colorbar(sm, cax=cbar_ax)
+        cbar.set_label('Temperature (°C)', fontsize=9)
+        cbar.ax.tick_params(labelsize=8)
+        
+        # Add title
+        title = f'Daily {self.state} Pattern Across All Cows (n={len(df.ID.unique())})'
+        if ID is not None:
+            title = f'Daily {self.state} Pattern for Cow #{ID}'
+        subtitle = 'Height: proportion, Color: temperature'
+        
+        # # Add titles with proper positioning
+        # fig.suptitle(title, fontsize=11, y=0.95, x=0.60)
+        # fig.text(0.60, 0.86, subtitle, ha='center', fontsize=9)
+        
+        # Save the figure
+        output_path = os.path.join(self.config.visuals.visuals_root_path, f'3d_surface_{self.state.lower()}.png')
+        fig.savefig(output_path, dpi=300, bbox_inches='tight')
+        
+        # plt.show()
+        
+        return pivot_state, pivot_temp
+
+
+
+    def fit_surface(self, pivot_state, pivot_temp):
         """Fit a function to the state surface with improved R² through better feature engineering
         
         Parameters:
@@ -269,125 +400,125 @@ class ActivityVersusTemperatureNew:
         Z_flat = Z.flatten()
 
         # Create models to try
-        models = {}
-        results = {}
+        # models = {}
+        # results = {}
         
         # Define number of Fourier components
-        n_components = 3  # Reduced from 5 to improve performance
+        n_components = 5  # Reduced from 5 to improve performance
         
-        # 1. Basic polynomial model
-        if model_type in ['polynomial', 'best']:
-            poly = PolynomialFeatures(degree=self.degree)
-            X_poly = poly.fit_transform(X_flat)
+        # # 1. Basic polynomial model
+        # if model_type in ['polynomial', 'best']:
+        #     poly = PolynomialFeatures(degree=self.degree)
+        #     X_poly = poly.fit_transform(X_flat)
             
-            poly_model = Ridge(alpha=0.1)
-            poly_model.fit(X_poly, Z_flat)
-            Z_fitted_poly = poly_model.predict(X_poly).reshape(X.shape)
-            r2_poly = poly_model.score(X_poly, Z_flat)
-            print(f"Polynomial fit R-squared: {r2_poly:.3f}")
+        #     poly_model = Ridge(alpha=0.1)
+        #     poly_model.fit(X_poly, Z_flat)
+        #     Z_fitted_poly = poly_model.predict(X_poly).reshape(X.shape)
+        #     r2_poly = poly_model.score(X_poly, Z_flat)
+        #     print(f"Polynomial fit R-squared: {r2_poly:.3f}")
             
-            # Store feature information
-            poly_model.poly_features = poly
-            poly_model.feature_names = poly.get_feature_names_out(['minute', 'day', 'temp'])
+        #     # Store feature information
+        #     poly_model.poly_features = poly
+        #     poly_model.feature_names = poly.get_feature_names_out(['minute', 'day', 'temp'])
             
-            models['polynomial'] = poly_model
-            results['polynomial'] = (Z_fitted_poly, r2_poly)
+        #     models['polynomial'] = poly_model
+        #     results['polynomial'] = (Z_fitted_poly, r2_poly)
         
-        # 2. Fourier features (for periodicity)
-        if model_type in ['fourier', 'best', 'combined']:
-            # Create Fourier features for minute (time of day)
-            minutes = X_flat[:, 0] * self.scale_factors['minute']  # back to original scale
+        # # 2. Fourier features (for periodicity)
+        # if model_type in ['fourier', 'best', 'combined']:
+        #     # Create Fourier features for minute (time of day)
+        #     minutes = X_flat[:, 0] * self.scale_factors['minute']  # back to original scale
             
-            fourier_features = []
-            feature_names = []
+        #     fourier_features = []
+        #     feature_names = []
             
-            # Add time of day fourier components (24-hour periodicity)
-            for i in range(1, n_components + 1):
-                period = 2 * np.pi * i / 1440
-                fourier_features.append(np.sin(minutes * period))
-                fourier_features.append(np.cos(minutes * period))
-                feature_names.append(f'sin_{i}')
-                feature_names.append(f'cos_{i}')
+        #     # Add time of day fourier components (24-hour periodicity)
+        #     for i in range(1, n_components + 1):
+        #         period = 2 * np.pi * i / 1440
+        #         fourier_features.append(np.sin(minutes * period))
+        #         fourier_features.append(np.cos(minutes * period))
+        #         feature_names.append(f'sin_{i}')
+        #         feature_names.append(f'cos_{i}')
             
-            # Add original features
-            X_fourier = np.column_stack([
-                *fourier_features, 
-                X_flat  # Include all original features
-            ])
-            all_feature_names = feature_names + ['minute', 'day', 'temp']
+        #     # Add original features
+        #     X_fourier = np.column_stack([
+        #         *fourier_features, 
+        #         X_flat  # Include all original features
+        #     ])
+        #     all_feature_names = feature_names + ['minute', 'day', 'temp']
             
-            # Fit ridge regression with Fourier features
-            fourier_model = Ridge(alpha=0.1)
-            fourier_model.fit(X_fourier, Z_flat)
-            Z_fitted_fourier = fourier_model.predict(X_fourier).reshape(X.shape)
-            r2_fourier = fourier_model.score(X_fourier, Z_flat)
-            print(f"Fourier fit R-squared: {r2_fourier:.3f}")
+        #     # Fit ridge regression with Fourier features
+        #     fourier_model = Ridge(alpha=0.1)
+        #     fourier_model.fit(X_fourier, Z_flat)
+        #     Z_fitted_fourier = fourier_model.predict(X_fourier).reshape(X.shape)
+        #     r2_fourier = fourier_model.score(X_fourier, Z_flat)
+        #     print(f"Fourier fit R-squared: {r2_fourier:.3f}")
             
-            # Store the feature names and information
-            fourier_model.feature_names = all_feature_names
-            fourier_model.n_components = n_components
+        #     # Store the feature names and information
+        #     fourier_model.feature_names = all_feature_names
+        #     fourier_model.n_components = n_components
             
-            models['fourier'] = fourier_model
-            results['fourier'] = (Z_fitted_fourier, r2_fourier)
+        #     models['fourier'] = fourier_model
+        #     results['fourier'] = (Z_fitted_fourier, r2_fourier)
         
-        # 3. Combined model
-        if model_type in ['combined', 'best']:
-            # Get Fourier features
-            minutes = X_flat[:, 0] * self.scale_factors['minute']
-            fourier_features = []
-            feature_names = []
-            
-            for i in range(1, n_components + 1):
-                period = 2 * np.pi * i / 1440
-                fourier_features.append(np.sin(minutes * period))
-                fourier_features.append(np.cos(minutes * period))
-                feature_names.append(f'sin_{i}')
-                feature_names.append(f'cos_{i}')
-            
-            # Add polynomial features (degree 2 is usually sufficient with Fourier)
-            poly = PolynomialFeatures(degree=2, include_bias=False)
-            X_poly = poly.fit_transform(X_flat)
-            poly_names = poly.get_feature_names_out(['minute', 'day', 'temp'])
-            
-            # Combine features
-            X_combined = np.column_stack([
-                *fourier_features,
-                X_poly
-            ])
-            all_feature_names = feature_names + list(poly_names)
-            
-            # Fit Ridge regression with combined features
-            combined_model = Ridge(alpha=0.1)
-            combined_model.fit(X_combined, Z_flat)
-            Z_fitted_combined = combined_model.predict(X_combined).reshape(X.shape)
-            r2_combined = combined_model.score(X_combined, Z_flat)
-            print(f"Combined fit R-squared: {r2_combined:.3f}")
-            
-            # Store model information
-            combined_model.feature_names = all_feature_names
-            combined_model.n_components = n_components
-            combined_model.poly_features = poly
-            
-            models['combined'] = combined_model
-            results['combined'] = (Z_fitted_combined, r2_combined)
+        # # 3. Combined model
+        # if model_type in ['combined', 'best']:
+        # Get Fourier features
+        minutes = X_flat[:, 0] * self.scale_factors['minute']
+        fourier_features = []
+        feature_names = []
         
-        # Select the best model
-        if model_type == 'best':
-            best_model_name = max(results, key=lambda k: results[k][1])
-            print(f"\nBest model: {best_model_name} (R² = {results[best_model_name][1]:.3f})")
-            Z_fitted, r2 = results[best_model_name]
-            model = models[best_model_name]
-        else:
-            Z_fitted, r2 = results[model_type]
-            model = models[model_type]
+        for i in range(1, n_components + 1):
+            period = 2 * np.pi * i / 1440
+            fourier_features.append(np.sin(minutes * period))
+            fourier_features.append(np.cos(minutes * period))
+            feature_names.append(f'sin_{i}')
+            feature_names.append(f'cos_{i}')
+        
+        # Add polynomial features (degree 2 is usually sufficient with Fourier)
+        poly = PolynomialFeatures(degree=2, include_bias=False)
+        X_poly = poly.fit_transform(X_flat)
+        poly_names = poly.get_feature_names_out(['minute', 'day', 'temp'])
+        
+        # Combine features
+        X_combined = np.column_stack([
+            *fourier_features,
+            X_poly
+        ])
+        all_feature_names = feature_names + list(poly_names)
+        
+        # Fit Ridge regression with combined features
+        combined_model = Ridge(alpha=0.1)
+        combined_model.fit(X_combined, Z_flat)
+        Z_fitted_combined = combined_model.predict(X_combined).reshape(X.shape)
+        r2_combined = combined_model.score(X_combined, Z_flat)
+        print(f"Combined fit R-squared: {r2_combined:.3f}")
+        
+        # Store model information
+        combined_model.feature_names = all_feature_names
+        combined_model.n_components = n_components
+        combined_model.poly_features = poly
+        
+        model = combined_model
+        Z_fitted, r2 = (Z_fitted_combined, r2_combined)
+        
+        # # Select the best model
+        # if model_type == 'best':
+        #     best_model_name = max(results, key=lambda k: results[k][1])
+        #     print(f"\nBest model: {best_model_name} (R² = {results[best_model_name][1]:.3f})")
+        #     Z_fitted, r2 = results[best_model_name]
+        #     model = models[best_model_name]
+        # else:
+
+
         
         # Store additional information for interpretation
-        model.model_type = model_type if model_type != 'best' else best_model_name
+        
         model.scale_factors = self.scale_factors
         model.X_flat = X_flat  # Store original features for reference
         
         # Create a consistent prediction function that works for all model types
-        def create_prediction_features(minutes, day, temp, model_type):
+        def create_prediction_features(minutes, day, temp):
             """Create the appropriate feature matrix for each model type"""
             # Scale the inputs
             minute_scaled = minutes / model.scale_factors['minute']
@@ -401,43 +532,43 @@ class ActivityVersusTemperatureNew:
                 np.full_like(minutes, temp_scaled)
             ])
             
-            if model_type == 'polynomial':
-                # Use the same polynomial features as during training
-                return model.poly_features.transform(X_base)
+            # if model_type == 'polynomial':
+            #     # Use the same polynomial features as during training
+            #     return model.poly_features.transform(X_base)
                 
-            elif model_type == 'fourier':
-                # Create Fourier features
-                fourier_features = []
-                for i in range(1, model.n_components + 1):
-                    period = 2 * np.pi * i / 1440
-                    fourier_features.append(np.sin(minutes * period))
-                    fourier_features.append(np.cos(minutes * period))
+            # elif model_type == 'fourier':
+            #     # Create Fourier features
+            #     fourier_features = []
+            #     for i in range(1, model.n_components + 1):
+            #         period = 2 * np.pi * i / 1440
+            #         fourier_features.append(np.sin(minutes * period))
+            #         fourier_features.append(np.cos(minutes * period))
                 
-                # Combine with base features
-                return np.column_stack([*fourier_features, X_base])
+            #     # Combine with base features
+            #     return np.column_stack([*fourier_features, X_base])
                 
-            elif model_type == 'combined':
-                # Create Fourier features
-                fourier_features = []
-                for i in range(1, model.n_components + 1):
-                    period = 2 * np.pi * i / 1440
-                    fourier_features.append(np.sin(minutes * period))
-                    fourier_features.append(np.cos(minutes * period))
-                
-                # Create polynomial features
-                X_poly = model.poly_features.transform(X_base)
-                
-                # Combine features
-                return np.column_stack([*fourier_features, X_poly])
+            # elif model_type == 'combined':
+            # Create Fourier features
+            fourier_features = []
+            for i in range(1, model.n_components + 1):
+                period = 2 * np.pi * i / 1440
+                fourier_features.append(np.sin(minutes * period))
+                fourier_features.append(np.cos(minutes * period))
             
-            else:
-                raise ValueError(f"Unknown model type: {model_type}")
+            # Create polynomial features
+            X_poly = model.poly_features.transform(X_base)
+            
+            # Combine features
+            return np.column_stack([*fourier_features, X_poly])
+            
+            # else:
+            #     raise ValueError(f"Unknown model type: {model_type}")
 
 
         # Prediction function
         def predict_for_day_temp(day, temp, minutes=np.linspace(0, 1440, 288)):
             """Predict state probability for a given day and temperature across minutes"""
-            X_pred = create_prediction_features(minutes, day, temp, model.model_type)
+            X_pred = create_prediction_features(minutes, day, temp)
             return model.predict(X_pred)
         
         # Attach the function to the model

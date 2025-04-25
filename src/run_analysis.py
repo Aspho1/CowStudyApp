@@ -16,34 +16,37 @@ import os
 import sys
 
 
-def find_r_executable():
+def find_r_executable(config_path):
     """Find the R executable on the system"""
     if platform.system() == "Windows":
         # Common R installation paths on Windows
         possible_paths = [
-            r"C:\Program Files\R\R-4.4.3\bin\Rscript.exe",
-            # r"C:\Program Files\R\R-4.4.0\bin\Rscript.exe",
-            # r"C:\Program Files\R\R-4.3.2\bin\Rscript.exe",
-            # r"C:\Program Files\R\R-4.3.0\bin\Rscript.exe",
+            config_path, 
+            r"C:/Program Files/R/R-4.4.3/bin/Rscript.exe",
+            r"C:/Program Files/R/R-4.4.0/bin/Rscript.exe",
+            r"C:/Program Files/R/R-4.3.2/bin/Rscript.exe",
+            r"C:/Program Files/R/R-4.3.0/bin/Rscript.exe",
         ]
 
         # Check R_HOME environment variable
         r_home = os.environ.get("R_HOME")
+        print("RHOME:", r_home)
         if r_home:
             possible_paths.append(Path(r_home) / "bin" / "Rscript.exe")
 
-        # Try to find Rscript in PATH
-        try:
-            result = subprocess.run(
-                ["where", "Rscript.exe"], capture_output=True, text=True
-            )
-            if result.returncode == 0:
-                possible_paths.extend(result.stdout.splitlines())
-        except subprocess.SubprocessError:
-            pass
+        # # Try to find Rscript in PATH
+        # try:
+        #     result = subprocess.run(
+        #         ["where", "Rscript.exe"], capture_output=True, text=True
+        #     )
+        #     if result.returncode == 0:
+        #         possible_paths.extend(result.stdout.splitlines())
+        # except subprocess.SubprocessError:
+        #     pass
 
         # Return first existing path
         for path in possible_paths:
+            print("CHECKING ", path)
             if Path(path).exists():
                 return str(Path(path))
 
@@ -236,7 +239,7 @@ def run_hmm_analysis(config: ConfigManager, target_data_path: Path, output_dir: 
     """Run the HMM analysis using R scripts"""
 
     analysis = config.analysis
-    r_executable = find_r_executable() or analysis.r_executable
+    r_executable = find_r_executable(analysis.r_executable)
     check_r_packages(r_executable)
 
     # Ensure R script directory exists
@@ -319,7 +322,7 @@ def run_hmm_analysis(config: ConfigManager, target_data_path: Path, output_dir: 
 
     # Build R command
     cmd = [
-        str(analysis.r_executable or "Rscript"),
+        str(r_executable or "Rscript"),
         str(r_script_path),
         str(util_path),
         str(config_path),

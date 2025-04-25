@@ -566,6 +566,25 @@ select_best_distributions <- function(data, Options, features, dirs) {
             # Fit distributions and compare
             fits <- get_regular_fit_metrics(feature_data, Options$distributions$regular)
             
+            fit_results <- data.frame(
+              Distribution = c("LNORM", "GAMMA", "NORM", "EXP"),
+              KS_pvalue = c(
+                fits$lnorm$ks_pvalue,
+                fits$gamma$ks_pvalue,
+                fits$norm$ks_pvalue,
+                fits$exp$ks_pvalue
+              ),
+              KS_statistic = c(
+                fits$lnorm$ks_statistic,
+                fits$gamma$ks_statistic,
+                fits$norm$ks_statistic,
+                fits$exp$ks_statistic
+              )
+            )
+            
+            cat("\n----------------------- Global Fits -----------------------\n")
+            print(fit_results, digits = 4)
+            cat("\n-----------------------------------------------------------\n")
             # Select best distribution based on AIC
             aic_values <- sapply(fits, function(x) x$aic)
             best_dist <- names(which.min(aic_values))
@@ -1111,6 +1130,33 @@ get_regular_fit_metrics <- function(data, distributions) {
             
             if (!inherits(fit, "try-error")) {
                 # cat(" Successful fit with method:", method, "\n")
+
+                ks_result <- try({
+                    # Create the appropriate distribution function with estimated parameters
+                    dist_func <- switch(distr,
+                        "lnorm" = function(x) plnorm(x, meanlog = fit$estimate["meanlog"], sdlog = fit$estimate["sdlog"]),
+                        "gamma" = function(x) pgamma(x, shape = fit$estimate["shape"], rate = fit$estimate["rate"]),
+                        "weibull" = function(x) pweibull(x, shape = fit$estimate["shape"], scale = fit$estimate["scale"]),
+                        "norm" = function(x) pnorm(x, mean = fit$estimate["mean"], sd = fit$estimate["sd"]),
+                        "exp" = function(x) pexp(x, rate = fit$estimate["rate"])
+                    )
+                    
+                    # Perform the KS test
+                    ks.test(data, dist_func)
+                }, silent = TRUE)
+
+
+                if (!inherits(ks_result, "try-error")) {
+                    ks_pvalue <- ks_result$p.value
+                    ks_statistic <- ks_result$statistic
+                } else {
+                    ks_pvalue <- NA
+                    ks_statistic <- NA
+                    cat(" KS test failed for", distr, "\n")
+                }
+
+
+
                 fits[[distr]] <- list(
                     distribution = distr,
                     aic = AIC(fit),
@@ -1118,8 +1164,12 @@ get_regular_fit_metrics <- function(data, distributions) {
                     loglik = fit$loglik,
                     parameters = as.list(fit$estimate),
                     fit = fit,
-                    method = method
+                    method = method,
+                    ks_pvalue = ks_pvalue,
+                    ks_statistic = ks_statistic
                 )
+
+
                 break  # Stop trying other methods if one succeeds
             } else {
                 cat(" Failed with method:", method, "\n")

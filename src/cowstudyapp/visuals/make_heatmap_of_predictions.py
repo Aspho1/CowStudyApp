@@ -170,14 +170,16 @@ class HeatMapMaker:
             config: Configuration manager instance
         """
         self.config = config
-        self.figure_size = (10, 6)
+        width_in_inches = 190/25.4
+        height_in_inches = width_in_inches * (.5)
+        self.figure_size = (width_in_inches, height_in_inches)
 
-        self.activity_colors = {
-            activity: color for activity, color in zip(
-                self.config.labels.valid_activities,
-                ['blue', 'green', 'red', 'orange', 'cyan', 'purple', 'brown']  # Add more colors if needed
-            )
-        }
+        # self.activity_colors = {
+        #     activity: color for activity, color in zip(
+        #         self.config.labels.valid_activities,
+        #         ['blue', 'green', 'red', 'orange', 'cyan', 'purple', 'brown']  # Add more colors if needed
+        #     )
+        # }
         
     def _prepare_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -219,10 +221,14 @@ class HeatMapMaker:
 
         return grazing_pct
         
+
+
+
+
     def make_graph(self, grazing_pct:pd.DataFrame):
 
 
-        print(grazing_pct.describe())
+        # print(grazing_pct.describe())
         heatmap_data = grazing_pct.pivot(
             index='ID',
             columns='day',
@@ -232,7 +238,7 @@ class HeatMapMaker:
 
 
         heatmap_data = heatmap_data.sort_index(ascending=True)
-        fig, ax = plt.subplots(layout='constrained', figsize=(20,12))
+        fig, ax = plt.subplots(layout='constrained', figsize=self.figure_size)
         
         # sns.heatmap(heatmap_data, annot=True, fmt=".0f", cmap="coolwarm", cbar=False, ax=ax, center=100/3)
         c = 100/3
@@ -241,7 +247,7 @@ class HeatMapMaker:
         cmap = sns.diverging_palette(250, 30, l=60, s=80, center="light", as_cmap=True)
         sns.heatmap(
             heatmap_data, 
-            annot=True, 
+            annot=False, 
             fmt=".0f", 
             cmap=cmap,
             # cmap="RdYlBu_r",
@@ -249,19 +255,113 @@ class HeatMapMaker:
             center=c,
             # vmin=vmin,
             # vmax=vmax,
-            cbar=False,  # Add colorbar to show the scale
+            cbar=True,  # Add colorbar to show the scale
             ax=ax
         )
         
         
         
         ax.tick_params(axis='y', labelsize=12)
-        ax.set_xticks([x + 0.5 for x in range(len(heatmap_data.columns))])
-        ax.set_xticklabels(heatmap_data.columns, ha='center', fontsize=10)
+        # ax.set_xticks([x + 0.5 for x in range(len(heatmap_data.columns))])
+        # date_labels = [d.strftime('%m-%d') for d in heatmap_data.columns]
+        # # ax.set_xticklabels(date_labels, rotation=45, ha='right', fontsize=10)
+        # ax.set_xticklabels(date_labels, rotation=45, ha='right', fontsize=10)
+
+
+
+        x_tick_positions = np.arange(len(heatmap_data.columns))[::2] + 0.5
+        x_tick_labels = [d.strftime('%m-%d') for d in heatmap_data.columns[::2]]
+        # Set the positions and labels
+        ax.set_xticks(x_tick_positions)
+        ax.set_xticklabels(x_tick_labels, rotation=45, ha='right', fontsize=10)
+
+
+
+
         ax.set_xlabel("Date", fontsize=14)
-        ax.set_ylabel("collar_id", fontsize=14)
-        plt.savefig(os.path.join(self.config.visuals.visuals_root_path, 'heatmap_of_grazing.png'))
+        ax.set_ylabel("Cow ID", fontsize=14)
+        plt.savefig(os.path.join(self.config.visuals.visuals_root_path, 'heatmap_of_grazing.png'), dpi=300)
+        # plt.show()
+        print("Saved?")
         plt.close()
+
+
+
+
+    # def make_graph(self, grazing_pct: pd.DataFrame):
+    #     """Generate a more compact and readable heatmap."""
+        
+    #     # Pivot data for heatmap
+    #     heatmap_data = grazing_pct.pivot(
+    #         index='ID',
+    #         columns='day',
+    #         values='grazing_percentage'
+    #     )
+        
+    #     mean_grazing = np.mean(heatmap_data)
+    #     print(f"Mean grazing percentage: {mean_grazing:.1f}%")
+        
+    #     # Sort IDs in ascending order
+    #     heatmap_data = heatmap_data.sort_index(ascending=True)
+        
+    #     # Create figure with publication dimensions (190mm wide)
+    #     fig, ax = plt.subplots(figsize=self.figure_size, dpi=300)
+        
+    #     # Calculate center value for diverging colormap
+    #     c = 100/3  # ~33.33% as center point
+        
+    #     # Use a simpler colormap with better contrast
+    #     cmap = sns.diverging_palette(240, 10, s=80, l=55, as_cmap=True)
+        
+    #     # Determine font sizes based on grid size
+    #     n_rows, n_cols = heatmap_data.shape
+    #     annot_fontsize = max(4, min(7, 150 / (n_rows * n_cols/2)))  # Smaller annotations
+        
+    #     # Create heatmap with simplified appearance
+    #     hm = sns.heatmap(
+    #         heatmap_data,
+    #         annot=True,
+    #         fmt=".0f",  # Show integer percentages
+    #         cmap=cmap,
+    #         center=c,
+    #         cbar=False,  # Remove colorbar for cleaner look
+    #         linewidths=0.1,  # Thinner cell borders
+    #         annot_kws={'fontsize': annot_fontsize, 'weight': 'normal'},
+    #         ax=ax
+    #     )
+        
+    #     # Set x-axis tick properties with less information
+    #     # Reduce number of date labels by showing every n-th date
+    #     date_stride = max(1, n_cols // 10)  # Show at most 10 date labels
+    #     ax.set_xticks([x + 0.5 for x in range(0, len(heatmap_data.columns), date_stride)])
+    #     ax.set_xticklabels([heatmap_data.columns[i] for i in range(0, len(heatmap_data.columns), date_stride)], 
+    #                     rotation=45, ha='right', fontsize=6)
+        
+    #     # Set y-axis tick properties
+    #     ax.set_yticks([y + 0.5 for y in range(len(heatmap_data.index))])
+    #     ax.set_yticklabels(heatmap_data.index, fontsize=6)
+        
+    #     # Simplified axis labels with smaller font
+    #     ax.set_xlabel("Date", fontsize=8, labelpad=5)
+    #     ax.set_ylabel("Collar ID", fontsize=8, labelpad=5)
+        
+    #     # Remove the title to reduce clutter
+        
+    #     # Tighten layout to make the best use of space
+    #     plt.tight_layout()
+        
+    #     # Save figure with appropriate resolution
+    #     output_path = os.path.join(self.config.visuals.visuals_root_path, 'heatmap_of_grazing.png')
+    #     plt.savefig(output_path, dpi=300, bbox_inches='tight', format='png')
+        
+    #     # Also save PDF version for publication
+    #     pdf_path = os.path.join(self.config.visuals.visuals_root_path, 'heatmap_of_grazing.pdf')
+    #     plt.savefig(pdf_path, dpi=300, bbox_inches='tight', format='pdf')
+        
+    #     plt.show()
+    #     plt.close()
+        
+    #     print(f"Heatmap saved to {output_path}")
 
 
     def super_manual(self):

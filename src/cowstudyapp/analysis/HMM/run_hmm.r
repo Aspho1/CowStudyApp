@@ -269,150 +269,133 @@ save_model <- function(model, base_dir, features){
 
 get_predictions_from_model <- function(model, output_dir, config) {
     tryCatch({
-        timezone <- "America/Denver"  # Let's be explicit about timezone
-        predictions <- viterbi(model)
-        states <- model$stateNames
-        results_df <- model$data
-        results_df$predicted_state <- states[predictions]
-        results_df$factored_activity <- NULL
-        buffer <- 1.5
-
-        if(config$day_only){
-            # Convert to Mountain time consistently
-            utc_times <- as.POSIXct(results_df$posix_time, origin="1970-01-01", tz="UTC")
-            mtn_times <- with_tz(utc_times, timezone)
-            
-            # Convert to dates explicitly using format and as.Date
-            mtn_dates <- as.Date(format(mtn_times, "%Y-%m-%d"))
-            unique_dates <- unique(mtn_dates)
-            unique_ID <- unique(results_df$ID)
-
-            for (id in unique_ID){ 
-                for(date_str in unique_dates) {
-                    # Convert string to Date object for getSunlightTimes
-                    date <- as.Date(date_str)
-                    
-                    # Use Mountain time dates for masking
-                    mask <- (mtn_dates == date & results_df$ID == id)
-                    filtered_data <- results_df[mask,]
-                    
-                    day_data <- data.frame(
-                        date = date,  # This should now be a proper Date object
-                        lat = filtered_data$latitude[1],
-                        lon = filtered_data$longitude[1]
-                    )
-                    
-                    sun_times <- getSunlightTimes(
-                        data = day_data, 
-                        keep = c("sunrise", "sunset"), 
-                        tz = timezone
-                    )
-                    # Create night mask using Mountain times
-                    night_mask <- mask & (
-                        mtn_times < (sun_times$sunrise - (60*60)*buffer) |
-                        mtn_times > (sun_times$sunset + (60*60)*buffer)
-                    )
-
-                    # Debug output
-                    daily_times <- mtn_times[mask]
-                    # if(length(daily_times) > 0) {
-                    #     cat(sprintf("\nID: %s, Date: %s\n", id, format(date, "%Y-%m-%d")))
-                    #     cat(sprintf("Time range: %s -> %s (Mountain Time)\n", 
-                    #         format(min(daily_times), "%H:%M:%S"),
-                    #         format(max(daily_times), "%H:%M:%S")))
-                    # }
-
-                    # n_early_night <- sum(mask & (mtn_times < (sun_times$sunrise - (60*60)*buffer)))
-                    # n_late_night <- sum(mask & (mtn_times > (sun_times$sunset + (60*60)*buffer)))
-                    
-                    # cat(sprintf("Records before sunrise: %d\n", n_early_night))
-                    # cat(sprintf("Records after sunset: %d\n", n_late_night))
-                    # cat(sprintf("Total night records: %d\n", sum(night_mask)))
-
-                    results_df$activity[night_mask] <- "NIGHTTIME"
-                    results_df$predicted_state[night_mask] <- "NIGHTTIME"
-                }
-            }
-        }            
-        # Filter for rows with actual labels
-        labeled_data <- results_df[(!is.na(results_df$activity))&(results_df$activity != "NIGHTTIME") , ]
+    timezone <- "America/Denver"  # Let's be explicit about timezone
+    predictions <- viterbi(model)
+    states <- model$stateNames
+    results_df <- model$data
+    results_df$predicted_state <- states[predictions]
+    results_df$factored_activity <- NULL
+    buffer <- 1.5
+    
+    if(config$day_only){
+        # Convert to Mountain time consistently
+        utc_times <- as.POSIXct(results_df$posix_time, origin="1970-01-01", tz="UTC")
+        mtn_times <- with_tz(utc_times, timezone)
+        # Convert to dates explicitly using format and as.Date
+        mtn_dates <- as.Date(format(mtn_times, "%Y-%m-%d"))
+        unique_dates <- unique(mtn_dates)
+        unique_ID <- unique(results_df$ID)
         
-        # Create confusion matrix
-        conf_matrix <- table(Actual = labeled_data$activity, 
-                            Predicted = labeled_data$predicted_state)
-        
-        # Calculate metrics for each state
-        metrics <- lapply(states, function(state) {
-            # Convert to binary classification for each state
-            actual_binary <- labeled_data$activity == state
-            pred_binary <- labeled_data$predicted_state == state
-            
-            # Calculate metrics
-            TP <- sum(actual_binary & pred_binary)
-            TN <- sum(!actual_binary & !pred_binary)
-            FP <- sum(!actual_binary & pred_binary)
-            FN <- sum(actual_binary & !pred_binary)
-            
-            # Compute statistics
-            accuracy <- (TP + TN) / (TP + TN + FP + FN)
-            sensitivity <- TP / (TP + FN)
-            specificity <- TN / (TN + FP)
-            precision <- TP / (TP + FP)
-            f1_score <- 2 * (precision * sensitivity) / (precision + sensitivity)
-            
-            # Handle NaN cases
-            metrics <- list(
-                accuracy = ifelse(is.nan(accuracy), 0, accuracy),
-                sensitivity = ifelse(is.nan(sensitivity), 0, sensitivity),
-                specificity = ifelse(is.nan(specificity), 0, specificity),
-                f1_score = ifelse(is.nan(f1_score), 0, f1_score)
+        for (id in unique_ID){
+        for(date_str in unique_dates) {
+            # Convert string to Date object for getSunlightTimes
+            date <- as.Date(date_str)
+            # Use Mountain time dates for masking
+            mask <- (mtn_dates == date & results_df$ID == id)
+            filtered_data <- results_df[mask,]
+            day_data <- data.frame(
+            date = date,  # This should now be a proper Date object
+            lat = filtered_data$latitude[1],
+            lon = filtered_data$longitude[1]
             )
-            return(metrics)
-        })
-        names(metrics) <- states
-        
-        # Print results to terminal
-        cat("\nPerformance Metrics by State:\n")
-        cat("============================\n")
-        for (state in states) {
-            cat(sprintf("\nState: %s\n", state))
-            cat(sprintf("Accuracy: %.3f\n", metrics[[state]]$accuracy))
-            cat(sprintf("Sensitivity: %.3f\n", metrics[[state]]$sensitivity))
-            cat(sprintf("Specificity: %.3f\n", metrics[[state]]$specificity))
-            cat(sprintf("F1 Score: %.3f\n", metrics[[state]]$f1_score))
+            sun_times <- getSunlightTimes(
+            data = day_data,
+            keep = c("sunrise", "sunset"),
+            tz = timezone
+            )
+            # Create night mask using Mountain times
+            night_mask <- mask & (
+            mtn_times < (sun_times$sunrise - (60*60)*buffer) |
+            mtn_times > (sun_times$sunset + (60*60)*buffer)
+            )
+            # Debug output
+            daily_times <- mtn_times[mask]
+            results_df$activity[night_mask] <- "NIGHTTIME"
+            results_df$predicted_state[night_mask] <- "NIGHTTIME"
         }
-        
-        # Save metrics to file
-        sink(file.path(output_dir, "performance_metrics.txt"))
-        
-        cat("Confusion Matrix:\n")
-        cat("=================\n")
-        print(conf_matrix)
-        
-        cat("\nPerformance Metrics by State:\n")
-        cat("============================\n")
-        for (state in states) {
-            cat(sprintf("\nState: %s\n", state))
-            cat(sprintf("Accuracy: %.3f\n", metrics[[state]]$accuracy))
-            cat(sprintf("Sensitivity: %.3f\n", metrics[[state]]$sensitivity))
-            cat(sprintf("Specificity: %.3f\n", metrics[[state]]$specificity))
-            cat(sprintf("F1 Score: %.3f\n", metrics[[state]]$f1_score))
         }
+    }            
+    
+    # Filter for rows with actual labels
+    labeled_data <- results_df[(!is.na(results_df$activity))&(results_df$activity != "NIGHTTIME") , ]
+    
+    # Create confusion matrix
+    conf_matrix <- table(Actual = labeled_data$activity,
+                        Predicted = labeled_data$predicted_state)
+    
+    # Calculate metrics for each state
+    metrics_list <- lapply(states, function(state) {
+        # Convert to binary classification for each state
+        actual_binary <- labeled_data$activity == state
+        pred_binary <- labeled_data$predicted_state == state
         
-        # Overall accuracy
-        overall_accuracy <- sum(diag(conf_matrix)) / sum(conf_matrix)
-        cat(sprintf("\nOverall Accuracy: %.3f\n", overall_accuracy))
+        # Calculate metrics
+        TP <- sum(actual_binary & pred_binary)
+        TN <- sum(!actual_binary & !pred_binary)
+        FP <- sum(!actual_binary & pred_binary)
+        FN <- sum(actual_binary & !pred_binary)
         
-        sink()
-
+        # Compute statistics
+        accuracy <- (TP + TN) / (TP + TN + FP + FN)
+        sensitivity <- TP / (TP + FN)
+        specificity <- TN / (TN + FP)
+        precision <- TP / (TP + FP)
+        f1_score <- 2 * (precision * sensitivity) / (precision + sensitivity)
+        
+        # Handle NaN cases
+        metrics <- c(
+        accuracy = ifelse(is.nan(accuracy), 0, accuracy),
+        sensitivity = ifelse(is.nan(sensitivity), 0, sensitivity),
+        specificity = ifelse(is.nan(specificity), 0, specificity),
+        f1_score = ifelse(is.nan(f1_score), 0, f1_score)
+        )
+        return(metrics)
+    })
+    names(metrics_list) <- states
+    
+    # Create metrics data frame for table display
+    metrics_df <- do.call(rbind, metrics_list)
+    metrics_df <- as.data.frame(metrics_df)
+    metrics_df$State <- rownames(metrics_df)
+    metrics_df <- metrics_df[, c("State", "accuracy", "sensitivity", "specificity", "f1_score")]
+    colnames(metrics_df) <- c("State", "Accuracy", "Sensitivity", "Specificity", "F1 Score")
+    
+    # Calculate overall accuracy for display
+    overall_accuracy <- sum(diag(conf_matrix)) / sum(conf_matrix)
+    
+    # Print results to terminal with nicely formatted tables
+    cat("\nPerformance Metrics by State:\n")
+    cat("============================\n")
+    print(format(metrics_df, digits = 3))
+    
+    cat("\nOverall Accuracy:", round(overall_accuracy, 3), "\n")
+    
+    cat("\nConfusion Matrix:\n")
+    print(conf_matrix)
+    
+    # Save metrics to file using the same table formatting
+    sink(file.path(output_dir, "performance_metrics.txt"))
+    
+    cat("Confusion Matrix:\n")
+    cat("=================\n")
+    print(conf_matrix)
+    
+    cat("\nPerformance Metrics by State:\n")
+    cat("============================\n")
+    print(format(metrics_df, digits = 3))
+    
+    cat("\nOverall Accuracy:", round(overall_accuracy, 3), "\n")
+    sink()
+    
     }, error = function(e) {
-        cat("\nError in viterbi:", e$message)
-        cat("\nModel state at error:")
-        # str(model)
-        stop(e)
+    cat("\nError in viterbi:", e$message)
+    cat("\nModel state at error:")
+    # str(model)
+    stop(e)
     })
 
     # Save predictions to CSV
+    results_df$magnitude_var <- expm1(results_df$magnitude_var)
     predictions_file <- file.path(output_dir, "predictions.csv")
     write.csv(results_df, predictions_file, row.names = FALSE)
     cat("\nPredictions saved to:", predictions_file)
@@ -644,13 +627,27 @@ create_time_covariate <- function(posix_time, latitude, longitude, timezone) {
 }
 
 prepare_hmm_data <- function(data, states, time_covariate, config) {
+    # Sometimes the extreme outliers of mag_var cause issues with overflow. A kind of crude but
+    # effective fix is to substitue those values with unlikely, but relatively more likely values.  
 
-    max_magnitude_var = 10
+    max_magnitude_var <- 8
     if ("magnitude_var" %in% names(data)) {
-        data$magnitude_var <- pmin(data$magnitude_var, max_magnitude_var)
+
+
+        # outliers <- data$magnitude_var > max_magnitude_var
+        # if (any(outliers)) {
+        #     random_range <- 10
+        #     n_outliers <- sum(outliers)
+        #     random_values <- max_magnitude_var + rexp(n_outliers, 1/2)
+        #     data$magnitude_var[outliers] <- random_values
+            
+        #     ## Fixed cutoff value
+        #     # data$magnitude_var <- pmin(data$magnitude_var, max_magnitude_var)
+        # }
+
         
         # Optional: Add log transform to compress the range
-        # data$magnitude_var <- log1p(data$magnitude_var)  # log1p(x) = log(1 + x)
+        data$magnitude_var <- log1p(data$magnitude_var)  # log1p(x) = log(1 + x)
 
     }
     # max_magnitude_var = 8

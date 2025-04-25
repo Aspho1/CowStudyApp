@@ -328,51 +328,188 @@ class MoonPhasesGrazing:
         
 
 
+    # def _plot_individual_cow_responses(self, df):
+    #     # Focus on nighttime data where moon effects are strongest
+    #     night_data = df[df['is_night'] == 'Night']
+
+
+
+
+
+    #     TITLE_SIZE = 16
+    #     TICK_SIZE = 12
+    #     LABEL_SIZE = 10
+    #     STAR_SIZE = 8  # Slightly smaller for cow IDs since there are many
+
+    #     plt.rcParams.update({
+    #         'font.family': 'sans-serif',
+    #         'font.sans-serif': ['Arial', 'Helvetica', 'DejaVu Sans'],
+    #         'font.size': LABEL_SIZE,
+    #         'axes.titlesize': TITLE_SIZE,
+    #         'axes.labelsize': LABEL_SIZE,
+    #         'xtick.labelsize': TICK_SIZE,
+    #         'ytick.labelsize': TICK_SIZE,
+    #         'legend.fontsize': LABEL_SIZE,
+    #         'figure.titlesize': TITLE_SIZE
+    #     })
+
+
+
+
+
+
+
+    #     width_in_inches = 190/25.4
+    #     height_in_inches = width_in_inches * (.6) 
+    #     # Create figure
+    #     plt.figure(figsize=(width_in_inches, height_in_inches))
+        
+    #     # Define colors explicitly
+    #     colors = ['#34495e', '#f39c12']  # Dark blue for regular, gold for full moon
+        
+    #     # Create box plot for each cow
+    #     ax = sns.boxplot(
+    #         x='ID',
+    #         y='grazing_percentage',
+    #         hue='is_full_moon',
+    #         data=night_data,
+    #         palette=colors,  # Use our explicit colors
+    #         fliersize=0
+    #     )
+        
+    #     # Create custom legend handles with explicit colors
+    #     from matplotlib.patches import Patch
+    #     legend_elements = [
+    #         Patch(facecolor='#34495e', edgecolor='black', label='Non Full Moon'),
+    #         Patch(facecolor='#f39c12', edgecolor='black', label='Full Moon')
+    #     ]
+        
+    #     # Create custom legend with our explicit patches
+    #     plt.legend(
+    #         handles=legend_elements,
+    #         title='Moon Phase',
+    #         loc='upper right',
+    #         bbox_to_anchor=(1.0, 0.98),
+    #         framealpha=0.9
+    #     )
+        
+    #     # Customize plot
+    #     # plt.title('Individual Cow Nighttime Grazing Responses to Full Moons', fontsize=18)
+    #     plt.xlabel('Cow ID')
+    #     plt.ylabel('Proportion of Time Spent Grazing')
+    #     plt.ylim(0, 0.7)
+    #     # plt.grid(axis='y', alpha=0.4)
+    #     plt.grid(axis='x', alpha=0.4)
+        
+    #     # Perform statistical tests for each cow and annotate significant differences
+    #     for i, cow in enumerate(sorted(night_data['ID'].unique())):
+    #         cow_data = night_data[night_data['ID'] == cow]
+    #         full = cow_data[cow_data['is_full_moon']]['grazing_percentage']
+    #         reg = cow_data[~cow_data['is_full_moon']]['grazing_percentage']
+            
+    #         if len(full) > 5 and len(reg) > 5:  # Only test if we have enough data
+    #             _, p = stats.ttest_ind(full, reg)
+    #             if p < 0.05:
+    #                 sig = '*'
+    #                 if p < 0.01: 
+    #                     sig = '**'
+    #                     if p < 0.001: 
+    #                         sig = '***'
+    #                 # Position stars slightly lower to avoid legend overlap
+    #                 ax.annotate(sig, xy=(i, 0.5), ha='center', fontsize=STAR_SIZE)
+    #                 # ax.annotate(sig, xy=(i, full.quantile(.80) + 0.05), ha='center', fontsize=14)
+    #                 # ax.annotate(sig, xy=(i, 0.95), ha='center', fontsize=14)
+        
+    #     plt.tight_layout()
+    #     plt.savefig(
+    #         os.path.join(self.config.visuals.visuals_root_path, 'moon_grazing_individual_cows.png'),
+    #         bbox_inches='tight',
+    #         dpi=300
+    #     )
+    #     plt.close()
+
+
     def _plot_individual_cow_responses(self, df):
         # Focus on nighttime data where moon effects are strongest
         night_data = df[df['is_night'] == 'Night']
         
-        # Create figure
-        plt.figure(figsize=(15, 8))
+        # Set publication-quality parameters
+        TITLE_SIZE = 14
+        AXIS_LABEL_SIZE = 12 
+        TICK_SIZE = 10
+        LEGEND_SIZE = 10
+        STAR_SIZE = 12  # Make significance stars more visible
         
-        # Define colors explicitly
+        # Set consistent font settings for publication
+        plt.rcParams.update({
+            'font.family': 'sans-serif',
+            'font.sans-serif': ['Arial', 'Helvetica', 'DejaVu Sans'],
+            'font.size': AXIS_LABEL_SIZE,
+            'axes.titlesize': TITLE_SIZE,
+            'axes.labelsize': AXIS_LABEL_SIZE,
+            'xtick.labelsize': TICK_SIZE,
+            'ytick.labelsize': TICK_SIZE,
+            'legend.fontsize': LEGEND_SIZE,
+            'figure.titlesize': TITLE_SIZE
+        })
+        
+        # Publication-width figure (190mm)
+        width_in_inches = 190/25.4
+        height_in_inches = width_in_inches * 0.5  # Slightly shorter to reduce white space
+        
+        # Create figure
+        fig, ax = plt.subplots(figsize=(width_in_inches, height_in_inches), dpi=300)
+        
+        # Define professional-looking colors
         colors = ['#34495e', '#f39c12']  # Dark blue for regular, gold for full moon
         
-        # Create box plot for each cow
-        ax = sns.boxplot(
+        # Create box plot with thinner lines and cleaner appearance
+        sns.boxplot(
             x='ID',
             y='grazing_percentage',
             hue='is_full_moon',
             data=night_data,
-            palette=colors,  # Use our explicit colors
-            fliersize=0
+            palette=colors,
+            fliersize=0,  # No outlier points
+            width=0.7,    # Slightly narrower boxes
+            linewidth=0.8,  # Thinner lines
+            ax=ax
         )
         
-        # Create custom legend handles with explicit colors
+        # Create custom legend with cleaner look
         from matplotlib.patches import Patch
         legend_elements = [
-            Patch(facecolor='#34495e', edgecolor='black', label='Non Full Moon'),
-            Patch(facecolor='#f39c12', edgecolor='black', label='Full Moon')
+            Patch(facecolor='#34495e', edgecolor='black', linewidth=0.8, label='Non Full Moon'),
+            Patch(facecolor='#f39c12', edgecolor='black', linewidth=0.8, label='Full Moon')
         ]
         
-        # Create custom legend with our explicit patches
+        # Add legend with better positioning
         plt.legend(
             handles=legend_elements,
             title='Moon Phase',
             loc='upper right',
-            bbox_to_anchor=(1.0, 0.98),
-            framealpha=0.9
+            bbox_to_anchor=(1.0, 1.0),
+            framealpha=1.0,
+            edgecolor='black',
+            fancybox=False,
+            borderpad=0.7
         )
         
-        # Customize plot
-        plt.title('Individual Cow Nighttime Grazing Responses to Full Moons', fontsize=18)
-        plt.xlabel('Cow ID', fontsize=16)
-        plt.ylabel('Proportion of Time Spent Grazing', fontsize=16)
-        plt.ylim(0, 0.65)
-        # plt.grid(axis='y', alpha=0.4)
-        plt.grid(axis='x', alpha=0.4)
+        # Customize plot - cleaner labels and grid
+        ax.set_xlabel('Cow ID', fontsize=AXIS_LABEL_SIZE)
+        ax.set_ylabel('Proportion of Time Spent Grazing', fontsize=AXIS_LABEL_SIZE)
         
-        # Perform statistical tests for each cow and annotate significant differences
+        # Set consistent y-axis limits
+        ax.set_ylim(0, 0.75)
+        
+        # Add subtle grid lines only on y-axis
+        ax.grid(axis='y', alpha=0.4, linestyle='--', linewidth=0.5)
+        
+        # Customize x-axis to make IDs more readable
+        plt.xticks(rotation=45, ha='right')  # Keep horizontal for readability
+        ax.tick_params(axis='x', which='major', pad=-2)
+        
+        # Perform statistical tests and add significance stars
         for i, cow in enumerate(sorted(night_data['ID'].unique())):
             cow_data = night_data[night_data['ID'] == cow]
             full = cow_data[cow_data['is_full_moon']]['grazing_percentage']
@@ -380,18 +517,31 @@ class MoonPhasesGrazing:
             
             if len(full) > 5 and len(reg) > 5:  # Only test if we have enough data
                 _, p = stats.ttest_ind(full, reg)
+                
+                # Determine significance level
+                sig = ''
                 if p < 0.05:
                     sig = '*'
-                    if p < 0.01: 
-                        sig = '**'
-                        if p < 0.001: 
-                            sig = '***'
-                    # Position stars slightly lower to avoid legend overlap
-                    ax.annotate(sig, xy=(i, 0.5), ha='center', fontsize=14)
-                    # ax.annotate(sig, xy=(i, full.quantile(.80) + 0.05), ha='center', fontsize=14)
-                    # ax.annotate(sig, xy=(i, 0.95), ha='center', fontsize=14)
+                if p < 0.01:
+                    sig = '**'
+                if p < 0.001:
+                    sig = '***'
+                    
+                # Position stars at a consistent height above the boxes
+                if sig:  # Only add annotation if significant
+                    ax.annotate(
+                        sig, 
+                        xy=(i, 0.5),  # Consistent position for all stars 
+                        ha='center', 
+                        va='center',
+                        fontsize=STAR_SIZE,
+                        fontweight='bold'  # Make stars bold for better visibility
+                    )
         
-        plt.tight_layout()
+        # Add tight layout with slight padding
+        plt.tight_layout(pad=1.2)
+        
+        # Save figure
         plt.savefig(
             os.path.join(self.config.visuals.visuals_root_path, 'moon_grazing_individual_cows.png'),
             bbox_inches='tight',

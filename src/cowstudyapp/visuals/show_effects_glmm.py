@@ -13,30 +13,71 @@ from matplotlib.colors import LinearSegmentedColormap
 import seaborn as sns
 
 
+
+os.environ['R_HOME'] = "C:\Program Files\R\R-4.4.3"
+from pymer4.models import Lmer
+import rpy2.robjects as robjects
+import rpy2
+
 from cowstudyapp.utils import from_posix_col
 from cowstudyapp.config import ConfigManager
 
-os.environ['R_HOME'] = 'C:\Program Files\R\R-4.4.1'
-
-from pymer4.models import Lmer
 
 
 
-# Performance optimizations (unchanged)
+
 def optimize_r_performance():
     try:
-        import rpy2.robjects as ro
+
+        print(f"rpy2 version: {rpy2.__version__}")
+        print(f"Current R_HOME: {os.environ.get('R_HOME', 'Not set')}")
+        print(f"Python executable: {sys.executable}")
+
+        print("-"*80)
+
+        r_version = robjects.r('R.version.string')
+        print(f"R version: {r_version[0]}")
+        
+        # Force reinstallation of both Matrix and lme4 in the correct order
+        robjects.r('''
+            # First remove existing packages if they exist
+            # if(requireNamespace("lme4", quietly = TRUE)) {
+            #     remove.packages("lme4")
+            # }
+            # if(requireNamespace("Matrix", quietly = TRUE)) {
+            #     remove.packages("Matrix")
+            # }
+            
+            # # Install Matrix first
+            # install.packages("https://cran.r-project.org/src/contrib/Archive/Matrix/Matrix_1.5-3.tar.gz", 
+            #                 repos=NULL, type="source")
+            # utils::install.packages("Matrix", type = "source")
+            # install.packages("Matrix", dependencies=TRUE, type="source")            
+            library(Matrix)
+            # # Then install lme4 from source (this will build it against the Matrix we just installed)
+            # install.packages("lme4", dependencies=TRUE, type="source")            
+            # utils::install.packages("lme4", type = "source")
+            library(lme4)
+            
+            # Optional: verify installation
+            message("Matrix version: ", packageVersion("Matrix"))
+            message("lme4 version: ", packageVersion("lme4"))
+        ''')
+        
         # Use multiple cores for BLAS operations
-        ro.r('library(parallel)')
+        robjects.r('library(parallel)')
         cores = max(1, multiprocessing.cpu_count() - 1)
-        ro.r(f'options(mc.cores = {cores})')
+        robjects.r(f'options(mc.cores = {cores})')
         
         # Set BLAS/LAPACK threading
-        ro.r('Sys.setenv(OMP_NUM_THREADS = 6)')  # Adjust based on your system
+        robjects.r('Sys.setenv(OMP_NUM_THREADS = 12)')
         
         print("R performance optimizations applied")
     except Exception as e:
         print(f"Could not optimize R performance: {e}")
+        print(f"Error details: {str(e)}")
+
+
 
 class TermSelector:
     """Class to handle model term selection using a correlation matrix format"""
@@ -575,7 +616,9 @@ class BehaviorAnalyzer:
         self.model_builder = BehaviorModelBuilder(config)
         self.term_selector = TermSelector()
 
+        os.environ['R_HOME'] = str(self.config.analysis.r_executable.parent.parent)
 
+        
         # Display mappings for variable names
         self.display_map = {
             'temp_z': 'Temperature',
@@ -684,7 +727,7 @@ class BehaviorAnalyzer:
         
         # Sample data if necessary
         if len(prepared_df) > 50000:
-            sample_frac = .5
+            sample_frac = 1
             print(f"Using a {sample_frac*100:.0f}% random sample ({len(prepared_df)} -> {int(len(prepared_df)*sample_frac)} rows)")
             prepared_df = prepared_df.sample(frac=sample_frac, random_state=42)
         
@@ -856,7 +899,8 @@ class BehaviorAnalyzer:
         #################### END ORTHOGONAL POLYNOMIALS
 
         #################### TEMPORARY VIF CALCULATIONS
-        print(clean_df.head())
+        print(type(clean_df))
+        print(clean_df)
         print(clean_df.columns)
         X = clean_df[['temp_z', 'time_z', 'time_z_sq', 'time_z_cub', 'time_z_qrt', 'hod_z']]
         X['temp_time'] = X['time_z'] * X['temp_z']
@@ -1549,10 +1593,13 @@ class BehaviorAnalyzer:
             # Get standardization info for interpretation
             means = period_results['standardization_info']['means']
             stds = period_results['standardization_info']['stds']
+    
+            width_in_inches = 190/25.4
+            height_in_inches = width_in_inches * 0.5  # Slightly shorter to reduce white space
             
             # Create a figure with subplots for each state
             fig, axes = plt.subplots(nrows=1, ncols=len(self.config.analysis.hmm.states), 
-                                    figsize=(16, 6), sharey=True)
+                                    figsize=(width_in_inches, height_in_inches), sharey=True)
             fig.suptitle(f"Predicted Behavior Probabilities - {period.capitalize()}", fontsize=16)
             
             # Create a color palette for temperature lines
@@ -1601,8 +1648,8 @@ class BehaviorAnalyzer:
                 
                 # Format x-axis with hour labels
                 ax.set_xticks(np.linspace(hour_min, hour_max, 7))
-                ax.set_xticklabels([f"{int(h)}:00" for h in np.linspace(hour_min, hour_max, 7)])
-                
+                ax.set_xticklabels([f"{int(h)}h" for h in np.linspace(hour_min, hour_max, 7)])
+                ax.tick_params(axis='x', rotation = 90)
                 if i == 0:
                     ax.set_ylabel("Probability")
                     
@@ -1661,7 +1708,7 @@ class BehaviorAnalyzer:
             
             # Adjust layout
             plt.tight_layout()
-            fig.subplots_adjust(top=0.88)
+            fig.subplots_adjust(top=0.84)
             
             # Save the figure if requested
             if save_path:

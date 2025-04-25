@@ -18,7 +18,6 @@ features <- c('step', 'magnitude_mean', 'magnitude_var')
 # selected_model <- rb19_model
 
 
-
 # valid_states <- selected_model$model$stateNames
 valid_states <- c("Resting","Grazing", "Traveling")
 

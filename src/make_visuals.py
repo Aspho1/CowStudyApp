@@ -44,13 +44,13 @@ def generate_plots(config, predictions_dataset, target_dataset):
 
 
     #############################################################################
-    # if config.visuals.!!!!!!!!!!!!!!.run:
-    from cowstudyapp.visuals.show_feature_distr import Feature_Plotter
-    fp = Feature_Plotter(config=config)
-    # fp.generate_plot(predictions_dataset, output_dir=output_dir)
-    # fp.plot_ecdf_comparison(predictions_dataset, output_dir=output_dir)
-    # fp.plot_publication_cdf_comparison(predictions_dataset, output_dir=output_dir)
-    fp.plot_publication_cdf_comparison_all_4(predictions_dataset, output_dir=output_dir)
+    if config.visuals.feature_dists.run:
+        from cowstudyapp.visuals.show_feature_distr import Feature_Plotter
+        fp = Feature_Plotter(config=config)
+        # fp.generate_plot(predictions_dataset, output_dir=output_dir)
+        # fp.plot_ecdf_comparison(predictions_dataset, output_dir=output_dir)
+        # fp.plot_publication_cdf_comparison(predictions_dataset, output_dir=output_dir)
+        fp.plot_publication_cdf_comparison_all_4(predictions_dataset, output_dir=output_dir)
 
 
     #############################################################################
@@ -64,8 +64,8 @@ def generate_plots(config, predictions_dataset, target_dataset):
     if config.visuals.radar.run:
         from cowstudyapp.visuals.show_radar_plots import RadarPlotOfCow
         radar = RadarPlotOfCow(config=config)
-        radar.make_cow_gallery_images(df=predictions_dataset)
-
+        # radar.make_cow_gallery_images(df=predictions_dataset)
+        radar.make_radar_TWO_cows(df=predictions_dataset, show=True)
 
     #############################################################################
     if config.visuals.cow_info_graph.run:
@@ -96,14 +96,16 @@ def generate_plots(config, predictions_dataset, target_dataset):
 
 
 
-        ######################## 3D Plot ########################
-        # from cowstudyapp.visuals.show_temp_vs_grazing_new import ActivityVersusTemperatureNew
-        # gvt = ActivityVersusTemperatureNew(config=config, fit_method='best', degree=5, state='Grazing')
-        # # gvt = GrazingVersusTemperatureNew(config=config, fit_method='gpr')
+    ######################## 3D Plot ########################
+    if config.visuals.convolution_surface.run:
+        from cowstudyapp.visuals.show_temp_vs_grazing_new import ActivityVersusTemperatureNew
+        gvt = ActivityVersusTemperatureNew(config=config, degree=5, state='Grazing')
+        # gvt = GrazingVersusTemperatureNew(config=config, fit_method='gpr')
         # gvt.plot_3d_surface(predictions_dataset)
+        gvt.plot_3d_surface_publication(predictions_dataset)
         
         
-        # Analyze the fitted surface
+        # # Analyze the fitted surface
         # model, pivot_state = gvt.plot_fitted_surface(predictions_dataset)
         # gvt.analyze_fitted_surface(model, pivot_state)
 
