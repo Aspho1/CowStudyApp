@@ -194,7 +194,7 @@ def get_r_dist_name(dist_type: DistributionTypes) -> str:
 
 
 def create_analysis_directories(
-    base_dir: Path, features: list, analysis_type: str, dataset_name: str
+    base_dir: Path, features: list, analysis_type: str, dataset_name: str, subdirs: bool = True
 ) -> dict:
     """
     Create directory structure for HMM analysis outputs
@@ -219,6 +219,7 @@ def create_analysis_directories(
     # Create directory structure
     analysis_dir = base_dir / analysis_type / (dataset_name + "_" + timestamp)
 
+    # if subdirs == True:
     # Create subdirectories
     plots_dir = analysis_dir / "plots"
     dist_plots_dir = plots_dir / "distributions"
@@ -370,18 +371,19 @@ def run_lstm_analysis(config: ConfigManager, target_data_path: Path, output_dir:
         if analysis.lstm is None:
             raise ValueError("ERROR: Missing required LSTM section in analysis config")  
     
-        dirs = create_analysis_directories(
-            base_dir=output_dir,
-            features=analysis.lstm.features,
-            analysis_type=analysis.mode,
-            dataset_name=analysis.dataset_name,
-        )
+        # dirs = create_analysis_directories(
+        #     base_dir=output_dir,
+        #     features=analysis.lstm.features,
+        #     analysis_type=analysis.mode,
+        #     dataset_name=analysis.dataset_name,
+        # )
 
         lstm = LSTM_Model(config=config)
 
         # print(analysis.mode)
         if analysis.mode == AnalysisModes.LOOCV:
-            lstm.do_loocv()
+            # lstm.do_loocv()
+            lstm.dont_do_loocv()
             pass
 
         elif analysis.mode == AnalysisModes.PRODUCT:
@@ -404,11 +406,11 @@ if __name__ == "__main__":
     config = ConfigManager.load(config_path)
 
     # Set up logging with more detail
-    logging.basicConfig(
-        level=logging.DEBUG,  # Change to DEBUG for more detail
-        # format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        format="%(message)s",
-    )
+    # logging.basicConfig(
+    #     level=logging.DEBUG,  # Change to DEBUG for more detail
+    #     # format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    #     format="%(message)s",
+    # )
 
     logging.info("Starting analysis...")
 

@@ -196,7 +196,7 @@ analysis:
     max_length: 'daily'
     # max_length: 20
     max_time_gap: -1
-    epochs: 100
+    epochs: 50
 
 
 visuals:
