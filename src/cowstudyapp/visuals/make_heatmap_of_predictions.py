@@ -245,7 +245,7 @@ class HeatMapMaker:
         # vmin, vmax = (1/3)*c, (5/3)*c  # Narrower range around 33
         # vmin, vmax = 0, 100  # Narrower range around 33
         cmap = sns.diverging_palette(250, 30, l=60, s=80, center="light", as_cmap=True)
-        sns.heatmap(
+        heatmap = sns.heatmap(
             heatmap_data, 
             annot=False, 
             fmt=".0f", 
@@ -259,7 +259,8 @@ class HeatMapMaker:
             ax=ax
         )
         
-        
+        cbar = heatmap.collections[0].colorbar
+        cbar.set_ticklabels([f'{x:.0f}%' for x in cbar.get_ticks()])
         
         ax.tick_params(axis='y', labelsize=12)
         # ax.set_xticks([x + 0.5 for x in range(len(heatmap_data.columns))])
@@ -275,9 +276,9 @@ class HeatMapMaker:
         ax.set_xticks(x_tick_positions)
         ax.set_xticklabels(x_tick_labels, rotation=45, ha='right', fontsize=10)
 
+        ax.set_yticks([])
 
-
-
+        ax.set_yticklabels([])
         ax.set_xlabel("Date", fontsize=14)
         ax.set_ylabel("Cow ID", fontsize=14)
         plt.savefig(os.path.join(self.config.visuals.visuals_root_path, 'heatmap_of_grazing.png'), dpi=300)

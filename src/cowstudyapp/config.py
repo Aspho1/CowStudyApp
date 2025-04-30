@@ -364,7 +364,7 @@ class LSTMConfig(CommonConfig):
     states: List[str]
     features: List[str]
 
-    max_length: int = 20
+    max_length: int|str = 20
     max_time_gap: int = 960
     epochs: int = 100
 

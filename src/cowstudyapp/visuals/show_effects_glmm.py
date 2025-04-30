@@ -14,7 +14,7 @@ import seaborn as sns
 
 
 
-os.environ['R_HOME'] = "C:\Program Files\R\R-4.4.3"
+os.environ['R_HOME'] = "C:\\Program Files\\R\\R-4.4.3"
 from pymer4.models import Lmer
 import rpy2.robjects as robjects
 import rpy2
@@ -878,42 +878,22 @@ class BehaviorAnalyzer:
         }
         
 
-
-
-
-
-
-
-
-        #################### TEMPORARY ORTHOGONAL POLYNOMIALS
-
-        # # Generate orthogonal polynomial terms
-        # poly_terms = np.polynomial.polynomial.polyvander(clean_df['time_z'], 4)
-        # q, _ = np.linalg.qr(poly_terms)  # QR decomposition to orthogonalize terms
-
-        # # q columns are orthogonal polynomial predictors
-        # clean_df['time_z'] = q[:, 1]
-        # clean_df['time_z_sq'] = q[:, 2]
-        # clean_df['time_z_cub'] = q[:, 3]
-        # clean_df['time_z_qrt'] = q[:, 4]
-        #################### END ORTHOGONAL POLYNOMIALS
-
         #################### TEMPORARY VIF CALCULATIONS
-        print(type(clean_df))
-        print(clean_df)
-        print(clean_df.columns)
-        X = clean_df[['temp_z', 'time_z', 'time_z_sq', 'time_z_cub', 'time_z_qrt', 'hod_z']]
-        X['temp_time'] = X['time_z'] * X['temp_z']
-        X['temp_time_4'] = X['time_z_qrt'] * X['temp_z']
-        import statsmodels.api as sm
-        X = sm.add_constant(X)
+        # print(type(clean_df))
+        # print(clean_df)
+        # print(clean_df.columns)
+        # X = clean_df[['temp_z', 'time_z', 'time_z_sq', 'time_z_cub', 'time_z_qrt', 'hod_z']]
+        # X['temp_time'] = X['time_z'] * X['temp_z']
+        # X['temp_time_4'] = X['time_z_qrt'] * X['temp_z']
+        # import statsmodels.api as sm
+        # X = sm.add_constant(X)
 
-        # Calculate VIF
-        from statsmodels.stats.outliers_influence import variance_inflation_factor
-        vif_df = pd.DataFrame()
-        vif_df['Variable'] = X.columns
-        vif_df['VIF'] = [variance_inflation_factor(X.values, i) for i in range(X.shape[1])]
-        print(vif_df)
+        # # Calculate VIF
+        # from statsmodels.stats.outliers_influence import variance_inflation_factor
+        # vif_df = pd.DataFrame()
+        # vif_df['Variable'] = X.columns
+        # vif_df['VIF'] = [variance_inflation_factor(X.values, i) for i in range(X.shape[1])]
+        # print(vif_df)
 
         # return
 
@@ -1600,7 +1580,7 @@ class BehaviorAnalyzer:
             # Create a figure with subplots for each state
             fig, axes = plt.subplots(nrows=1, ncols=len(self.config.analysis.hmm.states), 
                                     figsize=(width_in_inches, height_in_inches), sharey=True)
-            fig.suptitle(f"Predicted Behavior Probabilities - {period.capitalize()}", fontsize=16)
+            # fig.suptitle(f"Predicted Behavior Probabilities - {period.capitalize()}", fontsize=16)
             
             # Create a color palette for temperature lines
             by_colors = sns.color_palette("coolwarm", n_colors=5)

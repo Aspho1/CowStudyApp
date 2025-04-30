@@ -6,6 +6,7 @@ from cowstudyapp.config import (
     HMMConfig,
     LSTMConfig,
     DistributionTypes,
+    AnalysisModes
 )
 from pathlib import Path
 import subprocess
@@ -376,7 +377,16 @@ def run_lstm_analysis(config: ConfigManager, target_data_path: Path, output_dir:
             dataset_name=analysis.dataset_name,
         )
 
-        lstm = LSTM_Model(config=analysis)
+        lstm = LSTM_Model(config=config)
+
+        # print(analysis.mode)
+        if analysis.mode == AnalysisModes.LOOCV:
+            lstm.do_loocv()
+            pass
+
+        elif analysis.mode == AnalysisModes.PRODUCT:
+            pass
+
 
         logging.info("HMM analysis completed successfully")
 
