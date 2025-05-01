@@ -361,6 +361,9 @@ class TrainingInfo(BaseModel):
 class LSTMConfig(CommonConfig):
 
     enabled: bool = False
+
+    ops: bool = True
+
     states: List[str]
     features: List[str]
 

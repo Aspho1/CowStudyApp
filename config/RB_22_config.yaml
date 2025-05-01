@@ -183,6 +183,8 @@ analysis:
           - "WRAPPEDCAUCHY"
 
   lstm:
+    ops: true
+
     enabled: true
     states: # The states to use in the LSTM
       - "Grazing"
@@ -193,9 +195,9 @@ analysis:
       - "angle"
       - "magnitude_mean"
       - "magnitude_var"
-    max_length: 'daily'
-    # max_length: 20
-    max_time_gap: -1
+    # max_length: 'daily'
+    max_length: 20
+    max_time_gap: 960
     epochs: 50
 
 

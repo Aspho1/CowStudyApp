@@ -10,10 +10,13 @@ import numpy as np
 # from keras.models import Sequential
 # from keras.layers import Dense, LSTM, Dropout, Masking
 
-import tensorflow as tf
+# import tensorflow as tf
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, LSTM, Dropout, Masking, Input, BatchNormalization, Conv1D
-
+from tensorflow.keras.layers import Dense, LSTM, Dropout, Masking, Input, BatchNormalization, Conv1D, TimeDistributed, Flatten, GlobalAveragePooling1D
+from tensorflow.keras.callbacks import EarlyStopping, TensorBoard, ReduceLROnPlateau
+from tensorflow.keras.optimizers.schedules import ExponentialDecay
+from tensorflow.keras.losses import SparseCategoricalCrossentropy
+from tensorflow.random import set_seed
 
 from sklearn.preprocessing import StandardScaler
 # from sklearn.utils.class_weight import compute_class_weight
@@ -39,14 +42,117 @@ class LSTM_Model:
         self.activity_map = {"Grazing": 0, "Resting":1, "Traveling": 2, np.nan:-1}
         self.inv_activity_map = {self.activity_map[k]: k for k in self.activity_map.keys()}
 
+        self.nfeatures = len(self.config.analysis.lstm.features)
+        self.nclasses = len(self.config.analysis.lstm.states)
 
-        tf.random.set_seed(self.config.analysis.random_seed)
+        if self.config.analysis.lstm.max_length == 'daily':
+            max_length = 288
+        else:
+            max_length = self.config.analysis.lstm.max_length 
+        self.sequence_length = max_length
+
+
+        set_seed(self.config.analysis.random_seed)
         np.random.seed(self.config.analysis.random_seed)
         self.masking_val = -9999
+
+        self.layers = [
+            Input((self.sequence_length, self.nfeatures)),
+            Masking(mask_value=self.masking_val),
+            
+            # Conv1D layers to capture local patterns
+            # Conv1D(filters=64, kernel_size=3, padding='same', activation='relu'),
+            # BatchNormalization(),
+            # Flatten(),
+            # GlobalAveragePooling1D(),
+
+            # Dense(128, activation='relu'),
+            # Dropout(0.3),
+            # Dense(len(self.config.analysis.lstm.states), activation='softmax'),
+            # Conv1D(filters=128, kernel_size=3, padding='same', activation='relu'),
+            # BatchNormalization(),     
+            # # Single LSTM layer with more units
+
+            # LSTM(128, 
+            #     return_sequences=True,
+            #     # activation='tanh',
+            #     # recurrent_activation='sigmoid',
+            #     dropout=0.2,
+            #     # recurrent_dropout=0.2,
+            #     ),          
+            LSTM(64, 
+                return_sequences=True,
+                # activation='tanh',
+                # recurrent_activation='sigmoid',
+                dropout=0.2,
+                recurrent_dropout=0.2,
+                ),          
+            ]
+
+
+    def run_LSTM(self):
+
+        df = self._get_target_dataset(add_step_and_angle=True)
+        required_cols: List[str] = self.config.analysis.lstm.features + ["posix_time", "date", 'device_id', 'activity']
+        print(required_cols)
+        df = self._normalize_features(df, self.config.analysis.lstm.features)
+        df = df[required_cols].copy()
+
+        # Build either a One per observation or one per sequence label set. 
+        if self.config.analysis.lstm.ops:
+            sequences = self._build_sequences_ops(df) 
+            # print("!"*100)
+            # print(sequences["X"][8])
+            self.layers.extend([
+            Dense(64, activation='relu'),
+            Dropout(0.3),
+            Dense(len(self.config.analysis.lstm.states), activation='softmax')
+            ])
+
+
+        else:
+            sequences = self._build_sequences_opo(df)
+            self.layers.extend([
+            # Time distributed layers
+            TimeDistributed(Dense(64, activation='relu')),
+            TimeDistributed(Dropout(0.2)),
+            TimeDistributed(Dense(self.nclasses, activation='softmax'))
+        ])
+
+
+        # # Enable mixed precision to speed up computations
+        # if tf.config.list_physical_devices('GPU'):
+        #     print("Using GPU with mixed precision")
+        #     policy = tf.keras.mixed_precision.Policy('mixed_float16')
+        #     tf.keras.mixed_precision.set_global_policy(policy)
+        # else:
+        #     # Attempt to optimize CPU operations
+        #     try:
+        #         # Set number of threads for parallel processing
+        #         tf.config.threading.set_intra_op_parallelism_threads(8)
+        #         tf.config.threading.set_inter_op_parallelism_threads(8)
+        #     except:
+        #         print("Could not set parallelism threads.")
+        
+
+        # Do either LOOCV or product
+        if self.config.analysis.mode == "LOOCV":
+            self.do_loocv(sequences=sequences, df=df)
+            pass
+
+        elif self.config.analysis.mode == "PRODUCT":
+            self.dont_do_loocv(sequences=sequences, df=df)
+            pass
+
+        else:
+            raise ValueError(f"Unknown config mode {self.config.analysis.mode}.")
+
 
 
     def _get_target_dataset(self, add_step_and_angle=True):
         df = pd.read_csv(self.config.analysis.target_dataset)
+
+        print(df.activity.unique())
         step_size = self.config.analysis.gps_sample_interval//60
         dfs = []
         
@@ -126,7 +232,7 @@ class LSTM_Model:
         return df_out
 
 
-    def normalize_features(self, df, features):
+    def _normalize_features(self, df, features):
         """Normalize features before sequence building"""
         
         scaler = StandardScaler()
@@ -141,7 +247,7 @@ class LSTM_Model:
 
 
     def _build_sequences_opo(self, df:pd.DataFrame):
-        max_length = self.config.analysis.lstm.max_length
+        max_length = self.sequence_length
         features = self.config.analysis.lstm.features
         step_size = self.config.analysis.gps_sample_interval//60  # Sample interval in minutes
 
@@ -150,7 +256,7 @@ class LSTM_Model:
         self.sequence_length = expected_records
 
         lost_hour = (60//step_size)
-        if max_length == 'daily':
+        if max_length == 288:
             Cow_Date_Key = []
             X = []
             Y = []
@@ -195,62 +301,87 @@ class LSTM_Model:
             return {
                 'Cow_Date_Key': Cow_Date_Key,
                 'X': X,
-                'Y': Y,
+                'Y': Y.squeeze(axis=2),
             }
 
         # else:
 
 
-    def dont_do_loocv(self):
+    def _build_sequences_ops(self, df:pd.DataFrame):
+        """
+        # LOOK INTO RAGGED
+        Build sequences for many-to-one classification with zero padding.
+        Each sequence predicts the activity at its last timestamp.
+        """
 
 
+        # sequences = {}
+        
+        Cow_Date_Key = []
+        X = []
+        Y = []
 
-        df = self._get_target_dataset()
-        
-        # Enable mixed precision to speed up computations
-        if tf.config.list_physical_devices('GPU'):
-            print("Using GPU with mixed precision")
-            policy = tf.keras.mixed_precision.Policy('mixed_float16')
-            tf.keras.mixed_precision.set_global_policy(policy)
-        else:
-            # Attempt to optimize CPU operations
-            try:
-                # Set number of threads for parallel processing
-                tf.config.threading.set_intra_op_parallelism_threads(8)
-                tf.config.threading.set_inter_op_parallelism_threads(8)
-            except:
-                print("Could not set parallelism threads.")
-        
-        
 
-        required_cols: List[str] = self.config.analysis.lstm.features + ["posix_time", "date", 'device_id', 'activity']
-        print(required_cols)
-        df = self.normalize_features(df, self.config.analysis.lstm.features)
-        df = df[required_cols].copy()
-        
-        print(df.columns)
-        self.nfeatures = len(self.config.analysis.lstm.features)
-        self.nclasses = len(self.config.analysis.lstm.states)
-        
-        sequences = self._build_sequences_opo(df)
-        
+        for device_id, data in df.groupby("device_id"):
+            # sequences = []  # List of observation sequences
+            # labels = []    # List of activity labels
+            current_sequence = []
+            
+            for i in range(len(data)):
+                row = data.iloc[i]
+                current_features = []
+                # Get feature values for current observation
+                for f in self.config.analysis.lstm.features:
+                    if pd.isna(row[f]):
+                        current_features.append(self.masking_val)
+                    else:
+                        current_features.append(float(row[f]))
+                # current_features = [row[f] if row[f] != np.float64(np.nan) else self.masking_val]
+                # print(current_features)
+                # return
+                # Start new sequence if:
+                # 1. First record
+                # 2. Time gap too large (using posix_time)
+                if (i == 0) or (data.iloc[i]['posix_time'] - data.iloc[i-1]['posix_time'] > self.config.analysis.lstm.max_time_gap):
+                    current_sequence = []
+                
+                # Add current observation to sequence
+                current_sequence.append(current_features)
+                
+                # Keep only last max_length observations
+                if len(current_sequence) > self.sequence_length:
+                    current_sequence = current_sequence[-self.sequence_length:]
+                
+                # Create padded sequence
+                padded_sequence = np.zeros((self.sequence_length, len(self.config.analysis.lstm.features)))
+                start_idx = self.sequence_length - len(current_sequence)
+                padded_sequence[start_idx:] = current_sequence
+
+                # for seq_idx, feature_vector in enumerate(current_sequence):
+                #     padded_sequence[start_idx + seq_idx] = feature_vector
+
+                Cow_Date_Key.append([device_id, i])
+                X.append(padded_sequence)
+                # print(row['activity'])
+                Y.append(self.activity_map.get(row['activity'], -1))
+
+        Cow_Date_Key = np.array(Cow_Date_Key)
+        X = np.array(X, dtype=np.float32)  # Ensure float32 for X
+        Y = np.array(Y, dtype=np.int32)    # Ensure int32 for Y
+
+        return {
+            'Cow_Date_Key': Cow_Date_Key,
+            'X': X,
+            'Y': Y,
+        }
+
+    def dont_do_loocv(self, sequences, df):        
         Cow_Date_Key = sequences['Cow_Date_Key']
         X = sequences['X']
-        Y = sequences['Y'].squeeze(axis=2)
-        
-
-
-
-
-
-
+        Y = sequences['Y'] #.squeeze(axis=2)
+    
         val_split = 0.2
 
-        sequences = self._build_sequences_opo(df)
-        Cow_Date_Key = sequences['Cow_Date_Key']
-        X = sequences['X']
-        Y = sequences['Y'].squeeze(axis=2)
-        
         # Calculate label density for each sequence
         label_density = []
         for i in range(len(Y)):
@@ -283,13 +414,6 @@ class LSTM_Model:
         val_label_count = np.sum(val_Y != self.activity_map[np.nan])
         print(f"Training set: {len(train_X)} sequences with {train_label_count} labeled timesteps")
         print(f"Validation set: {len(val_X)} sequences with {val_label_count} labeled timesteps")
-
-
-
-
-
-
-
 
 
         # Create output directory for models
@@ -332,40 +456,11 @@ class LSTM_Model:
         return model, history
     
 
-
-
-    def do_loocv(self):
-        df = self._get_target_dataset()
-        
-        required_cols: List[str] = self.config.analysis.lstm.features + ["posix_time", "date", 'device_id', 'activity']
-        print(required_cols)
-        df = self.normalize_features(df, self.config.analysis.lstm.features)
-        df = df[required_cols].copy()
-        
-        print(df.columns)
-        self.nfeatures = len(self.config.analysis.lstm.features)
-        self.nclasses = len(self.config.analysis.lstm.states)
-        
-        sequences = self._build_sequences_opo(df)
-        
+    def do_loocv(self, sequences, df):     
         Cow_Date_Key = sequences['Cow_Date_Key']
         X = sequences['X']
-        Y = sequences['Y'].squeeze(axis=2)
-        
-        # Enable mixed precision to speed up computations
-        if tf.config.list_physical_devices('GPU'):
-            print("Using GPU with mixed precision")
-            policy = tf.keras.mixed_precision.Policy('mixed_float16')
-            tf.keras.mixed_precision.set_global_policy(policy)
-        else:
-            # Attempt to optimize CPU operations
-            try:
-                # Set number of threads for parallel processing
-                tf.config.threading.set_intra_op_parallelism_threads(8)
-                tf.config.threading.set_inter_op_parallelism_threads(8)
-            except:
-                print("Could not set parallelism threads.")
-        
+        Y = sequences['Y'] #.squeeze(axis=2)
+
         # For storing results
         all_predictions = []
         all_actual = []
@@ -375,14 +470,10 @@ class LSTM_Model:
         # Create output directory for models
         output_dir = Path(self.config.analysis.output_dir) / "lstm_models"
         output_dir.mkdir(exist_ok=True, parents=True)
-        
-
-
-
 
         for i, test_cow in enumerate(df.device_id.unique()):
             print(f"\n==== Training model for test cow {test_cow} ({i+1}/{len(df.device_id.unique())}) ====")
-            
+
             test_idx = Cow_Date_Key[:,0] == test_cow
             train_idx = Cow_Date_Key[:,0] != test_cow
             
@@ -424,161 +515,20 @@ class LSTM_Model:
         return all_models, all_histories
 
 
-
-
-
-
-    def _make_LSTM(self, X, Y, test_X=None, test_Y=None, val_X=None, val_Y=None):
+    def _make_LSTM(self, train_X, train_Y, test_X, test_Y):
         """Build and train LSTM model with improved handling of imbalanced data
         
         Parameters:
         -----------
         train_X, train_Y: Training data
-        test_X, test_Y: Test data for LOOCV (optional, can be None)
-        val_X, val_Y: Validation data (optional, used in global model mode)
-        
+        test_X, test_Y: Test data
         Returns:
         --------
-        model, history, pred_final, test_Y_clean, test_mask
+        model, history, pred_final
         """
-        # # Handle train/validation split
-        # use_external_validation = val_X is not None and val_Y is not None
-        # use_test_prediction = test_X is not None and test_Y is not None
-
-
         n_epochs = self.config.analysis.lstm.epochs
-        # # Create masks for unknown values in training data
-        # train_mask = (train_Y != self.activity_map[np.nan]).astype(np.float32)
 
-        # # Debug mask information
-        # total_timesteps = train_Y.size
-        # masked_timesteps = np.sum(train_mask == 0)
-        # print(f"Total training timesteps: {total_timesteps}")
-        # print(f"Masked timesteps: {masked_timesteps} ({masked_timesteps/total_timesteps:.2%})")
-        
-
-        # # Clean training data for model use
-        # train_Y_clean = np.copy(train_Y)
-        # train_Y_clean[train_Y_clean == self.activity_map[np.nan]] = 0
-        
-
-
-
-        # # DEBUGGING 
-
-        # # Calculate class weights only on valid data
-        # valid_labels = train_Y[train_mask > 0]
-        # class_counts = np.bincount(valid_labels)
-        
-        # # Ensure all classes are represented
-        # if len(class_counts) < self.nclasses:
-        #     print("WARNING: Some classes are missing in valid data!")
-        #     class_counts = np.pad(class_counts, (0, self.nclasses - len(class_counts)))
-        
-        # class_counts = np.maximum(class_counts, 1)  # Ensure no zeros
-        
-        # total = np.sum(class_counts)
-        # class_weights = {i: total / (self.nclasses * class_counts[i]) for i in range(self.nclasses)}
-        
-        # # print(f"Class distribution in valid training data: {class_counts}")
-        # # print(f"Class weights: {class_weights}")
-        
-        # # Create sample weight matrix - verify with explicit examples
-        # sample_weights = np.ones_like(train_Y_clean, dtype=np.float32)
-        # sample_weights = sample_weights * train_mask  # Mask unknown values
-        
-
-        # # Process test data if provided
-        # if True:
-        #     test_mask = int((test_Y != self.activity_map[np.nan])).astype(np.float32)
-        #     test_Y_clean = np.copy(test_Y)
-        #     test_Y_clean[test_Y_clean == self.activity_map[np.nan]] = 0
-        # else:
-        #     # Create dummy values that will be ignored
-        #     test_mask = np.array([0])
-        #     test_Y_clean = np.array([0])
-        
-        # # Process validation data if provided
-        # if use_external_validation:
-        #     val_mask = int((val_Y != self.activity_map[np.nan])).astype(np.float32)
-        #     val_Y_clean = np.copy(val_Y)
-        #     val_Y_clean[val_Y_clean == self.activity_map[np.nan]] = 0
-        #     validation_data = (val_X, val_Y_clean, val_mask)
-        #     validation_split = None
-
-        #     valid_val_labels = np.sum(val_mask)
-        #     print(f"Validation set: {valid_val_labels} valid labels out of {val_Y.size}")
-        # else:
-        #     # Use internal validation split
-        #     validation_data = None
-        #     validation_split = 0.3
-        
-
-        # # Calculate class weights to handle imbalance
-        # valid_labels = train_Y_clean[train_mask > 0].flatten()
-        # class_counts = np.bincount(valid_labels)
-        # total = np.sum(class_counts)
-        # class_weights = {i: total / (len(class_counts) * count) if count > 0 else 1.0 
-        #                 for i, count in enumerate(class_counts)}
-        
-        # print(f"Class distribution in training data: {class_counts}")
-        # print(f"Class weights: {class_weights}")
-        
-        # # Create a combined weight matrix that includes both masking and class weights
-        # sample_weights = np.ones_like(train_Y_clean, dtype=np.float32)
-        
-        # # First apply the mask (0 weight for unknown values)
-        # sample_weights = sample_weights * train_mask
-        
-        # # Then apply class weights (each timestep gets weight based on its class)
-        # for class_id, weight in class_weights.items():
-        #     class_mask = (train_Y_clean == class_id)
-        #     sample_weights[class_mask] = weight * sample_weights[class_mask]
-        
-
-
-        # assume you’ve already grouped into daily sequences:
-        #  X: np.array, shape (batch, seq_len, n_features), filled with your mask_value for missing *features*
-        #  Y: np.array, shape (batch, seq_len), dtype float, containing integer labels or np.nan for “no label”
-
-        # Convert labels to int (fill nan→0) and build a 0/1 mask for where a label actually exists
-        Y_int   = np.nan_to_num(Y, nan=0).astype('int32')        # any “dummy” class 0
-        mask_y  = (~np.isnan(Y)).astype('float32')               # 1.0 where label is valid, 0.0 otherwise
-
-
-
-        # Create a simpler, faster model
-        model = Sequential([
-            Input((self.sequence_length, self.nfeatures)),
-            Masking(mask_value=self.masking_val),
-            
-            # Conv1D layers to capture local patterns
-            Conv1D(filters=64, kernel_size=3, padding='same', activation='relu'),
-            BatchNormalization(),
-            # Conv1D(filters=128, kernel_size=3, padding='same', activation='relu'),
-            # BatchNormalization(),     
-            # # Single LSTM layer with more units
-
-            # LSTM(128, 
-            #     return_sequences=True,
-            #     # activation='tanh',
-            #     # recurrent_activation='sigmoid',
-            #     dropout=0.2,
-            #     # recurrent_dropout=0.2,
-            #     ),          
-            LSTM(64, 
-                return_sequences=True,
-                # activation='tanh',
-                # recurrent_activation='sigmoid',
-                dropout=0.2,
-                recurrent_dropout=0.2,
-                ),          
-            
-            # Time distributed layers
-            tf.keras.layers.TimeDistributed(Dense(64, activation='relu')),
-            tf.keras.layers.TimeDistributed(Dropout(0.2)),
-            tf.keras.layers.TimeDistributed(Dense(self.nclasses, activation='softmax'))
-        ])
+        model = Sequential(self.layers)
         
         batchsize=16
         # lr_schedule = tf.keras.optimizers.schedules.CosineDecay(
@@ -589,12 +539,11 @@ class LSTM_Model:
         
     #     # learning rate schedule
         initial_learning_rate = 0.001
-        lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+        lr_schedule = ExponentialDecay(
             initial_learning_rate,
             decay_steps=1000,
             decay_rate=0.9
         )
-
 
         # model.compile(
         #     optimizer=tf.keras.optimizers.Adam(learning_rate=lr_schedule),
@@ -606,77 +555,71 @@ class LSTM_Model:
 
         model.compile(
             optimizer='adam',
-            loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+            loss=SparseCategoricalCrossentropy(),
             metrics=['accuracy'],
-            # sample_weight_mode='temporal'              # <-- tells Keras that sample_weight is (batch, time)
         )
         
         model.summary()
-        # print(f"Train_Y Shape: {train_Y.shape}")
-        # print(f"Train_X Shape: {train_X.shape}")
-        
+        print(f"Train_Y Shape: {train_Y.shape}")
+        # Train_Y Shape: (19285,)
+        print(f"Train_X Shape: {train_X.shape}")
+        # Train_X Shape: (19285, 20, 4)
 
-        
-        # Create a tensorboard callback
-        log_dir = Path(self.config.analysis.output_dir) / "logs" / datetime.now().strftime("%Y%m%d-%H%M%S")
 
-        tensorboard_callback = tf.keras.callbacks.TensorBoard(
-            log_dir=log_dir, 
-            histogram_freq=1,
-            profile_batch=0  # Disable profiling for speed
-        )
+        # Create sample weights (give zero weight to masked steps)
+        sample_weights = np.ones(train_Y.shape)
+        for i in range(len(train_X)):
+            # Find positions where all features are masked
+            mask = ~np.all(train_X[i] == self.masking_val, axis=1)
+            # Apply the mask to weights (only for step-wise models)
+            sample_weights[i] = mask
         
-
         history = model.fit(
-            X, 
-            Y_int,
+            train_X,
+            train_Y,
             # validation_data=validation_data,
-            # validation_split=validation_split,
-            sample_weight=mask_y,
+            validation_split=0,
+            sample_weight=sample_weights,
             epochs=n_epochs,
             batch_size=batchsize,
             callbacks=[
-                tf.keras.callbacks.EarlyStopping(
+                EarlyStopping(
                     monitor='val_loss',
                     # monitor='loss',
                     patience=15,
                     restore_best_weights=True
                 ),
-                # tf.keras.callbacks.ReduceLROnPlateau(
+                # ReduceLROnPlateau(
                 #     monitor='val_loss',
                 #     factor=0.05,
                 #     patience=10,
                 #     min_lr=0.00001
                 # ),
-                tensorboard_callback
             ],
             verbose=1
         )
         
-        # Only make predictions if test data was provided
-        if use_test_prediction:
-            print("Predicting on test data...")
-            pred_y = model.predict(test_X, verbose=0)
-            pred_y_classes = np.argmax(pred_y, axis=2)
-            
-            # Restore NaN class labels
-            pred_final = np.copy(pred_y_classes)
-            pred_final[test_mask == 0] = self.activity_map[np.nan]
-            
-            # Calculate per-class accuracy
-            for class_name, class_id in self.activity_map.items():
-                if class_id == self.activity_map[np.nan]:
-                    continue
-                    
-                class_mask = (test_Y_clean == class_id) & (test_mask > 0)
-                if np.sum(class_mask) > 0:
-                    class_acc = np.mean(pred_y_classes[class_mask] == class_id)
-                    print(f"{class_name} accuracy: {class_acc:.4f} (n={np.sum(class_mask)})")
-        else:
-            # No predictions are made (global model)
-            pred_final = np.array([])
+
         
-        return model, history, pred_final, test_Y_clean, test_mask
+        # Make predictions on test data
+        print("Predicting on test data...")
+        pred_y = model.predict(test_X, verbose=0)
+        pred_y_classes = np.argmax(pred_y, axis=1)  # Use axis=1 since we flattened
+        
+        # Calculate accuracy
+        accuracy = np.mean(pred_y_classes == test_Y)
+        print(f"Test accuracy: {accuracy:.4f}")
+        
+        # Per-class metrics
+        classes = np.unique(test_Y)
+        for class_id in classes:
+            class_mask = (test_Y == class_id)
+            if np.sum(class_mask) > 0:
+                class_acc = np.mean(pred_y_classes[class_mask] == class_id)
+                print(f"Class {class_id} accuracy: {class_acc:.4f} (n={np.sum(class_mask)})")
+        
+        return model, history, pred_y_classes
+
 
     def _plot_single_history(self, history):
         """Plot training history for a single model"""

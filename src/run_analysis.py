@@ -380,14 +380,16 @@ def run_lstm_analysis(config: ConfigManager, target_data_path: Path, output_dir:
 
         lstm = LSTM_Model(config=config)
 
-        # print(analysis.mode)
-        if analysis.mode == AnalysisModes.LOOCV:
-            # lstm.do_loocv()
-            lstm.dont_do_loocv()
-            pass
+        lstm.run_LSTM()
 
-        elif analysis.mode == AnalysisModes.PRODUCT:
-            pass
+        # # print(analysis.mode)
+        # if analysis.mode == AnalysisModes.LOOCV:
+        #     # lstm.do_loocv()
+        #     lstm.dont_do_loocv()
+        #     pass
+
+        # elif analysis.mode == AnalysisModes.PRODUCT:
+        #     pass
 
 
         logging.info("HMM analysis completed successfully")
