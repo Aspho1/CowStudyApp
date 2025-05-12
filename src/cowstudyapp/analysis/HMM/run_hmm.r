@@ -1,12 +1,15 @@
 # run_hmm.R
 
-init_the_script <- function(util_path, config_path, data_path, output_dir){
+init_the_script <- function(util_path, config_path, target_dataset_path, cv_dir, mod_dir, pred_dir){
+
+
+    
     # Load dependencies
     cat("Loading dependencies...\n")
     
     packages <- c("momentuHMM", "dplyr", "ggplot2", "caret", "fitdistrplus",
                  "circular", "CircStats", "lubridate", 'grid', 'gridExtra',
-                 "movMF", "suncalc")
+                 "movMF", "suncalc", "fs")
 
     suppressWarnings({
         suppressPackageStartupMessages({
@@ -28,20 +31,21 @@ init_the_script <- function(util_path, config_path, data_path, output_dir){
     
     set.seed(1)
 
-
-
     all_activities <- config$all_activities
     # all_activities <- c("Grazing", "Resting", "Traveling", "Drinking", "Fighting", "Mineral", "Scratching")
 
 
     # dirs <- create_output_structure(base_output_dir=output_dir, features=features)
-    dirs <- list(
-        base_dir = output_dir,
-        plots_dir = file.path(output_dir, "plots"),
-        dist_plots_dir = file.path(output_dir, "plots", "distributions")
-    )
+
+    cv_dir = path(cv_dir)
+    mod_dir = path(mod_dir)
+    pred_dir = path(pred_dir)
+
+    #     plots_dir = file.path(output_dir, "plots"),
+    #     dist_plots_dir = file.path(output_dir, "plots", "distributions")
+    # )
     
-    cat("Loading data from:", data_path, "\n")
+    cat("Loading data from:", target_dataset_path, "\n")
     cat("   States:", paste(states, collapse=", "), "\n")
     cat("   Features:", features$name, "\n")
 
@@ -69,7 +73,7 @@ init_the_script <- function(util_path, config_path, data_path, output_dir){
     }
 
     cat("Selecting and renaming target data...\n")
-    target_dataset <- load_csv_data(data_path, features)
+    target_dataset <- load_csv_data(target_dataset_path, features)
 
     cat("Ensuring cows in Excluded devices are not in the dataset...\n")
     target_dataset <- subset(target_dataset, !(ID %in% config$excluded_devices))
@@ -79,7 +83,7 @@ init_the_script <- function(util_path, config_path, data_path, output_dir){
     if (config$mode == "LOOCV") {
         # Run LOOCV on target dataset
         cat("Starting LOOCV...\n")
-        run_LOOCV(config, Options, features, states, dirs, target_dataset, all_activities)
+        run_LOOCV(config, Options, features, states, cv_dir, target_dataset, all_activities)
         
 
     }else if(config$mode == "PRODUCT"){
@@ -110,7 +114,7 @@ init_the_script <- function(util_path, config_path, data_path, output_dir){
                 features <- select_best_distributions(data=training_dataset, 
                                     features=features,
                                     Options=Options,
-                                    dirs=dirs)
+                                    dirs=mod_dir)
 
 
                 cat("Training the model...\n")
@@ -142,7 +146,7 @@ init_the_script <- function(util_path, config_path, data_path, output_dir){
             
             cat("Getting target dataset predictions...\n")
             # get_predictions_from_model(model, target_dataset, dirs, states)
-            get_predictions_from_model(model, dirs$base_dir, config)
+            get_predictions_from_model(model, pred_dir, config)
         
         # # Make predictions. Read the 
         # viterbi(model)
@@ -156,7 +160,7 @@ init_the_script <- function(util_path, config_path, data_path, output_dir){
             target_dataset <- prepare_hmm_data(data=target_dataset, states=states, config=config)
         
             cat("Loading the training dataset...\n")
-            training_data <- load_csv_data(data_path=data_path,features=features,all_activities=all_activities)
+            training_data <- load_csv_data(data_path=target_dataset_path,features=features,all_activities=all_activities)
             
             cat("Creating the training prepData object...\n")
             training_data <- prepare_hmm_data(data=training_data, states=states, config=config)
@@ -168,7 +172,7 @@ init_the_script <- function(util_path, config_path, data_path, output_dir){
             features <- select_best_distributions(data=training_data, 
                                 features=features,
                                 Options=Options,
-                                dirs=dirs)
+                                dirs=mod_dir)
 
             cat("Training the model...\n")
             trained_model <- train_model(training_data, features, states, time_covariate=config$time_covariate)
@@ -178,10 +182,10 @@ init_the_script <- function(util_path, config_path, data_path, output_dir){
             
             cat("Getting target dataset predictions...\n")
             # get_predictions_from_model(model, target_dataset, dirs, states)
-            get_predictions_from_model(model, dirs$base_dir, config)
+            get_predictions_from_model(model, pred_dir, config)
 
             cat("Saving the model and featureset to disk...\n")
-            save_model(model,dirs$base_dir, features)
+            save_model(model, mod_dir, features)
 
         }
         cat("Finished!...\n")
@@ -660,7 +664,8 @@ prepare_hmm_data <- function(data, states, time_covariate, config) {
     # }
 
     # str(data)
-
+    cat("states!!!!!!!!!!: ",unique(data$activity),"\n")
+    cat("factor_levels!!!!!!!!!!: ",states,"\n")
     prepped_data <- prepData(data)
     prepped_data$factored_activity <- as.integer(factor(data$activity, 
                                                       levels = states))
@@ -800,7 +805,7 @@ apply_model <- function(data, trained_model, features, states, time_covariate) {
 }
 
 
-run_LOOCV <- function(config, Options, features, states, dirs, target_dataset, all_activities) {
+run_LOOCV <- function(config, Options, features, states, cv_dir, target_dataset, all_activities) {
 
     cat("Starting HMM analysis...\n")
 
@@ -809,21 +814,15 @@ run_LOOCV <- function(config, Options, features, states, dirs, target_dataset, a
     # print(length(target_dataset$ID))
 
     prepped_data <- prepare_hmm_data(target_dataset, states, config=config)
-    # print("2!!!!!!!!!!!!!!!!!")
-    # print(length(prepped_data$ID))
 
     prepped_data <- process_labeled_data(prepped_data, states, all_activities, config$timezone)
-
-
-    # print("3!!!!!!!!!!!!!!!!!")
-    # print(length(prepped_data$ID))
 
     cat("Selecting feature distributions...\n")
 
     features <- select_best_distributions(data=prepped_data, 
                                           features=features,
                                           Options=Options,
-                                          dirs=dirs)
+                                          dirs=cv_dir)
 
     cat("Features After Selecting best distributions:\n")
     for (i in 1:nrow(features)) {
@@ -972,9 +971,7 @@ run_LOOCV <- function(config, Options, features, states, dirs, target_dataset, a
         cow_counter <- cow_counter + 1
     
     }
-
     cat("Finished LOOCV\n")
-
 
  # Print final summary table
     cat("\n=== Complete LOOCV Summary ===\n")
@@ -1012,8 +1009,8 @@ run_LOOCV <- function(config, Options, features, states, dirs, target_dataset, a
 
 
     # Ensure both actual and predicted states are factors with the same levels
-    print("!!!!!!")
-    print(all_actual_states)
+    # print("!!!!!!")
+    # print(all_actual_states)
 
     valid_indices <- !is.na(all_actual_states)
 
@@ -1042,7 +1039,7 @@ run_LOOCV <- function(config, Options, features, states, dirs, target_dataset, a
                             features=features
     )
 
-    print_cv_results(results)
+    print_cv_results(results, cv_dir)
     
 }
 
@@ -1097,15 +1094,19 @@ if (length(args) < 4) {
 
 util_path <- args[1]
 config_path <- args[2]
-data_path <- args[3]
-output_dir <- args[4]
-
+target_dataset_path <- args[3]
+# output_dir <- args[4]
+cv_dir <- args[4]
+mod_dir <- args[5]
+pred_dir <- args[6]
 
 init_the_script(
       util_path=util_path
     , config_path=config_path
-    , data_path=data_path
-    , output_dir=output_dir
+    , target_dataset_path=target_dataset_path
+    , cv_dir=cv_dir
+    , mod_dir=mod_dir
+    , pred_dir=pred_dir
     )
 
 quit(status=0)

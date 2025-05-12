@@ -1299,8 +1299,6 @@ plot_distribution_analysis_old <- function(data, col_name, fits, Options) {
 }
 
 
-
-
 plot_distribution_analysis <- function(data, col_name, fits, Options, activities = NULL, distribution_colors, activity_colors) {
     # Create initial data frame with all data and activities
     plot_data <- data.frame(
@@ -1671,10 +1669,12 @@ get_cv_metrics <- function(cv_models, all_actual_states, all_predicted_states, t
 
 
 
-print_cv_results <- function(results) {
+print_cv_results <- function(results, cv_dir) {
     if (is.null(results$features)) {
         stop("Features list is required for printing results")
     }
+
+    sink(file.path(cv_dir, "cv_results.txt"))
     
     cat("\n=================================================\n")
     cat("===================== Results ===================\n")
@@ -1750,7 +1750,5 @@ print_cv_results <- function(results) {
             }
         }
     }
-    
-    # Flush the output to ensure everything is printed
-    flush.console()
+    sink(NULL)
 }

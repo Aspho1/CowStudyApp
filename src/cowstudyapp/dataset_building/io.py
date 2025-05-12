@@ -152,7 +152,7 @@ class DataLoader:
         print(
             f"Processing {len(gps_files)} GPS files and {len(accel_files)} accelerometer files"
         )
-        print(f"Excluded devices: {", ".join([str(x) for x in self.excluded_devices])}")
+        print(f"Excluded devices: {', '.join([str(x) for x in self.excluded_devices])}")
 
         if not (
             self.validator.config.start_datetime and self.validator.config.end_datetime
@@ -318,7 +318,7 @@ class DataLoader:
             stats["format_type"] = format_type
 
             stats["initial_records"] = df.shape[0]
-            print(f"Initial accelerometer records: {stats["initial_records"]}")
+            print(f"Initial accelerometer records: {stats['initial_records']}")
             self.quality_report["accelerometer"]["total_initial_records"] += stats[
                 "initial_records"
             ]
@@ -327,7 +327,7 @@ class DataLoader:
             stats["preprocessing_stats"] = accel_valid_stats
 
             stats["final_records"] = df.shape[0]
-            print(f"Final accelerometer records: {stats["final_records"]}")
+            print(f"Final accelerometer records: {stats['final_records']}")
             # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
             # print(df.columns)
             self.quality_report["accelerometer"]["total_final_records"] += stats[

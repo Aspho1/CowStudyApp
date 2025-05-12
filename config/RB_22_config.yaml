@@ -5,7 +5,7 @@ common:
   accel_sample_interval: 60           # Expected seconds between Accelerometer 
   # excluded_devices: [841, 1005, 1021, 1006] 
   excluded_devices: [841, 1005] 
-  random_seed: 0
+  random_seed: 123
 
 
 io:
@@ -121,8 +121,23 @@ analysis:
   r_executable: "C:/Program Files/R/R-4.4.3/bin/Rscript.exe"
   # r_executable: "C:/Program Files/R/R-4.3.0/bin/Rscript.exe"
 
-  output_dir: "data/analysis_results"
   
+  
+  
+  
+  
+  
+  
+  ########## TEMP ONLY FOR BAYSES OPT I NEED SLEEP
+  # output_dir: "data/analysis_results"
+
+
+
+  cv_results: "data/cv_results"
+  models: "data/models"
+  predictions: "data/predictions"
+
+
   day_only: false
 
   hmm:
@@ -183,22 +198,56 @@ analysis:
           - "WRAPPEDCAUCHY"
 
   lstm:
+    enabled: true
+    
     ops: true
 
-    enabled: true
+
+    ################ Warning these two will SIGNIFICANTLY increase runtime to find parameters 
+    # BAYESIAN Optimization
+    bayes_opt: true                # Whether to use Bayesian optimization 
+    bayes_opt_n_calls: 20          # Number of evaluations to perform
+    bayes_opt_resume: true         # Whether to resume from previous optimization
+    bayes_opt_fast_eval: false      # Use faster evaluation during optimization
+
+    # GRID SEARCH
+    hyperparams_search: false   # Whether to run hyperparameter search
+    hyperparams_sample: false   # Whether to sample a subset of parameters for quick testing
+
     states: # The states to use in the LSTM
       - "Grazing"
       - "Resting"
       - "Traveling"
+      # - "Drinking"
+      # - "Fighting"
+      # - "Mineral"
     features:
       - "step"
       - "angle"
       - "magnitude_mean"
       - "magnitude_var"
+      # - "x_mean"
+      # - "x_var"
+      # - "y_mean"
+      # - "y_var"
+      # - "z_mean"
+      # - "z_var"
+      # - "pct_of_day"
     # max_length: 'daily'
     max_length: 20
     max_time_gap: 960
-    epochs: 50
+    epochs: 1000
+    cows_per_cv_fold: 3
+
+    max_length: 70
+    batch_size: 13
+    initial_lr: 0.0008013770340749126
+    decay_steps: 500
+    decay_rate: 0.510164871944301
+    clipnorm: 0.7306814672664718
+    patience: 50
+    min_delta: 8.991637285631857e-07
+    reg_val: 3.415197283259112e-05
 
 
 visuals:
@@ -207,7 +256,7 @@ visuals:
   # predictions_path: 'data/analysis_results/hmm/FinalPredictions/RB_22_Paper_Model_Preds/predictions.csv' 
   predictions_path: 'data/analysis_results/hmm/FinalPredictions/RB_Paper_Model_Preds_logmagvar/predictions.csv'
   
-  visuals_root_path: "data/visuals/RB_22/"
+  visuals_root_path: "data/visuals/"
 
   radar:
     run: false

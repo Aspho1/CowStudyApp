@@ -46,13 +46,19 @@ dev = [
     "mypy>=1.0.0",
 ]
 
+[tool.hatch.build]
+# Tell Hatchling that your packages live under "src/"
+package-dir = { "" = "src" }
+
 [tool.hatch.metadata]
 requires-external = [
     "R >= 4.0.0",
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/cowstudyapp"]
+# packages = ["src/cowstudyapp"]
+packages = ["cowstudyapp"]
+
 
 [tool.black]
 line-length = 88

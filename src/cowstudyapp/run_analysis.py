@@ -15,6 +15,14 @@ import json
 import platform
 import os
 import sys
+import argparse
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] %(levelname)s %(message)s',
+    stream=sys.stdout
+)
+logger = logging.getLogger(__name__)
 
 
 def find_r_executable(config_path):
@@ -74,10 +82,9 @@ def install_r_packages(packages):
     r_executable = find_r_executable()
     try:
         subprocess.run([r_executable, "--vanilla", "-e", r_script], check=True)
-        logging.info(f"Successfully installed R packages: {packages}")
+        logger.info(f"Successfully installed R packages: {packages}")
     except subprocess.SubprocessError as e:
         raise RuntimeError(f"Failed to install R packages: {e}")
-
 
 def check_r_packages(r_executable):
     """Check if required R packages are installed"""
@@ -95,21 +102,23 @@ def check_r_packages(r_executable):
         "gridExtra",
         "movMF",
         "suncalc",
-        "lme4"
+        "lme4",
+        "fs"
     ]
+
 
     # Step 1: Just get installed packages
     try:
         # First just try to get the list of installed packages
         list_cmd = subprocess.run(
-            [r_executable, "-e", "cat(paste(installed.packages()[,1], collapse=','))"],
+            [r_executable, '--vanilla',"-e", "cat(paste(installed.packages()[,1], collapse=','))"],
             capture_output=True,
             text=True,
             check=True,
         )
 
         installed_packages = list_cmd.stdout.split(",")
-        logging.info(f"Found {len(installed_packages)} installed R packages")
+        logger.info(f"Found {len(installed_packages)} installed R packages")
 
         # Step 2: Check which required packages are missing
         missing_packages = [
@@ -119,7 +128,8 @@ def check_r_packages(r_executable):
         if missing_packages:
             # Ask user if they want to install missing packages
             print(f"\nMissing R packages: {', '.join(missing_packages)}")
-            response = input("Would you like to install them? [y/N] ")
+            # response = input("Would you like to install them? [y/N] ")
+            response = 'y'
 
             if response.lower() == "y":
                 # Install packages one at a time
@@ -127,11 +137,15 @@ def check_r_packages(r_executable):
                     print(f"\nInstalling {pkg}...")
                     install_cmd = [
                         r_executable,
+                        '--vanilla',
                         "-e",
-                        f"install.packages('{pkg}', repos='https://cran.rstudio.com/')",
+                        f"install.packages('{pkg}', repos='https://cran.rstudio.com/', dependencies=TRUE)",
                     ]
                     try:
-                        subprocess.run(install_cmd, check=True)
+                        result = subprocess.run(install_cmd, check=True, capture_output=True, text=True)
+                        print("=== R stdout ===\n", result.stdout)
+                        print("=== R stderr ===\n", result.stderr)
+                        result.check_returncode()                        
                         print(f"Successfully installed {pkg}")
                     except subprocess.CalledProcessError as e:
                         print(f"Failed to install {pkg}: {e}")
@@ -144,7 +158,7 @@ def check_r_packages(r_executable):
                     f"Rscript -e 'install.packages(c({quoted_packages}))'"
                 )
         else:
-            logging.info("All required R packages are installed")
+            logger.info("All required R packages are installed")
 
     except subprocess.CalledProcessError as e:
         # Add more diagnostic information
@@ -155,7 +169,7 @@ def check_r_packages(r_executable):
             f"STDOUT: {e.stdout if e.stdout else 'Empty'}\n"
             f"STDERR: {e.stderr if e.stderr else 'Empty'}"
         )
-        logging.error(error_msg)
+        logger.error(error_msg)
         raise RuntimeError(error_msg)
 
 
@@ -165,7 +179,7 @@ def stream_r_output(process, prefix="R"):
         for line in iter(process.stdout.readline, ""):
             line = line.strip()
             if line:
-                logging.info(f"{prefix}: {line}")
+                logger.info(f"{prefix}: {line}")
     except KeyboardInterrupt:
         # Terminate the subprocess
         process.terminate()
@@ -193,7 +207,7 @@ def get_r_dist_name(dist_type: DistributionTypes) -> str:
     return mapping[dist_type]
 
 
-def create_analysis_directories(
+def create_analysis_directories_OLD(
     base_dir: Path, features: list, analysis_type: str, dataset_name: str, subdirs: bool = True
 ) -> dict:
     """
@@ -237,7 +251,40 @@ def create_analysis_directories(
     }
 
 
-def run_hmm_analysis(config: ConfigManager, target_data_path: Path, output_dir: Path):
+def create_analysis_directories(cv_dir: Path, mod_dir: Path, pred_dir: Path) -> dict:
+    """
+    Create directory structure for HMM analysis outputs
+
+    Args:
+        base_dir: Base output directory (data/analysis_results/hmm)
+        features: List of features being used
+        analysis_type: Either 'LOOCV' or 'Product'
+
+    Returns:
+        Dictionary containing paths to different output directories
+    """
+
+    cv_dir = cv_dir / "HMM"
+    mod_dir = mod_dir / "HMM"
+    pred_dir = pred_dir / "HMM"
+
+    # models_dir = analysis_dir / "models"  # New directory for saved models
+    # Create all directories
+    for directory in [cv_dir, mod_dir, pred_dir]:  # , models_dir
+        deepest_dir: Path = (directory / "plots" / "distributions")
+        deepest_dir.mkdir(parents=True, exist_ok=True)
+
+
+    return {
+        "cv_dir": cv_dir,
+        "mod_dir": mod_dir,
+        "pred_dir": pred_dir,
+        # "models_dir": models_dir
+    }
+
+
+# def run_hmm_analysis(config: ConfigManager, target_data_path: Path, output_dir: Path):
+def run_hmm_analysis(config: ConfigManager, target_data_path: Path):
     """Run the HMM analysis using R scripts"""
 
     analysis = config.analysis
@@ -245,7 +292,11 @@ def run_hmm_analysis(config: ConfigManager, target_data_path: Path, output_dir: 
     check_r_packages(r_executable)
 
     # Ensure R script directory exists
-    r_script_dir = Path("src/cowstudyapp/analysis/HMM")
+    # try:
+    #     r_script_dir = Path("src/cowstudyapp/analysis/HMM")
+    # except FileNotFoundError:
+    r_script_dir = Path("/SShare/Education/CowStudyApp/src/cowstudyapp/analysis/HMM")
+    
     if not r_script_dir.exists():
         raise FileNotFoundError(f"R script directory not found: {r_script_dir}")
 
@@ -253,17 +304,34 @@ def run_hmm_analysis(config: ConfigManager, target_data_path: Path, output_dir: 
     if analysis.hmm is None:
         raise ValueError("ERROR: Missing required HMM section in analysis config")  
     
+    # dirs = create_analysis_directories_OLD(
+    #     base_dir=output_dir,
+    #     features=analysis.hmm.features,
+    #     analysis_type=analysis.mode,
+    #     dataset_name=analysis.dataset_name,
+    # )
     dirs = create_analysis_directories(
-        base_dir=output_dir,
-        features=analysis.hmm.features,
-        analysis_type=analysis.mode,
-        dataset_name=analysis.dataset_name,
+        cv_dir=config.analysis.cv_results,
+        mod_dir=config.analysis.models,
+        pred_dir=config.analysis.predictions,
+        # features=analysis.hmm.features,
+        # analysis_type=analysis.mode,
+        # dataset_name=analysis.dataset_name,
     )
+
+    # if analysis.mode == "LOOCV":
+    #     curdir = config.analysis.cv_results
+    # else:
+    #     if not analysis.training_info:
+    #         curdir = config.analysis.models
+    #     else:
+    #         curdir = config.analysis.predictions
+
 
     r_script_path = r_script_dir / "run_hmm.r"
     util_path = r_script_dir / "util.r"
     # Create output directory
-    output_dir.mkdir(parents=True, exist_ok=True)
+    # output_dir.mkdir(parents=True, exist_ok=True)
 
     training_info_type = (
         "dataset"
@@ -309,7 +377,7 @@ def run_hmm_analysis(config: ConfigManager, target_data_path: Path, output_dir: 
             },
         )
 
-    config_path: Path = dirs["base_dir"] / "hmm_config.json"
+    config_path: Path = dirs['mod_dir'] / "hmm_config.json"
     with open(config_path, "w") as f:
         json.dump(r_config, f, indent=2)
 
@@ -329,7 +397,9 @@ def run_hmm_analysis(config: ConfigManager, target_data_path: Path, output_dir: 
         str(util_path),
         str(config_path),
         str(target_data_path),
-        str(dirs["base_dir"]),
+        str(dirs["cv_dir"]),
+        str(dirs["mod_dir"]),
+        str(dirs["pred_dir"])
     ]
 
     try:
@@ -344,25 +414,25 @@ def run_hmm_analysis(config: ConfigManager, target_data_path: Path, output_dir: 
         if process.returncode != 0:
             raise RuntimeError(f"R script failed with return code {process.returncode}")
 
-        logging.info("HMM analysis completed successfully")
+        logger.info("HMM analysis completed successfully")
 
     except Exception as e:
-        logging.error(f"Error running HMM analysis: {e}")
+        logger.error(f"Error running HMM analysis: {e}")
         raise
 
     except KeyboardInterrupt:
-        logging.info("Received interrupt signal, terminating R process...")
+        logger.info("Received interrupt signal, terminating R process...")
         if process.poll() is None:  # If process is still running
             process.terminate()
             try:
                 process.wait(timeout=5)
             except subprocess.TimeoutExpired:
-                logging.warning("R process didn't terminate, forcing kill...")
+                logger.warning("R process didn't terminate, forcing kill...")
                 process.kill()
         raise
 
 
-def run_lstm_analysis(config: ConfigManager, target_data_path: Path, output_dir: Path):
+def run_lstm_analysis(config: ConfigManager, target_data_path: Path):
     """Run the HMM analysis using R scripts"""
     from cowstudyapp.analysis.RNN.run_lstm import LSTM_Model
 
@@ -394,49 +464,71 @@ def run_lstm_analysis(config: ConfigManager, target_data_path: Path, output_dir:
         #     pass
 
 
-        logging.info("LSTM analysis completed successfully")
+        logger.info("LSTM analysis completed successfully")
 
     except Exception as e:
-        logging.error(f"Error running LSTM analysis: {e}")
+        logger.error(f"Error running LSTM analysis: {e}")
         raise
 
 
-if __name__ == "__main__":
-    # Load configuration
-    # config_path = Path("config/default.yaml")
-    # config_path = Path("config/RB_19_config.yaml")
-    config_path = Path("config/RB_22_config.yaml")
-    # config_path = Path("config/RB_19_22_combined_config.yaml")
+
+
+def main(config_path=None, progress_callback=None):
+    logger.info("Starting run_analysis")
+    if config_path is None and len(sys.argv) > 1:
+        parser = argparse.ArgumentParser(
+            prog="run_analysis",
+            description="Perform serial classification on data"
+        )
+        parser.add_argument(
+            "task_id",
+            help="ID of this analysis task (for logging, etc.)"
+        )
+        parser.add_argument(
+            "config_path",
+            type=Path,
+            help="YAML file with analysis configuration"
+        )
+        args = parser.parse_args()
+        config_path = args.config_path
+        task_id = args.task_id
+
+    else:
+        # Load configuration
+        # config_path = Path("config/default.yaml")
+        config_path = Path(config_path)
+        if not config_path:
+            config_path = Path("config/RB_22_config.yaml")
+        # config_path = Path("config/RB_19_22_combined_config.yaml")
+        task_id = "direct-call"
     config = ConfigManager.load(config_path)
 
-    # Set up logging with more detail
-    # logging.basicConfig(
-    #     level=logging.DEBUG,  # Change to DEBUG for more detail
-    #     # format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    #     format="%(message)s",
-    # )
+    try:
+        if config.analysis.hmm.enabled:
+            logger.info("Running HMM analysis...")
+            run_hmm_analysis(
+                config=config,
+                target_data_path=Path(config.analysis.target_dataset),
+            )
+        if config.analysis.lstm.enabled:
+            logger.info("Running LSTM analysis...")
+            run_lstm_analysis(
+                config=config,
+                target_data_path=Path(config.analysis.target_dataset),
+                # output_dir=output_dir / "lstm",
+            )
 
-    logging.info("Starting analysis...")
+        return True
 
-    # Create output directory
-    output_dir = Path(config.analysis.output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    logging.info(f"Created output directory: {output_dir}")
+    except Exception as e:
+        logger.exception("Error while performing task %s: %s", task_id, str(e))
+        return False
 
-    # Run enabled analyses
-    if config.analysis.hmm.enabled:
-        logging.info("Running HMM analysis...")
-        run_hmm_analysis(
-            config=config,
-            target_data_path=Path(config.analysis.target_dataset),
-            output_dir=output_dir / "hmm",
-        )
-    if config.analysis.lstm.enabled:
-        logging.info("Running LSTM analysis...")
-        run_lstm_analysis(
-            config=config,
-            target_data_path=Path(config.analysis.target_dataset),
-            output_dir=output_dir / "lstm",
-        )
 
+# & C:/Users/thl31/pythonVenvs/CowStudyApp/Scripts/python.exe o:/Education/CowStudyApp/src/cowstudyapp/run_analysis.py "direct-call" "config/RB_22_config.yaml"
+
+if __name__ == "__main__":
+    success = main()
+    if not success:
+        sys.exit(1)
 

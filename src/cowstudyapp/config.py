@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 import platform
 from typing import Literal, Optional, Dict, List, Set
-from pydantic import BaseModel, DirectoryPath, FilePath, Field, field_validator, ValidationInfo
+from pydantic import BaseModel, DirectoryPath, FilePath, Field, field_validator, ValidationInfo, model_validator
 import pytz
 import yaml
 from .utils import list_valid_timezones
@@ -273,6 +273,7 @@ class IoConfig(CommonConfig):
 
     
 
+
 ########################## Analysis ##############################################
 
 class AnalysisFeatureConfig(BaseModel):
@@ -364,12 +365,37 @@ class LSTMConfig(CommonConfig):
 
     ops: bool = True
 
+    hyperparams_search: bool = False
+    hyperparams_sample: bool = False
+
+
+    bayes_opt: bool = False
+    bayes_opt_n_calls: int = 50
+    bayes_opt_resume: bool = True
+    bayes_opt_fast_eval: bool = True
+
     states: List[str]
     features: List[str]
 
+
+    cows_per_cv_fold: int = 1
     max_length: int|str = 20
     max_time_gap: int = 960
     epochs: int = 100
+
+    batch_size: int =  16
+    initial_lr: float = 1e-4
+    decay_steps: int = 1000
+    decay_rate: float = .5
+    clipnorm: float = .75
+    patience: int = 50
+    max_length: int = 20
+    min_delta: float = 1e-4
+    reg_val: float = 1e-5
+
+
+
+
 
 class AnalysisConfig(CommonConfig):
     mode: AnalysisModes = AnalysisModes.LOOCV
@@ -379,7 +405,10 @@ class AnalysisConfig(CommonConfig):
     r_executable: Optional[Path] = None
     hmm: Optional[HMMConfig] = None
     lstm: Optional[LSTMConfig] = None
-    output_dir: Path = Field(default=Path("data/analysis_results"))
+    # output_dir: Path = Field(default=Path("data/analysis_results"))
+    cv_results: Path = Field(default=Path("data/cv_results"))
+    models: Path = Field(default=Path("data/models"))
+    predictions: Path = Field(default=Path("data/predictions"))
     # enabled_analyses: List[Literal["hmm"]] = ["hmm"]
 
 
@@ -391,7 +420,8 @@ class AnalysisConfig(CommonConfig):
     #         raise ValueError(f"Data file does not exist: {v}")
     #     return v
 
-    @field_validator('output_dir')
+    # @field_validator('output_dir')
+    @field_validator('cv_results', 'models', 'predictions')
     @classmethod
     def validate_output_dir(cls, v: Path) -> Path:
         v.mkdir(parents=True, exist_ok=True)
@@ -406,7 +436,7 @@ class AnalysisConfig(CommonConfig):
 
     def validate_config(self) -> None:
         """Validate analysis configuration"""
-
+        pass
 ##################################### Visualizations Config #####################################
 
 class RadarConfig(BaseModel):
@@ -463,7 +493,7 @@ class ConvolutionSurface(BaseModel):
 
 
 
-class VisualsConfig(CommonConfig):
+class VisualsConfig(BaseModel):
     predictions_path: Optional[Path] = None
     visuals_root_path: Path
     radar: RadarConfig
@@ -474,15 +504,34 @@ class VisualsConfig(CommonConfig):
     moon_phases: MoonPhasesConfig
     cow_info_graph: CowInfoGraphConfig
     heatmap: HeatmapConfig
-
-    @field_validator('visuals_root_path')
-    @classmethod
-    def validate_directory(cls, v: Path) -> Path:
-        if not v.exists():
-            raise ValueError(f"Path `{v}` does not exist.")
-        return v
+    dataset_name: str = Field(default="")
 
 
+    @model_validator(mode="after")
+    def apply_dataset_folder(cls, m: "VisualsConfig") -> "VisualsConfig":
+        # now you *do* have `m.dataset_name`
+
+        if not str(m.visuals_root_path).endswith(m.dataset_name):
+            m.visuals_root_path = m.visuals_root_path / Path(m.dataset_name or "UNNAMED")
+        if not m.visuals_root_path.exists():
+            raise ValueError(f"Path `{m.visuals_root_path}` does not exist.")
+        return m
+    # @field_validator('visuals_root_path')
+    # @classmethod
+    # def validate_directory(cls, v: Path, m: "VisualsConfig") -> Path:
+    #     print("H!!!")
+    #     v = v / Path(com.data.get("dataset_name","UNNAMED"))
+    #     print(v)
+    #     if not v.exists():
+    #         raise ValueError(f"Path `{v}` does not exist.")
+    #     return v
+
+    # @field_validator('dist')
+    # def validate_dist(cls, v, info: ValidationInfo):
+    #     # Covariates don't need a distribution
+    #     if info.data.get('dist_type') == FeatureDistType.COVARIATE:
+    #         return None
+    #     return v
 
     @field_validator('predictions_path')
     @classmethod
