@@ -29,7 +29,7 @@ class Feature_Plotter:
         """
         self.config = config
         self.figure_size = (10, 6)
-
+        self.output_dir = self.config.visuals.visuals_root_path
 
         self.features = {
             "step" : {
@@ -131,7 +131,7 @@ class Feature_Plotter:
         return df
 
 
-    def generate_plot(self, df: pd.DataFrame, output_dir: Path) -> None:
+    def generate_plot(self, df: pd.DataFrame) -> None:
 
         self._get_model_params()
         # return
@@ -235,12 +235,12 @@ class Feature_Plotter:
             plt.subplots_adjust(top=0.92)
             
             # Save the plot
-            output_path = output_dir / f"features_{state.lower()}.png"
+            output_path = self.output_dir / f"features_{state.lower()}.png"
             fig.savefig(output_path, bbox_inches='tight', dpi=300)
             plt.close(fig)  
     
 
-    def plot_ecdf_comparison(self, df: pd.DataFrame, output_dir: Path) -> None:
+    def plot_ecdf_comparison(self, df: pd.DataFrame) -> None:
         """Plot ECDF vs theoretical CDF for better comparison"""
         df = self._prepare_data(df)
         states = ['Grazing', 'Resting', 'Traveling']
@@ -303,7 +303,7 @@ class Feature_Plotter:
         plt.show()
 
 
-    def plot_publication_cdf_comparison(self, df: pd.DataFrame, output_dir: Path) -> None:
+    def plot_publication_cdf_comparison(self, df: pd.DataFrame) -> None:
         """Create a publication-quality CDF comparison plot for all features"""
         df = self._prepare_data(df)
         states = ['Grazing', 'Resting', 'Traveling']
@@ -538,7 +538,7 @@ class Feature_Plotter:
         # print(f"Circular distribution saved to {circular_output_path_png}")
 
 
-    def plot_publication_cdf_comparison_all_4(self, df: pd.DataFrame, output_dir: Path) -> None:
+    def plot_publication_cdf_comparison_all_4(self, df: pd.DataFrame) -> None:
         """Create a publication-quality CDF comparison plot for all features including angle in Cartesian coordinates"""
         self._get_model_params()
         # return
@@ -743,7 +743,7 @@ class Feature_Plotter:
         # # Save the plot if needed
         # output_path = output_dir / "feature_distributions.pdf"
         # fig.savefig(output_path, dpi=300, bbox_inches='tight')
-        output_path_png = output_dir / "feature_distributions.png"
+        output_path_png = self.output_dir / "feature_distributions.png"
         fig.savefig(output_path_png, dpi=300, bbox_inches='tight')
         
         plt.show()

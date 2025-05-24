@@ -6,6 +6,7 @@ import logging
 # from dataclasses import dataclass
 import random
 import time
+import traceback
 from typing import Dict, List
 import pandas as pd
 import numpy as np
@@ -44,7 +45,7 @@ import seaborn as sns
 from cowstudyapp.config import ConfigManager, LSTMConfig, AnalysisConfig
 from cowstudyapp.utils import from_posix, from_posix_col
 
-from sklearn.metrics import confusion_matrix, f1_score
+from sklearn.metrics import confusion_matrix, f1_score, accuracy_score
 import multiprocessing as mp
 from functools import partial
 
@@ -527,34 +528,37 @@ class LSTM_Model:
             ]
 
 
-    def run_LSTM(self):
+    def run_LSTM(self, progress_callback=None):
+        
+        if progress_callback is None:
+            progress_callback = lambda percent, message: print(f"{percent}%: {message}")
+        progress_callback(7, "Preparing dataset for LSTM analysis")
+        untransformed = self._get_target_dataset(add_step_and_angle=True)
 
-        df = self._get_target_dataset(add_step_and_angle=True)
-        # print(df.columns)
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        print(untransformed[['step']].head(20))
+        
         required_cols: List[str] = self.config.analysis.lstm.features + ["posix_time", "date", 'device_id', 'activity']
-        # print(required_cols)
-        df = self._normalize_features(df, self.config.analysis.lstm.features)
-        df = df[required_cols].copy()
-
+        progress_callback(10, f"Normalizing features: {', '.join(self.config.analysis.lstm.features)}")
+        transformed = untransformed[required_cols].copy()
+        transformed = self._normalize_features(transformed, self.config.analysis.lstm.features)
+        # df = df[required_cols].copy()
 
         # Build sequences based on configuration
         if self.config.analysis.lstm.ops:
-            sequences = self._build_sequences_ops(df)
-            # Define model architecture for one-per-observation
+            progress_callback(20, "Building sequences for one-per-sample (OPS) analysis")
+            sequences = self._build_sequences_ops(transformed, progress_callback)
+            progress_callback(40, "Building OPS model architecture")
             self._build_ops_architecture()
         else:
-            print("HERE")
-            sequences = self._build_sequences_opo(df)
-            print(sequences["Cow_Date_Key"][:2,:])
-            # Define model architecture for one-per-sequence
+            progress_callback(20, "Building sequences for one-per-observation (OPO) analysis")
+            sequences = self._build_sequences_opo(transformed, progress_callback)
+            progress_callback(40, "Building OPO model architecture")
             self._build_opo_architecture()
-            print("HERE2")
-
-
         # Check if we're doing Bayesian optimization
         if self.config.analysis.lstm.bayes_opt:
             bayes_opt = BayesianOptSearch(self.config)
-            best_params = bayes_opt.run_search(self, sequences, df)
+            best_params = bayes_opt.run_search(self, sequences, transformed)
             
             # Set the best parameters
             for key, value in best_params.items():
@@ -573,10 +577,11 @@ class LSTM_Model:
             else:
                 self._build_opo_architecture()
 
+        # print("run3")
         # Check if we're doing hyperparameter search
         if self.config.analysis.lstm.hyperparams_search:
             search = HyperparamSearch(self.config)
-            results = search.run_search(self, sequences, df)
+            results = search.run_search(self, sequences, transformed)
             # Use the best parameters
             best_params = max(results, key=lambda x: x['f1_score'])['params']
             print("\nUsing best parameters for final model:")
@@ -591,13 +596,15 @@ class LSTM_Model:
 
         # Do either LOOCV or product
         if self.config.analysis.mode == "LOOCV":
-            print(self.layers)
+            progress_callback(40, "Starting LOOCV")
+            ############ Should this use transformed or untransformed????
+            self.do_loocv(sequences=sequences, df=transformed, progress_callback=progress_callback)
 
-            self.do_loocv(sequences=sequences, df=df)
-
-
+            
         elif self.config.analysis.mode == "PRODUCT":
-            self.dont_do_loocv(sequences=sequences, df=df)
+            print("Starting PRODUCT")
+            progress_callback(40, "Starting PRODUCT")
+            self.dont_do_loocv(sequences=sequences, df=untransformed[required_cols], progress_callback=progress_callback)
 
         else:
             raise ValueError(f"Unknown config mode {self.config.analysis.mode}.")
@@ -605,21 +612,21 @@ class LSTM_Model:
     def _build_ops_architecture(self):
         """Build model architecture for one-per-observation"""
         self.layers.extend([
-            LSTM(256, 
-                return_sequences=True,
-                recurrent_dropout=self.dropout_rate,
-                dropout=self.dropout_rate,
-                kernel_regularizer=L2(self.reg_val),
-                recurrent_regularizer=L2(self.reg_val)
-                ),
-            LSTM(128, 
+            LSTM(32, 
                 return_sequences=False,
                 recurrent_dropout=self.dropout_rate,
                 dropout=self.dropout_rate,
                 kernel_regularizer=L2(self.reg_val),
                 recurrent_regularizer=L2(self.reg_val)
                 ),
-            Dense(128, activation='relu'),
+            # LSTM(128, 
+            #     return_sequences=False,
+            #     recurrent_dropout=self.dropout_rate,
+            #     dropout=self.dropout_rate,
+            #     kernel_regularizer=L2(self.reg_val),
+            #     recurrent_regularizer=L2(self.reg_val)
+            #     ),
+            Dense(32, activation='relu'),
             Dropout(self.dropout_rate),  
             Dense(self.nclasses, activation='softmax')
         ])
@@ -762,432 +769,868 @@ class LSTM_Model:
         return df
 
 
-    def _build_sequences_opo(self, df:pd.DataFrame):
+
+
+
+
+
+
+
+    # def _build_sequences_opo(self, df:pd.DataFrame):
+    #     max_length = self.sequence_length
+    #     features = self.config.analysis.lstm.features
+    #     step_size = self.config.analysis.gps_sample_interval//60  # Sample interval in minutes
+
+    #     minutes_in_day = 24 * 60
+    #     expected_records = minutes_in_day // step_size
+    #     # self.sequence_length = expected_records
+
+    #     # df['activity'].fillna(self.UNLABELED_VALUE,inplace=True)
+    #     lost_hour = (60//step_size)
+
+    #     Cow_Date_Key = []
+    #     X = []
+    #     Y = []
+
+    #     if (max_length>=276) & (max_length < 288):
+    #         print("WARNING: Daylight savings had not been accounted for.")
+
+    #     if max_length == 288:
+    #         print("WARNING: Daylight is only account for when an hour is lost, not gained. (If the data are from spring you are fine).")
+    #         for device_id, device_data in df.groupby("device_id"):
+    #             # self.data_map[device_id] = {}
+    #             for date, day_data in device_data.groupby("date"):
+    #                 if len(day_data) < expected_records * 0.5:  # Skip days with too few records
+    #                     # print(f"Skipping day with insufficient data: {date}, {len(day_data)}/{expected_records}")
+    #                     continue
+                    
+    #                 # Extract features, replace NaN with masking value
+    #                 seq :pd.DataFrame = day_data[features].copy().reset_index(drop=True) #.fillna(self.masking_val)
+    #                 labels :pd.DataFrame = day_data[['activity']].copy().reset_index(drop=True)
+
+    #                 labels = labels.map(lambda x: self.activity_map.get(x, -1))
+
+    #                 if len(seq) == expected_records - lost_hour:
+    #                     # print(f"Missing data due to timezone shift. Inserting {lost_hour} values to the end of the sequence.")
+    #                     masking_df = pd.DataFrame({
+    #                         col: [np.nan] * lost_hour for col in seq.columns
+    #                     })
+    #                     seq = pd.concat([seq, masking_df], ignore_index=True)
+
+    #                     nan_labels = pd.DataFrame({'activity': [np.nan] * lost_hour})
+    #                     nan_labels = nan_labels.map(lambda x: self.activity_map.get(x, -1))
+    #                     labels = pd.concat([labels, nan_labels], ignore_index=True)
+
+    #                 else:
+    #                     pass
+    #                 seq.fillna(self.masking_val, inplace=True)
+    #                 labels.fillna(self.UNLABELED_VALUE,inplace=True)
+                    
+    #                 # Add sequence to our dataset
+    #                 Cow_Date_Key.append([device_id,date])
+    #                 X.append(seq)
+    #                 Y.append(labels.to_numpy().ravel())
+
+
+    #     else: 
+            
+
+    #         # print(f"Input DataFrame shape: {df.shape}")
+    #         # print(f"Input DataFrame columns: {df.columns.tolist()}")
+    #         # print(f"Activity unique values: {df['activity'].unique().tolist()}")
+    #         # print(f"NaN values in activity column: {df['activity'].isna().sum()}")
+            
+    #         # # Debug our activity_map
+    #         # print(f"Activity map: {self.activity_map}")
+    #         # print(f"UNLABELED_VALUE: {self.UNLABELED_VALUE}")
+
+    #         for device_id, data in df.groupby("device_id"):
+    #             # sequences = []  # List of observation sequences
+    #             # labels = []    # List of activity labels
+                
+    #             for i in range(max_length, len(data), max_length): # Head of the list
+    #                 current_sequence = []
+    #                 current_labels = []
+
+    #                 for j in range(i-max_length, i):
+    #                     row = data.iloc[j]
+    #                     current_features = []
+    #                     # Get feature values for current observation
+    #                     for f in self.config.analysis.lstm.features:
+    #                         if pd.isna(row[f]):
+    #                             current_features.append(self.masking_val)
+    #                         else:
+    #                             current_features.append(float(row[f]))
+
+
+    #                     current_label=self.activity_map.get(row['activity'], self.UNLABELED_VALUE)
+    #                     current_labels.append(current_label)
+    #                     # Add current observation to sequence
+    #                     current_sequence.append(current_features)
+    #                     # Cow_Date_Key.append([device_id,i+j])  
+    #                 # if len(X) < 3:  # Just for the first few sequences
+    #                 #     print(f"Sample sequence {len(X)+1}:")
+    #                 #     print(f"  - Labels: {current_labels[:5]}...{current_labels[-5:]}")
+    #                 #     print(f"  - Any valid labels: {any(l != self.UNLABELED_VALUE for l in current_labels)}")
+    #                 #     print(f"  - Device ID: {device_id}, Sequence index: {i}")
+
+
+    #                 X.append(current_sequence)
+    #                 Y.append(current_labels)
+    #                 Cow_Date_Key.append([device_id,i])
+
+    #     # print(Cow_Date_Key)
+    #     Cow_Date_Key = np.array(Cow_Date_Key)
+    #     X = np.array(X, dtype=np.float32)  # Ensure float32 for X
+    #     Y = np.array(Y, dtype=np.int32)    # Ensure int32 for Y
+
+
+    #     # print(Cow_Date_Key.shape)
+    #     # print(Cow_Date_Key[:2,:])
+    #     # print(X.shape)
+    #     # print(Y.shape)
+
+
+    #     # print(Y[:5])
+    #     # print(Cow_Date_Key)
+    #     return {
+    #         'Cow_Date_Key': Cow_Date_Key,
+    #         'X': X,
+    #         'Y': Y #.squeeze(axis=2),
+    #     }
+
+    #     # else:
+
+
+
+    # def _build_sequences_opo(self, df:pd.DataFrame, progress_callback=None):
+    #     """
+    #     Build sequences for one-per-observation analysis.
+    #     Includes memory optimization and progress reporting.
+    #     """
+    #     if progress_callback is None:
+    #         progress_callback = lambda percent, message: None
+            
+    #     max_length = self.sequence_length
+    #     features = self.config.analysis.lstm.features
+    #     step_size = self.config.analysis.gps_sample_interval//60  # Sample interval in minutes
+
+    #     minutes_in_day = 24 * 60
+    #     expected_records = minutes_in_day // step_size
+    #     lost_hour = (60//step_size)
+
+    #     Cow_Date_Key = []
+    #     X = []
+    #     Y = []
+        
+    #     # Count total days for progress reporting
+    #     total_days = 0
+    #     for _, device_data in df.groupby("device_id"):
+    #         total_days += device_data['date'].nunique()
+        
+    #     progress_callback(20, f"Building OPO sequences from {total_days} cow-days")
+        
+    #     days_processed = 0
+        
+    #     if max_length == 288:
+    #         progress_callback(25, "Using daily sequence mode (288 samples per day)")
+            
+    #         for device_id, device_data in df.groupby("device_id"):
+    #             device_data = device_data.sort_values('posix_time')
+                
+    #             for date, day_data in device_data.groupby("date"):
+    #                 days_processed += 1
+                    
+    #                 # Progress update
+    #                 progress_pct = 25 + int(30 * days_processed / total_days)
+    #                 progress_callback(progress_pct, f"Processing day {days_processed}/{total_days}: Device {device_id}, Date {date}")
+                    
+    #                 if len(day_data) < expected_records * 0.5:  # Skip days with too few records
+    #                     continue
+                    
+    #                 # Extract features, replace NaN with masking value
+    #                 seq = day_data[features].copy().reset_index(drop=True)
+    #                 labels = day_data[['activity']].copy().reset_index(drop=True)
+                    
+    #                 labels = labels.map(lambda x: self.activity_map.get(x, -1))
+
+    #                 if len(seq) == expected_records - lost_hour:
+    #                     # Handle daylight savings time issues
+    #                     masking_df = pd.DataFrame({
+    #                         col: [np.nan] * lost_hour for col in seq.columns
+    #                     })
+    #                     seq = pd.concat([seq, masking_df], ignore_index=True)
+
+    #                     nan_labels = pd.DataFrame({'activity': [np.nan] * lost_hour})
+    #                     nan_labels = nan_labels.map(lambda x: self.activity_map.get(x, -1))
+    #                     labels = pd.concat([labels, nan_labels], ignore_index=True)
+
+    #                 seq.fillna(self.masking_val, inplace=True)
+    #                 labels.fillna(self.UNLABELED_VALUE, inplace=True)
+                    
+    #                 # Add sequence to our dataset
+    #                 Cow_Date_Key.append([device_id, date])
+    #                 X.append(seq.values)
+    #                 Y.append(labels.to_numpy().ravel())
+                    
+    #                 # Force garbage collection periodically
+    #                 if days_processed % 100 == 0:
+    #                     import gc
+    #                     gc.collect()
+    #     else:
+    #         progress_callback(25, f"Using custom sequence length: {max_length}")
+            
+    #         days_processed = 0
+    #         sequence_count = 0
+            
+    #         for device_id, data in df.groupby("device_id"):
+    #             data = data.sort_values('posix_time').reset_index(drop=True)
+    #             days_processed += data['date'].nunique()
+                
+    #             # Progress update
+    #             progress_pct = 25 + int(30 * days_processed / total_days)
+    #             progress_callback(progress_pct, f"Processing device {device_id}: {data['date'].nunique()} days")
+                
+    #             # Process in sliding windows of size max_length
+    #             for i in range(max_length, len(data), max_length // 2):  # 50% overlap for better coverage
+    #                 current_sequence = []
+    #                 current_labels = []
+                    
+    #                 sequence_start = max(0, i - max_length)
+    #                 sequence_end = min(len(data), i)
+                    
+    #                 for j in range(sequence_start, sequence_end):
+    #                     row = data.iloc[j]
+    #                     current_features = []
+                        
+    #                     # Get feature values for current observation
+    #                     for f in features:
+    #                         if pd.isna(row[f]):
+    #                             current_features.append(self.masking_val)
+    #                         else:
+    #                             current_features.append(float(row[f]))
+                        
+    #                     current_label = self.activity_map.get(row['activity'], self.UNLABELED_VALUE)
+    #                     current_labels.append(current_label)
+    #                     current_sequence.append(current_features)
+                    
+    #                 # Only add if we have at least 50% of max_length
+    #                 if len(current_sequence) >= max_length / 2:
+    #                     # Pad if needed
+    #                     if len(current_sequence) < max_length:
+    #                         padding_needed = max_length - len(current_sequence)
+    #                         padding = [[self.masking_val] * len(features)] * padding_needed
+    #                         current_sequence = padding + current_sequence
+    #                         current_labels = [self.UNLABELED_VALUE] * padding_needed + current_labels
+                        
+    #                     sequence_count += 1
+    #                     X.append(current_sequence)
+    #                     Y.append(current_labels)
+    #                     Cow_Date_Key.append([device_id, i])
+                    
+    #                 # Force garbage collection periodically
+    #                 if sequence_count % 1000 == 0:
+    #                     import gc
+    #                     gc.collect()
+        
+    #     progress_callback(60, "Converting sequences to numpy arrays")
+        
+    #     # Convert to numpy arrays efficiently
+    #     X_array = np.array(X, dtype=np.float32)
+    #     Y_array = np.array(Y, dtype=np.int32)
+    #     Key_array = np.array(Cow_Date_Key)
+        
+    #     progress_callback(80, f"Created {len(X_array)} sequences covering {days_processed} cow-days")
+        
+    #     return {
+    #         'Cow_Date_Key': Key_array,
+    #         'X': X_array,
+    #         'Y': Y_array
+    #     }
+
+
+    def _build_sequences_opo(self, df: pd.DataFrame, progress_callback=None):
+        """
+        Build sequences for one-per-observation (OPO) analysis.
+        Pre-calculates sequence counts and includes every observation exactly once.
+        """
+        if progress_callback is None:
+            progress_callback = lambda percent, message: None
+        
         max_length = self.sequence_length
         features = self.config.analysis.lstm.features
-        step_size = self.config.analysis.gps_sample_interval//60  # Sample interval in minutes
-
+        num_features = len(features)
+        
+        # Sample interval calculations
+        step_size = self.config.analysis.gps_sample_interval // 60  # Sample interval in minutes
         minutes_in_day = 24 * 60
         expected_records = minutes_in_day // step_size
-        # self.sequence_length = expected_records
-
-        # df['activity'].fillna(self.UNLABELED_VALUE,inplace=True)
-        lost_hour = (60//step_size)
-
-        Cow_Date_Key = []
-        X = []
-        Y = []
-
-        if (max_length>=276) & (max_length < 288):
-            print("WARNING: Daylight savings had not been accounted for.")
-
-        if max_length == 288:
-            print("WARNING: Daylight is only account for when an hour is lost, not gained. (If the data are from spring you are fine).")
+        lost_hour = 60 // step_size  # Records in one hour (for DST handling)
+        
+        progress_callback(5, "Analyzing data to determine sequence counts")
+        
+        # Daily sequence mode (for sequence lengths near 288)
+        if max_length >= expected_records - lost_hour and max_length <= expected_records + lost_hour:
+            is_daily_mode = True
+            progress_callback(10, f"Using daily sequence mode (length={max_length}, expected={expected_records})")
+            
+            # Calculate exact number of sequences (one per day with sufficient data)
+            total_sequences = 0
+            device_sequences = {}  # To track how many sequences per device
+            
             for device_id, device_data in df.groupby("device_id"):
-                # self.data_map[device_id] = {}
+                device_sequences[device_id] = 0
                 for date, day_data in device_data.groupby("date"):
-                    if len(day_data) < expected_records * 0.5:  # Skip days with too few records
-                        # print(f"Skipping day with insufficient data: {date}, {len(day_data)}/{expected_records}")
-                        continue
-                    
-                    # Extract features, replace NaN with masking value
-                    seq :pd.DataFrame = day_data[features].copy().reset_index(drop=True) #.fillna(self.masking_val)
-                    labels :pd.DataFrame = day_data[['activity']].copy().reset_index(drop=True)
-
-                    labels = labels.map(lambda x: self.activity_map.get(x, -1))
-
-                    if len(seq) == expected_records - lost_hour:
-                        # print(f"Missing data due to timezone shift. Inserting {lost_hour} values to the end of the sequence.")
-                        masking_df = pd.DataFrame({
-                            col: [np.nan] * lost_hour for col in seq.columns
-                        })
-                        seq = pd.concat([seq, masking_df], ignore_index=True)
-
-                        nan_labels = pd.DataFrame({'activity': [np.nan] * lost_hour})
-                        nan_labels = nan_labels.map(lambda x: self.activity_map.get(x, -1))
-                        labels = pd.concat([labels, nan_labels], ignore_index=True)
-
-                    else:
-                        pass
-                    seq.fillna(self.masking_val, inplace=True)
-                    labels.fillna(self.UNLABELED_VALUE,inplace=True)
-                    
-                    # Add sequence to our dataset
-                    Cow_Date_Key.append([device_id,date])
-                    X.append(seq)
-                    Y.append(labels.to_numpy().ravel())
-
-
-        else: 
+                    # We include all days since we need to process all observations
+                    device_sequences[device_id] += 1
+                    total_sequences += 1
             
-
-            print(f"Input DataFrame shape: {df.shape}")
-            print(f"Input DataFrame columns: {df.columns.tolist()}")
-            print(f"Activity unique values: {df['activity'].unique().tolist()}")
-            print(f"NaN values in activity column: {df['activity'].isna().sum()}")
+            progress_callback(15, f"Will create {total_sequences} daily sequences")
+        else:
+            is_daily_mode = False
+            progress_callback(10, f"Using custom sequence length mode (length={max_length})")
             
-            # Debug our activity_map
-            print(f"Activity map: {self.activity_map}")
-            print(f"UNLABELED_VALUE: {self.UNLABELED_VALUE}")
+            # Calculate exact number of sequences needed
+            total_sequences = 0
+            device_sequences = {}  # To track how many sequences per device
+            
+            for device_id, device_data in df.groupby("device_id"):
+                # Calculate how many complete sequences we can make
+                data_len = len(device_data)
+                num_sequences = (data_len + max_length - 1) // max_length  # Ceiling division
+                device_sequences[device_id] = num_sequences
+                total_sequences += num_sequences
+            
+            progress_callback(15, f"Will create {total_sequences} sequences of length {max_length}")
+        
+        # Pre-allocate arrays with exact sizes
+        cow_date_keys = np.zeros((total_sequences, 2), dtype=object)
+        all_sequences = np.full((total_sequences, max_length, num_features), self.masking_val, dtype=np.float32)
+        all_labels = np.full((total_sequences, max_length), self.UNLABELED_VALUE, dtype=np.int32)
+        
+        # Pre-fill NaN values in the feature columns
+        df[features] = df[features].fillna(self.masking_val)
+        
+        # Process the data
+        sequence_idx = 0
+        device_count = 0
+        total_devices = len(device_sequences)
+        
+        for device_id, device_data in df.groupby("device_id"):
+            print(f"OPO Building sequences -- Processing device {device_id} ({device_count+1}/{total_devices})")
 
-            for device_id, data in df.groupby("device_id"):
-                # sequences = []  # List of observation sequences
-                # labels = []    # List of activity labels
+            device_count += 1
+            device_progress_base = 20 + (75 * (device_count - 1) / total_devices)
+            device_progress_next = 20 + (75 * device_count / total_devices)
+            
+            progress_callback(int(device_progress_base), 
+                            f"Processing device {device_id} ({device_count}/{total_devices})")
+            
+            # Ensure data is sorted by time
+            device_data = device_data.sort_values('posix_time').reset_index(drop=True)
+            
+            if is_daily_mode:
+                # Process by days
+                day_count = 0
+                total_days = device_data['date'].nunique()
                 
-                for i in range(max_length, len(data), max_length): # Head of the list
-                    current_sequence = []
-                    current_labels = []
-
-                    for j in range(i-max_length, i):
-                        row = data.iloc[j]
-                        current_features = []
-                        # Get feature values for current observation
-                        for f in self.config.analysis.lstm.features:
-                            if pd.isna(row[f]):
-                                current_features.append(self.masking_val)
-                            else:
-                                current_features.append(float(row[f]))
-
-
-                        current_label=self.activity_map.get(row['activity'], self.UNLABELED_VALUE)
-                        current_labels.append(current_label)
-                        # Add current observation to sequence
-                        current_sequence.append(current_features)
-                        # Cow_Date_Key.append([device_id,i+j])  
-                    # if len(X) < 3:  # Just for the first few sequences
-                    #     print(f"Sample sequence {len(X)+1}:")
-                    #     print(f"  - Labels: {current_labels[:5]}...{current_labels[-5:]}")
-                    #     print(f"  - Any valid labels: {any(l != self.UNLABELED_VALUE for l in current_labels)}")
-                    #     print(f"  - Device ID: {device_id}, Sequence index: {i}")
-
-
-                    X.append(current_sequence)
-                    Y.append(current_labels)
-                    Cow_Date_Key.append([device_id,i])
-
-        # print(Cow_Date_Key)
-        Cow_Date_Key = np.array(Cow_Date_Key)
-        X = np.array(X, dtype=np.float32)  # Ensure float32 for X
-        Y = np.array(Y, dtype=np.int32)    # Ensure int32 for Y
-
-
-        # print(Cow_Date_Key.shape)
-        # print(Cow_Date_Key[:2,:])
-        # print(X.shape)
-        # print(Y.shape)
-
-
-        # print(Y[:5])
-        # print(Cow_Date_Key)
+                for date, day_data in device_data.groupby("date"):
+                    day_count += 1
+                    day_progress = device_progress_base + (device_progress_next - device_progress_base) * day_count / total_days
+                    
+                    progress_callback(int(day_progress), 
+                                    f"Device {device_id}: day {day_count}/{total_days}")
+                    
+                    # Extract features and labels
+                    day_features = day_data[features].values
+                    day_activities = day_data['activity'].map(lambda x: self.activity_map.get(x, self.UNLABELED_VALUE)).values
+                    
+                    day_len = len(day_features)
+                    
+                    # Handle various day lengths properly
+                    if day_len <= max_length:
+                        # Day fits in sequence - just copy it
+                        all_sequences[sequence_idx, :day_len] = day_features
+                        all_labels[sequence_idx, :day_len] = day_activities
+                    elif day_len == expected_records + lost_hour and max_length < day_len:
+                        # Fall back day (extra hour) that exceeds max_length
+                        # Take first max_length observations
+                        all_sequences[sequence_idx] = day_features[:max_length]
+                        all_labels[sequence_idx] = day_activities[:max_length]
+                    elif day_len > max_length:
+                        # Day longer than max_length - truncate
+                        all_sequences[sequence_idx] = day_features[:max_length]
+                        all_labels[sequence_idx] = day_activities[:max_length]
+                    
+                    # Store reference information
+                    cow_date_keys[sequence_idx] = [device_id, date]
+                    sequence_idx += 1
+            else:
+                # Process by fixed chunks of max_length
+                data_len = len(device_data)
+                expected_sequences = device_sequences[device_id]
+                
+                # Extract all features and activities at once
+                device_features = device_data[features].values
+                device_activities = device_data['activity'].map(lambda x: self.activity_map.get(x, self.UNLABELED_VALUE)).values
+                
+                # Process in chunks
+                for chunk_idx in range(expected_sequences):
+                    chunk_progress = device_progress_base + (device_progress_next - device_progress_base) * (chunk_idx + 1) / expected_sequences
+                    
+                    if (chunk_idx + 1) % max(1, expected_sequences // 10) == 0:  # Update every ~10% of chunks
+                        progress_callback(int(chunk_progress), 
+                                        f"Device {device_id}: chunk {chunk_idx + 1}/{expected_sequences}")
+                    
+                    # Calculate chunk boundaries
+                    start_idx = chunk_idx * max_length
+                    end_idx = min(start_idx + max_length, data_len)
+                    chunk_len = end_idx - start_idx
+                    
+                    # Handle the last chunk which may be partial
+                    if chunk_len < max_length:
+                        # Place data at the end of the sequence (right-aligned)
+                        padding_len = max_length - chunk_len
+                        all_sequences[sequence_idx, padding_len:] = device_features[start_idx:end_idx]
+                        all_labels[sequence_idx, padding_len:] = device_activities[start_idx:end_idx]
+                    else:
+                        # Full chunk
+                        all_sequences[sequence_idx] = device_features[start_idx:end_idx]
+                        all_labels[sequence_idx] = device_activities[start_idx:end_idx]
+                    
+                    # Store reference information - use middle index as reference
+                    ref_idx = (start_idx + end_idx) // 2
+                    cow_date_keys[sequence_idx] = [device_id, ref_idx]
+                    sequence_idx += 1
+        
+        # Verify that we created the expected number of sequences
+        assert sequence_idx == total_sequences, f"Expected {total_sequences} sequences, created {sequence_idx}"
+        
+        progress_callback(95, f"Created {sequence_idx} sequences")
+        progress_callback(100, "OPO sequence building complete")
+        
         return {
-            'Cow_Date_Key': Cow_Date_Key,
-            'X': X,
-            'Y': Y #.squeeze(axis=2),
+            'Cow_Date_Key': cow_date_keys,
+            'X': all_sequences,
+            'Y': all_labels
         }
 
-        # else:
 
-
-    def _build_sequences_ops(self, df:pd.DataFrame):
+    def _build_sequences_ops(self, df: pd.DataFrame, progress_callback=None):
         """
-        # LOOK INTO RAGGED
         Build sequences for many-to-one classification with zero padding.
         Each sequence predicts the activity at its last timestamp.
+        Uses efficient NumPy operations for better performance.
         """
-        Cow_Date_Key = []
-        X = []
-        Y = []
-
-
-        for device_id, data in df.groupby("device_id"):
-            # sequences = []  # List of observation sequences
-            # labels = []    # List of activity labels
-            current_sequence = []
+        if progress_callback is None:
+            progress_callback = lambda percent, message: None
+        
+        # Get total number of rows for progress calculation
+        total_rows = len(df)
+        
+        # Get unique device IDs for reporting
+        unique_devices = df['device_id'].unique()
+        num_devices = len(unique_devices)
+        progress_callback(5, f"Building sequences for {num_devices} devices ({total_rows} observations)")
+        
+        # Pre-process feature data
+        # Fill NaN values in features
+        df[self.config.analysis.lstm.features] = df[self.config.analysis.lstm.features].fillna(self.masking_val)
+        
+        # Pre-allocate arrays for results - one row per observation
+        cow_date_keys = np.zeros((total_rows, 2), dtype=np.int32)
+        all_sequences = np.zeros((total_rows, self.sequence_length, len(self.config.analysis.lstm.features)), 
+                                dtype=np.float32)
+        all_labels = np.zeros(total_rows, dtype=np.int32)
+        
+        # Track the current position in our result arrays
+        sequence_count = 0
+        
+        # Process each device's data
+        for idx, (device_id, data) in enumerate(df.groupby("device_id")):
+            print(f"OPS Building sequences -- Processing device {device_id} ({idx+1}/{num_devices})")
+            device_progress_base = 5 + (90 * idx // num_devices)
+            device_progress_target = 5 + (90 * (idx + 1) // num_devices)
             
-            for i in range(len(data)):
-                row = data.iloc[i]
-                current_features = []
-                # Get feature values for current observation
-                for f in self.config.analysis.lstm.features:
-                    if pd.isna(row[f]):
-                        current_features.append(self.masking_val)
-                    else:
-                        current_features.append(float(row[f]))
-                # current_features = [row[f] if row[f] != np.float64(np.nan) else self.masking_val]
-                # print(current_features)
-                # return
-                # Start new sequence if:
-                # 1. First record
-                # 2. Time gap too large (using posix_time)
-                if (i == 0) or (data.iloc[i]['posix_time'] - data.iloc[i-1]['posix_time'] > self.config.analysis.lstm.max_time_gap):
-                    current_sequence = []
+            progress_callback(device_progress_base, 
+                            f"Processing device {device_id} ({idx+1}/{num_devices})")
+            
+            data_len = len(data)
+            device_progress_interval = max(1, data_len // 20)  # Update 20 times per device
+            
+            # Feature matrix for this device
+            feature_matrix = data[self.config.analysis.lstm.features].values
+            
+            # Activity labels
+            activities = data['activity'].map(lambda x: self.activity_map.get(x, self.UNLABELED_VALUE)).values
+            
+            # Posix times for checking time gaps
+            posix_times = data['posix_time'].values
+            
+            # Initialize empty sequence with masking values
+            current_sequence = np.full((self.sequence_length, len(self.config.analysis.lstm.features)), 
+                                    self.masking_val, dtype=np.float32)
+            current_sequence_len = 0
+            
+            # Create sequences for this device
+            for i in range(data_len):
+                # Report progress periodically
+                if i % device_progress_interval == 0:
+                    device_progress = device_progress_base + (device_progress_target - device_progress_base) * i // data_len
+                    progress_callback(device_progress, 
+                                    f"Device {device_id}: {i}/{data_len} observations processed")
                 
-                # Add current observation to sequence
-                current_sequence.append(current_features)
+                # Check for time gap
+                if i > 0 and (posix_times[i] - posix_times[i-1] > self.config.analysis.lstm.max_time_gap):
+                    # Time gap too large, reset sequence
+                    current_sequence.fill(self.masking_val)
+                    current_sequence_len = 0
                 
-                # Keep only last max_length observations
-                if len(current_sequence) > self.sequence_length:
-                    current_sequence = current_sequence[-self.sequence_length:]
+                # Add current observation to sequence using a circular buffer approach
+                if current_sequence_len < self.sequence_length:
+                    # Sequence not full yet, add at the end
+                    current_sequence[self.sequence_length - current_sequence_len - 1] = feature_matrix[i]
+                    current_sequence_len += 1
+                else:
+                    # Sequence full, shift everything up and add new at the end
+                    current_sequence = np.roll(current_sequence, -1, axis=0)
+                    current_sequence[-1] = feature_matrix[i]
                 
-                # Create padded sequence
-                padded_sequence = np.zeros((self.sequence_length, len(self.config.analysis.lstm.features)))
-                start_idx = self.sequence_length - len(current_sequence)
-                padded_sequence[start_idx:] = current_sequence
-
-                # for seq_idx, feature_vector in enumerate(current_sequence):
-                #     padded_sequence[start_idx + seq_idx] = feature_vector
-
-
-                # if random.random() < 0.1:
-                Cow_Date_Key.append([device_id, i])
-                X.append(padded_sequence)
-                # print(row['activity'])
-                Y.append(self.activity_map.get(row['activity'], -1))
-
-        Cow_Date_Key = np.array(Cow_Date_Key)
-        X = np.array(X, dtype=np.float32)  # Ensure float32 for X
-        Y = np.array(Y, dtype=np.int32)    # Ensure int32 for Y
-
+                # Store the sequence for every observation
+                all_sequences[sequence_count] = current_sequence
+                cow_date_keys[sequence_count] = [device_id, i]
+                all_labels[sequence_count] = activities[i]
+                sequence_count += 1
+        
+        # Final progress update
+        progress_callback(100, f"Sequence building complete. Created {sequence_count} sequences.")
+        
+        # Validate that we created the expected number of sequences
+        assert sequence_count == total_rows, f"Expected {total_rows} sequences, but created {sequence_count}"
+        
         return {
-            'Cow_Date_Key': Cow_Date_Key,
-            'X': X,
-            'Y': Y,
+            'Cow_Date_Key': cow_date_keys,
+            'X': all_sequences,
+            'Y': all_labels,
         }
 
 
-    # def dont_do_loocv(self, sequences, df):        
-    #     Cow_Date_Key_full = sequences['Cow_Date_Key']
-    #     X_full = sequences['X']
-    #     Y_full = sequences['Y'] #.squeeze(axis=2)
-    
 
-    #     # ONLY TRAIN ON SEQUENCES WITH LABELS
-    #     has_label = (Y_full != -1) if len(Y_full.shape) == 1 else np.any(Y_full[:,:] != -1, 1)
+    def dont_do_loocv(self, sequences, df, progress_callback=None):
+        """Process data in product mode with trained or new model"""
+        if progress_callback is None:
+            progress_callback = lambda percent, message: None
+        
+        print(df.head(20))
 
-    #     Cow_Date_Key = Cow_Date_Key_full[has_label]
-    #     X = X_full[has_label]
-    #     Y = Y_full[has_label]
+        import gc
 
-    #     # # Calculate label density for each sequence
-    #     # label_density = []
-    #     # for i in range(len(Y)):
-    #     #     # Calculate percentage of timesteps that have valid labels
-    #     #     valid_labels = (Y[i] != self.UNLABELED_VALUE)
-    #     #     density = np.mean(valid_labels)
-    #     #     label_density.append(density)
-        
-    #     # # Only consider sequences with sufficient labels for validation
-    #     # min_label_density = 0.1  # At least 10% of timesteps must have labels
-    #     # valid_indices = np.where(np.array(label_density) >= min_label_density)[0]
-        
-    #     # if len(valid_indices) < 10:
-    #     #     print("WARNING: Very few sequences with sufficient labels found!")
-    #     #     # Fallback to using all sequences
-    #     #     valid_indices = np.arange(len(X))
-        
-    #     # Now split only among valid indices
-    #     # np.random.shuffle(valid_indices)
-    #     # split_idx = int(len(valid_indices) * (1 - val_split))
-        
-    #     # train_indices = valid_indices[:split_idx]
-    #     # val_indices = valid_indices[split_idx:]
-        
-    #     train_X, test_X, train_Y, test_Y= train_test_split(X,Y,random_state=self.config.analysis.random_seed,test_size=.3,shuffle=True)
-        
-    #     # train_X, val_X = X[train_indices], X[val_indices]
-    #     # train_Y, val_Y = Y[train_indices], Y[val_indices]
-        
-    #     # Print label statistics
-    #     train_label_count = np.sum(train_Y != self.UNLABELED_VALUE)
-    #     test_label_count = np.sum(test_Y != self.UNLABELED_VALUE)
-    #     print(f"Training set: {len(train_X)} sequences with {train_label_count} labeled timesteps")
-    #     print(f"Test set: {len(test_X)} sequences with {test_label_count} labeled timesteps")
-
-        
-    #     # Train a single global model on all data
-    #     print("\n==== Training Single Global Model ====")
-        
-    #     # # Use a small validation split
-
-    #     # indices = np.arange(len(X))
-    #     # np.random.shuffle(indices)
-    #     # split_idx = int(len(indices) * (1 - val_split))
-        
-    #     # train_indices = indices[:split_idx]
-    #     # val_indices = indices[split_idx:]
-        
-    #     # train_X, val_X = X[train_indices], X[val_indices]
-    #     # train_Y, val_Y = Y[train_indices], Y[val_indices]
-        
-    #     # # Train single model (no test data provided)
-    #     # model, history, _, _, _ = self._make_LSTM(
-    #     #     train_X, train_Y, val_X=val_X, val_Y=val_Y, test_X=None, test_Y=None
-    #     # )
-        
-
-    #     model, history, pred_y_classes = self._make_LSTM(
-    #         train_X, train_Y, test_X, test_Y
-    #     )
-
-    #     # Generate all predictions:
-
-    #     model.fit(X_full)
-        
-    #     # Save the global model
-    #     model_path = self.output_dir / "global_lstm_model.keras"
-    #     model.save(model_path)
-    #     print(f"Global model saved to {model_path}")
-        
-    #     # Plot training history
-    #     self._plot_single_history(history)
-        
-    #     return model, history
-
-
-
-    def dont_do_loocv(self, sequences, df):        
+        progress_callback(60, "Preparing data for model training/prediction")
         Cow_Date_Key_full = sequences['Cow_Date_Key']
         X_full = sequences['X']
-        Y_full = sequences['Y'] #.squeeze(axis=2)
-
+        Y_full = sequences['Y']
+        
         # ONLY TRAIN ON SEQUENCES WITH LABELS
         has_label = (Y_full != -1) if len(Y_full.shape) == 1 else np.any(Y_full[:,:] != -1, 1)
-
         Cow_Date_Key = Cow_Date_Key_full[has_label]
         X = X_full[has_label]
         Y = Y_full[has_label]
-
+        
         # Split data for training/testing
-        train_X, test_X, train_Y, test_Y= train_test_split(X, Y, random_state=self.config.analysis.random_seed, test_size=.3, shuffle=True)
+        progress_callback(65, "Splitting data into training and test sets")
+        train_X, test_X, train_Y, test_Y = train_test_split(
+            X, Y, random_state=self.config.analysis.random_seed, test_size=.3, shuffle=True
+        )
         
         # Print label statistics
         train_label_count = np.sum(train_Y != self.UNLABELED_VALUE)
         test_label_count = np.sum(test_Y != self.UNLABELED_VALUE)
-        print(f"Training set: {len(train_X)} sequences with {train_label_count} labeled timesteps")
-        print(f"Test set: {len(test_X)} sequences with {test_label_count} labeled timesteps")
+        progress_callback(67, f"Training set: {len(train_X)} sequences with {train_label_count} labeled timesteps")
+        progress_callback(68, f"Test set: {len(test_X)} sequences with {test_label_count} labeled timesteps")
         
-        # Train model
-        print("\n==== Training Single Global Model ====")
-        model, history, _ = self._make_LSTM(train_X, train_Y, test_X, test_Y)
+        model = None
+        history = None
+
+        # Check if we should load a model from a path
+        if self.config.analysis.training_info_path and str(self.config.analysis.training_info_path).endswith(".keras"):
+            progress_callback(70, "Loading existing model for prediction")
+            try:
+                model_path = self.config.analysis.training_info_path
+                progress_callback(72, f"Loading model from: {model_path}")
+                # Load the saved model
+                model = tf.keras.models.load_model(model_path, custom_objects={
+                    'MaskedConv1D': MaskedConv1D  # Include any custom layers here
+                })
+                # For consistency with the training case
+                progress_callback(75, "Model loaded successfully")
+                print("LOADED THE MODEL SUCCESSFULLY FROM ", self.config.analysis.training_info_path)
+            except Exception as e:
+                print("ERROR LOADING THE MODEL FROM ", self.config.analysis.training_info_path)
+                progress_callback(72, f"Error loading model: {str(e)}")
+                progress_callback(73, "Falling back to training a new model")
+                print(traceback.format_exc())
+                model, history, _ = self._make_LSTM(train_X, train_Y, test_X, test_Y, progress_callback)
+                # Save the global model
+                model_path = self.model_path / "global_lstm_model.keras"
+                model.save(model_path)
+                progress_callback(80, f"New model saved to {model_path}")
+                # Plot training history
+                if history:
+                    self._plot_single_history(history)
+
+
+        else:
+            progress_callback(70, "Training new model")
+            model, history, _ = self._make_LSTM(train_X, train_Y, test_X, test_Y, progress_callback)
+            # Save the global model
+            model_path = self.model_path / "global_lstm_model.keras"
+            model.save(model_path)
+            progress_callback(80, f"Model saved to {model_path}")
+            # Plot training history
+            if history:
+                self._plot_single_history(history)
         
-        # Save the global model
-        model_path = self.model_path / "global_lstm_model.keras"
-        model.save(model_path)
-        print(f"Global model saved to {model_path}")
-        
-        # Plot training history ############### CHECK OUTPUT PATH
-        self._plot_single_history(history)
-        
+        del train_X, train_Y, test_X, test_Y
+        gc.collect()
+
         # Generate predictions for the full dataset
-        print("\n==== Generating Predictions for Full Dataset ====")
+        progress_callback(85, "Generating predictions for the full dataset")
+
+        # Process predictions in batches to avoid memory issues
+        batch_size_pred = 1024  # Adjust based on your system's memory
+        n_batches = (len(X_full) + batch_size_pred - 1) // batch_size_pred
         
-        # Predict on full dataset (X_full)
-        predictions = model.predict(X_full, verbose=1)
-        
-        # Get the predicted class for each observation
-        if len(Y_full.shape) == 1:  # OPS case
-            predicted_classes = np.argmax(predictions, axis=1)
-        else:  # OPO case
-            predicted_classes = np.argmax(predictions, axis=2)
+        if n_batches > 1:
+            # Multi-batch prediction
+            predictions = []
+            for i in range(n_batches):
+                start_idx = i * batch_size_pred
+                end_idx = min((i + 1) * batch_size_pred, len(X_full))
+                progress_callback(85 + (5 * i // n_batches), 
+                                f"Predicting batch {i+1}/{n_batches} ({start_idx}-{end_idx})")
+                
+
+                # print(X_full.shape)
+                # print(X_full[0].shape)
+                batch_pred = model.predict(X_full[start_idx:end_idx], verbose=0)
+                predictions.append(batch_pred)
+                
+                # Force garbage collection after each batch
+                gc.collect()
+            
+            # Combine batch predictions
+            if len(Y_full.shape) == 1:  # OPS case
+                predictions = np.vstack(predictions)
+            else:  # OPO case
+                predictions = np.vstack([p for p in predictions])
+        else:
+            # Single batch prediction
+            predictions = model.predict(X_full, verbose=0)
         
         # Create a results dataframe
         results_df = pd.DataFrame()
         
         # Process the predictions and map back to the original data
-        print("Creating prediction results dataframe...")
+        progress_callback(90, "Creating prediction results dataframe")
+        all_cow_preds_aligned = pd.DataFrame(columns=['device_id', 'posix_time', 'predicted_state'])
+        unique_cows = np.unique(Cow_Date_Key_full[:,0].astype(int))
+        current_cow = 0
+        total_cows = len(unique_cows)
         
+        # Extract predicted classes from prediction probabilities
         if len(Y_full.shape) == 1:  # OPS (many-to-one) case
-            # Extract device_ids and indices from Cow_Date_Key
-            device_ids = Cow_Date_Key_full[:, 0]
-            indices = Cow_Date_Key_full[:, 1].astype(int)
+            progress_callback(91, "Processing OPS predictions")
+            predicted_classes = np.argmax(predictions, axis=1)
             
-            # Create a dataframe with predictions
-            results_df = pd.DataFrame({
-                'device_id': device_ids,
-                'index': indices,
-                'predicted_activity_id': predicted_classes
-            })
-            
-            # Map numeric class ids back to activity labels
-            results_df['predicted_activity'] = results_df['predicted_activity_id'].map(
-                lambda x: self.inv_activity_map.get(x, 'Unknown')
-            )
-            
-            # Merge with original dataframe to get timestamps and original activities
-            # We need to reset the index of the original df to use it for merging
-            df_reset = df.reset_index()
-            df_reset['index'] = df_reset.index
-            
-            # Merge by device_id and index
-            results_df = pd.merge(
-                results_df,
-                df_reset[['device_id', 'index', 'posix_time', 'activity']],
-                on=['device_id', 'index'],
-                how='left'
-            )
-            
-        else:  # OPO (one-per-observation) case
-            # For OPO, each row in X_full is a full sequence
-            # We need to map each prediction back to the right observation
-            
-            sequences_with_preds = []
-            
-            for i in range(len(X_full)):
-                device_id = Cow_Date_Key_full[i, 0]
-                date = Cow_Date_Key_full[i, 1]
+            # Process one cow at a time to manage memory
+            for cow_id in unique_cows:
+                current_cow += 1
+                progress_callback(91 + int(4 * current_cow / total_cows),
+                                f"Processing cow {current_cow}/{total_cows}")
                 
-                # Get the day's data for this device
-                day_data = df[(df['device_id'] == device_id) & (df['date'] == pd.to_datetime(date).date())]
-                
-                if len(day_data) == 0:
-                    continue
-                    
-                # Create a result dataframe for this sequence
-                seq_df = day_data.copy()
-                seq_df['predicted_activity_id'] = predicted_classes[i]
-                seq_df['predicted_activity'] = seq_df['predicted_activity_id'].map(
-                    lambda x: self.inv_activity_map.get(x, 'Unknown')
+                key_for_this_cow = Cow_Date_Key_full[:,0] == cow_id
+                this_cows_preds = pd.Series(predicted_classes[key_for_this_cow]).map(
+                    lambda x: self.inv_activity_map.get(x, 'HELLO1')
                 )
                 
-                sequences_with_preds.append(seq_df)
+                cow_df = df[df['device_id'] == cow_id].copy()
+                cow_df['predicted_state'] = this_cows_preds.values[:len(cow_df)]  # Ensure length matches
+                results_df = pd.concat([results_df, cow_df], ignore_index=True)
+                
+                # Force garbage collection periodically
+                if current_cow % 5 == 0:
+                    gc.collect()
             
-            # Combine all results
-            if sequences_with_preds:
-                results_df = pd.concat(sequences_with_preds)
-            else:
-                print("Warning: No sequences could be mapped back to original data")
-                return model, history
+        else:  # OPO (one-per-observation) case
+            progress_callback(91, "Processing OPO predictions")
+            predicted_classes = np.argmax(predictions, axis=2)
+            
+            # Process one cow at a time
+            for cow_id in unique_cows:
+                current_cow += 1
+                progress_callback(91 + int(4 * current_cow / total_cows),
+                                f"Processing cow {current_cow}/{total_cows}")
+                
+                key_for_this_cow = Cow_Date_Key_full[:,0] == cow_id
+                this_cows_preds_ids = predicted_classes[key_for_this_cow]
+                this_cows_preds_flattened = this_cows_preds_ids.flatten()
+                this_cows_preds = pd.Series(this_cows_preds_flattened).map(
+                    lambda x: self.inv_activity_map.get(x, 'HELLO2')
+                )
+                
+                this_cows_first_ts = df[df['device_id'] == cow_id]['posix_time'].iloc[0]
+                step_size = self.config.analysis.gps_sample_interval
+                n_total = len(this_cows_preds_flattened)
+                
+                # Create index range safely
+                idx_start = int(this_cows_first_ts)
+                idx_end = int(this_cows_first_ts + (n_total*step_size))
+                idx_step = int(step_size)
+                idx = list(range(idx_start, idx_end, idx_step))[:n_total]  # Ensure length matches predictions
+                
+                # Create temporary dataframe
+                this_cows_data = pd.DataFrame({
+                    'device_id': cow_id,
+                    'posix_time': idx[:len(this_cows_preds)],  # Ensure length matches
+                    'predicted_state': this_cows_preds[:len(idx)]  # Ensure length matches
+                })
+                
+                all_cow_preds_aligned = pd.concat([all_cow_preds_aligned, this_cows_data], ignore_index=True)
+                
+                # Force garbage collection periodically
+                if current_cow % 5 == 0:
+                    gc.collect()
+            
+            # Merge with original data
+            results_df = pd.merge(
+                left=all_cow_preds_aligned,
+                right=df,
+                on=['device_id', 'posix_time'],
+                how='left'
+            )
+        
+        # Clean up large objects before continuing
+        del all_cow_preds_aligned, predicted_classes, predictions, X_full, Y_full
+        gc.collect()
+
         
         # Reorder columns for clarity
-        results_df = results_df[['device_id', 'posix_time', 'activity', 'predicted_activity', 'predicted_activity_id'] + 
-                            [col for col in results_df.columns if col not in 
-                                ['device_id', 'posix_time', 'activity', 'predicted_activity', 'predicted_activity_id', 'index']]]
+        results_df = results_df[
+                            ['device_id', 'posix_time'] + 
+                            [col for col in results_df.columns if col not in ['device_id', 'posix_time', 'activity', 'predicted_state', 'predicted_activity_id', 'index', 'date']] + 
+                            ['activity', 'predicted_state']
+            ]
+        results_df.rename(columns={'device_id': 'ID'}, inplace=True)
+        
+        # Generate performance metrics for labeled data only
+        progress_callback(95, "Generating performance metrics")
+        
+        # Extract actual and predicted states for labeled data only
+        labeled_data = results_df.dropna(subset=['activity']).copy()
+        y_true = labeled_data['activity'].values
+        y_pred = labeled_data['predicted_state'].values
+        
+        # Get unique activity states (sorted for consistent display)
+        activity_states = sorted(set(self.inv_activity_map.values()))
+        
+        # Calculate confusion matrix
+        conf_matrix = confusion_matrix(y_true, y_pred, labels=activity_states)
+        
+        # Calculate performance metrics by state
+        metrics_by_state = {}
+        for i, state in enumerate(activity_states):
+            TP = conf_matrix[i, i]
+            FP = conf_matrix[:, i].sum() - TP
+            FN = conf_matrix[i, :].sum() - TP
+            TN = conf_matrix.sum() - TP - FP - FN
+            
+            accuracy = (TP + TN) / (TP + TN + FP + FN) if (TP + TN + FP + FN) > 0 else 0
+            sensitivity = TP / (TP + FN) if (TP + FN) > 0 else 0
+            specificity = TN / (TN + FP) if (TN + FP) > 0 else 0
+            precision = TP / (TP + FP) if (TP + FP) > 0 else 0
+            f1 = 2 * (precision * sensitivity) / (precision + sensitivity) if (precision + sensitivity) > 0 else 0
+            
+            metrics_by_state[state] = {
+                'Accuracy': accuracy,
+                'Sensitivity': sensitivity,
+                'Specificity': specificity,
+                'F1 Score': f1
+            }
+        
+        # Calculate overall accuracy
+        overall_accuracy = accuracy_score(y_true, y_pred)
+        
+        # Create the metrics text file
+        metrics_path = self.pred_path / "performance_metrics.txt"
+        
+        with open(metrics_path, 'w') as f:
+            # Write report header
+            f.write("Performance Metrics Report\n")
+            f.write("========================\n\n")
+            
+            # Write confusion matrix
+            f.write("Confusion Matrix:\n")
+            f.write("=================\n")
+            
+            # Create header row for the confusion matrix
+            header_row = "Actual \\ Predicted"
+            for state in activity_states:
+                header_row += f" {state:>10}"
+            f.write(header_row + "\n")
+            
+            # Write the matrix rows
+            for i, state in enumerate(activity_states):
+                row = f"{state:>17}"
+                for j in range(len(activity_states)):
+                    row += f" {conf_matrix[i, j]:>10d}"
+                f.write(row + "\n")
+            
+            f.write("\n")
+            
+            # Write performance metrics by state
+            f.write("Performance Metrics by State:\n")
+            f.write("============================\n")
+            
+            # Write header for metrics table
+            f.write(f"{'Actual':>12} {'Predicted':>12} {'Accuracy':>10} {'Sensitivity':>12} {'Specificity':>12} {'F1 Score':>10}\n")
+            
+            # Write metrics for each state
+            for state in activity_states:
+                metrics = metrics_by_state[state]
+                f.write(f"{state:>12} {state:>12} {metrics['Accuracy']:>10.3f} {metrics['Sensitivity']:>12.3f} "
+                    f"{metrics['Specificity']:>12.3f} {metrics['F1 Score']:>10.3f}\n")
+            
+            f.write("\n")
+            
+            # Write overall accuracy
+            f.write(f"Overall Accuracy: {overall_accuracy:.3f}\n")
+            
+            # Add sample counts
+            f.write("\n")
+            f.write("Sample Counts:\n")
+            f.write("=============\n")
+            class_counts = labeled_data['activity'].value_counts().to_dict()
+            for state in activity_states:
+                count = class_counts.get(state, 0)
+                f.write(f"{state:>12}: {count:>6d} samples\n")
+            f.write(f"{'Total':>12}: {len(labeled_data):>6d} samples\n")
         
         # Save to CSV
         output_path = self.pred_path / "predictions.csv"
+
+        print("saving predictions to", output_path)
         results_df.to_csv(output_path, index=False)
-        print(f"Predictions saved to {output_path}")
+        time.sleep(1)
+        progress_callback(100, f"Predictions saved to {output_path}, metrics saved to {metrics_path}")
         
         return model, history
-    
 
-    # def manual_chunking(self, cow_ids, n_chunks):
-    #     # 1) Shuffle a copy (so we don't clobber the original)
-    #     cows = cow_ids[:]       
-    #     random.shuffle(cows)
 
-    #     # 2) Compute how many go in each chunk
-    #     k, r = divmod(len(cows), n_chunks)
-    #     #    first 'r' chunks get size k+1, the rest get k
 
-    #     chunks = []
-    #     idx = 0
-    #     for i in range(n_chunks):
-    #         size = k + 1 if i < r else k
-    #         chunks.append(cows[idx:idx + size])
-    #         idx += size
-    #     random.shuffle(chunks)
-    #     return chunks
+
+
+
+
 
 
     def manual_chunking(self, cow_ids, chunk_size):
@@ -1231,7 +1674,7 @@ class LSTM_Model:
         return chunks
 
 
-    def do_loocv(self, sequences: Dict[str, np.ndarray], df, n=11, compute_metrics_only=False, n_jobs=-1):
+    def do_loocv(self, sequences: Dict[str, np.ndarray], df, n=11, compute_metrics_only=False, n_jobs=-1,progress_callback=None):
         """
         Run Leave-One-Out Cross Validation with parallelization
         
@@ -1243,6 +1686,9 @@ class LSTM_Model:
         compute_metrics_only: If True, uses a faster approach for hyperparameter tuning
         n_jobs: Number of parallel processes to use (-1 for all available)
         """
+        if progress_callback is None:
+            progress_callback = lambda percent, message: None
+
         Cow_Date_Key:np.ndarray = sequences['Cow_Date_Key']
         X:np.ndarray = sequences['X']
         Y:np.ndarray = sequences['Y']
@@ -1281,10 +1727,14 @@ class LSTM_Model:
         # Determine number of processes
         n_jobs = (mp.cpu_count()-2) if n_jobs == -1 else n_jobs
         n_jobs = min(n_jobs, len(test_chunks))  # Can't use more processes than chunks
+
+
+        ################################# PLEASE STOP CRASHING ##############################
+        n_jobs = 1 ##########################################################################
         
         # Instead of using a Pool directly, we'll use the starmap approach with pre-built arguments
         print(f"Running LOOCV with {n_jobs} parallel processes")
-        
+        progress_callback(45, f"Running LOOCV with {n_jobs} parallel processes")
         # Create argument list for each fold
         fold_args = []
         for test_chunk in test_chunks:
@@ -1292,7 +1742,7 @@ class LSTM_Model:
             train_mask = ~test_mask
             test_X, test_Y = X[test_mask], Y[test_mask]
             train_X, train_Y = X[train_mask], Y[train_mask]
-            
+            progress_callback(45, f"Initializing fold with held out device_ids: {test_chunk}")
             fold_args.append((test_chunk, train_X, train_Y, test_X, test_Y, compute_metrics_only))
         
         # Process folds in parallel
@@ -1316,6 +1766,7 @@ class LSTM_Model:
             lbl = '-'.join([str(int(c)) for c in test_chunk])
             print(f"{'-'*80} Results for group {lbl} {'-'*80}")
             print(f"Accuracy on valid data points: {result['accuracy']:.4f}")
+            progress_callback(99, f"Testing on held out device_ids {test_chunk} had an accuracy of {result['accuracy']:.4f}")
             print("Class distribution in test data:")
             for class_name, acc in result['class_accuracies'].items():
                 count = result['class_counts'].get(class_name, 0)
@@ -1489,7 +1940,7 @@ class LSTM_Model:
 
 
 
-    def _make_LSTM(self, train_X, train_Y, test_X, test_Y):
+    def _make_LSTM(self, train_X, train_Y, test_X, test_Y, progress_callback=None):
         """Build and train LSTM model with improved handling of imbalanced data
         
         Parameters:
@@ -1500,6 +1951,11 @@ class LSTM_Model:
         --------
         model, history, pred_final
         """
+        if progress_callback is None:
+            progress_callback = lambda percent, message: None
+        
+        progress_callback(73, "Building and compiling LSTM model")
+
         def weighted_categorical_focal_loss(gamma=2.0):
             def loss(y_true, y_pred):
                 y_pred = tf.clip_by_value(y_pred, 1e-7, 1.0 - 1e-7)
@@ -1515,56 +1971,6 @@ class LSTM_Model:
         ops = len(train_Y.shape) == 1
             
         n_epochs = self.config.analysis.lstm.epochs
-
-
-
-
-
-
-
-
-
-
-
-
-        # # 1) Inputs + masking
-        # inp = Input(shape=(self.sequence_length, self.nfeatures), name="inputs")
-        # x   = Masking(mask_value=self.masking_val, name="mask")(inp)
-
-        # # 2) LSTM stack
-        # x   = LSTM(128, return_sequences=True,
-        #         dropout=self.dropout_rate, recurrent_dropout=self.dropout_rate,
-        #         kernel_regularizer=L2(self.reg_val), recurrent_regularizer=L2(self.reg_val)
-        #         )(x)
-
-        # # 3) Self-attention block (with mask propagation!)
-        # #    - num_heads & key_dim are hyperparameters you can bayes-opt, too.
-        # attn_mask = tf.cast(tf.not_equal(inp, self.masking_val)[..., :1], tf.int32)
-        # #    shape: (batch, seq_len, 1) → broadcast to (batch, seq_len, seq_len)
-        # attn_mask = attn_mask & tf.transpose(attn_mask, [0,2,1])
-
-        # attn_out  = MultiHeadAttention(
-        #                 num_heads=4, key_dim=32, dropout=self.dropout_rate
-        #             )(
-        #                 query=x, value=x, key=x,
-        #                 attention_mask=attn_mask
-        #             )
-
-        # # 4) Residual + LayerNorm
-        # x = Add()([x, attn_out])
-        # x = LayerNormalization()(x)
-
-        # # 5) Classifier head, time-distributed
-        # x = TimeDistributed(Dense(64, activation="relu"))(x)
-        # x = TimeDistributed(Dropout(self.dropout_rate))(x)
-        # out = TimeDistributed(Dense(self.nclasses, activation="softmax"))(x)
-
-        # model = Model(inputs=inp, outputs=out)
-
-
-
-
-
 
 
         model = Sequential(self.layers)
@@ -1748,7 +2154,7 @@ class LSTM_Model:
         plt.legend()
         
 
-        plt.savefig(self.output_dir / "lstm_global_history.png", dpi=300)
+        plt.savefig(self.model_path / "lstm_global_history.png", dpi=300)
         plt.close()
         
         # Print final metrics
@@ -1847,7 +2253,7 @@ class LSTM_Model:
             plt.xlabel('Predicted Label')
             
             # Save the figure
-            plt.savefig(self.output_dir / "lstm_confusion_matrix.png", dpi=300)
+            plt.savefig(self.cv_path / "lstm_confusion_matrix.png", dpi=300)
             plt.close()
             
             # Plot training history
@@ -1857,7 +2263,7 @@ class LSTM_Model:
             print(f"Error generating visualization: {e}")
         
         # Save detailed metrics to file
-        with open(self.output_dir / "lstm_results.txt", "w") as f:
+        with open(self.cv_path / "lstm_results.txt", "w") as f:
             f.write(f"Overall accuracy: {accuracy:.4f}\n\n")
             f.write("Class-wise accuracy:\n")
             for class_name, class_id in self.activity_map.items():
@@ -1943,7 +2349,7 @@ class LSTM_Model:
         plt.legend()
         
 
-        plt.savefig(self.output_dir / "lstm_training_history.png", dpi=300)
+        plt.savefig(self.cv_path / "lstm_training_history.png", dpi=300)
         plt.close()
 
 

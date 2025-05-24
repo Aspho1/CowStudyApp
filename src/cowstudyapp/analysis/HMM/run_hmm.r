@@ -29,7 +29,7 @@ init_the_script <- function(util_path, config_path, target_dataset_path, cv_dir,
     features <- config$features
     states <- config$states
     
-    set.seed(1)
+    set.seed(config$random_seed)
 
     all_activities <- config$all_activities
     # all_activities <- c("Grazing", "Resting", "Traveling", "Drinking", "Fighting", "Mineral", "Scratching")
@@ -37,9 +37,9 @@ init_the_script <- function(util_path, config_path, target_dataset_path, cv_dir,
 
     # dirs <- create_output_structure(base_output_dir=output_dir, features=features)
 
-    cv_dir = path(cv_dir)
-    mod_dir = path(mod_dir)
-    pred_dir = path(pred_dir)
+    cv_dir <- path(cv_dir)
+    mod_dir <- path(mod_dir)
+    pred_dir <- path(pred_dir)
 
     #     plots_dir = file.path(output_dir, "plots"),
     #     dist_plots_dir = file.path(output_dir, "plots", "distributions")
@@ -114,7 +114,7 @@ init_the_script <- function(util_path, config_path, target_dataset_path, cv_dir,
                 features <- select_best_distributions(data=training_dataset, 
                                     features=features,
                                     Options=Options,
-                                    dirs=mod_dir)
+                                    dir=mod_dir)
 
 
                 cat("Training the model...\n")
@@ -172,7 +172,7 @@ init_the_script <- function(util_path, config_path, target_dataset_path, cv_dir,
             features <- select_best_distributions(data=training_data, 
                                 features=features,
                                 Options=Options,
-                                dirs=mod_dir)
+                                dir=mod_dir)
 
             cat("Training the model...\n")
             trained_model <- train_model(training_data, features, states, time_covariate=config$time_covariate)
@@ -664,8 +664,8 @@ prepare_hmm_data <- function(data, states, time_covariate, config) {
     # }
 
     # str(data)
-    cat("states!!!!!!!!!!: ",unique(data$activity),"\n")
-    cat("factor_levels!!!!!!!!!!: ",states,"\n")
+    # cat("states!!!!!!!!!!: ",unique(data$activity),"\n")
+    # cat("factor_levels!!!!!!!!!!: ",states,"\n")
     prepped_data <- prepData(data)
     prepped_data$factored_activity <- as.integer(factor(data$activity, 
                                                       levels = states))
@@ -822,7 +822,7 @@ run_LOOCV <- function(config, Options, features, states, cv_dir, target_dataset,
     features <- select_best_distributions(data=prepped_data, 
                                           features=features,
                                           Options=Options,
-                                          dirs=cv_dir)
+                                          dir=cv_dir)
 
     cat("Features After Selecting best distributions:\n")
     for (i in 1:nrow(features)) {
@@ -835,9 +835,12 @@ run_LOOCV <- function(config, Options, features, states, cv_dir, target_dataset,
     if (Options$show_correlation) {
         correlation_plot <- plot_correlation_matrix(data = prepped_data, 
                                                     features = features)
+        # plots_dir <- file.path(dir, "distributions")
+        # dir.create(plots_dir, recursive = TRUE, showWarnings = FALSE)
+
         save_plot(correlation_plot, 
                  "correlation_matrix", 
-                 dirs$plots_dir)
+                 cv_dir)
     }
 
     # Do LOOCV
@@ -929,13 +932,25 @@ run_LOOCV <- function(config, Options, features, states, cv_dir, target_dataset,
         
         # Calculate statistics for this cow
         valid_indices <- !is.na(test_data$factored_activity)
+
+        
+
         test_actual <- test_data$factored_activity[valid_indices]
         test_pred <- test_predicted_states[valid_indices]
+        cow_factored_actual <- factor(states[test_actual], levels = states)
+        cow_factored_pred <-factor(states[test_pred], levels = states)
 
         # print(data.frame(list(
         #     actual=states[test_actual],
         #     pred=states[test_pred])
         # ))
+
+        summary_table <- confusionMatrix(cow_factored_pred,cow_factored_actual)
+        print(summary_table)
+        # str(summary_table)
+        cat("\n-----------------------------\n")
+        # cat(summary_table$table)
+        # cat("\n")
 
         # Store results for this cow using cow_counter
         cow_results$n_labels[cow_counter] <- sum(valid_indices)
@@ -975,8 +990,7 @@ run_LOOCV <- function(config, Options, features, states, cv_dir, target_dataset,
 
  # Print final summary table
     cat("\n=== Complete LOOCV Summary ===\n")
-    summary_table <- format_cow_results(cow_results)
-    print(summary_table)
+    conf_matrix <- confusionMatrix(all_predicted_states, all_actual_states)
     
     # Calculate and print overall statistics
     cat("\n=== Overall Statistics ===\n")
@@ -1038,6 +1052,8 @@ run_LOOCV <- function(config, Options, features, states, cv_dir, target_dataset,
                             # test_type=Options$clas,
                             features=features
     )
+
+
 
     print_cv_results(results, cv_dir)
     

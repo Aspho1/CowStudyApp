@@ -117,13 +117,10 @@ analysis:
   # training_info_path: "data/analysis_results/hmm/FinalModels/RB_22_Paper_Model/trained_model.rds" # No CV, no filter cows, no covariate.
 
 
-  # r_executable: "C:/Program Files/R/R-4.4.1/bin/Rscript.exe"
-  r_executable: "C:/Program Files/R/R-4.4.3/bin/Rscript.exe"
+  r_executable: "C:/Program Files/R/R-4.4.1/bin/Rscript.exe"
+  # r_executable: "C:/Program Files/R/R-4.4.3/bin/Rscript.exe"
   # r_executable: "C:/Program Files/R/R-4.3.0/bin/Rscript.exe"
 
-  
-  
-  
   
   
   
@@ -141,7 +138,7 @@ analysis:
   day_only: false
 
   hmm:
-    enabled: false
+    enabled: true
     time_covariate: false
 
     states: # The states to use in the HMM
@@ -198,14 +195,14 @@ analysis:
           - "WRAPPEDCAUCHY"
 
   lstm:
-    enabled: true
+    enabled: false
     
     ops: true
 
 
     ################ Warning these two will SIGNIFICANTLY increase runtime to find parameters 
     # BAYESIAN Optimization
-    bayes_opt: true                # Whether to use Bayesian optimization 
+    bayes_opt: false                # Whether to use Bayesian optimization 
     bayes_opt_n_calls: 20          # Number of evaluations to perform
     bayes_opt_resume: true         # Whether to resume from previous optimization
     bayes_opt_fast_eval: false      # Use faster evaluation during optimization
@@ -234,32 +231,56 @@ analysis:
       # - "z_var"
       # - "pct_of_day"
     # max_length: 'daily'
-    max_length: 20
+    # max_length: 20
     max_time_gap: 960
     epochs: 1000
     cows_per_cv_fold: 3
 
-    max_length: 70
-    batch_size: 13
-    initial_lr: 0.0008013770340749126
-    decay_steps: 500
-    decay_rate: 0.510164871944301
-    clipnorm: 0.7306814672664718
-    patience: 50
-    min_delta: 8.991637285631857e-07
-    reg_val: 3.415197283259112e-05
+
+    #### OPO
+    # max_length: 70
+    # batch_size: 13
+    ## max_length: 36
+    ## batch_size: 32
+    # initial_lr: 0.0008013770340749126
+    # decay_steps: 500
+    # decay_rate: 0.510164871944301
+    # clipnorm: 0.7306814672664718
+    # patience: 50
+    # min_delta: 8.991637285631857e-07
+    # reg_val: 3.415197283259112e-05
+
+
+
+
+    #### OPS
+    max_length: 160
+    batch_size: 22
+    initial_lr: 0.001
+    decay_steps: 10000
+    decay_rate: 0.4
+    clipnorm: 1.9493856438736408
+    patience: 13
+    min_delta: 1.6850428524897937e-07
+    reg_val: 1e-07
 
 
 visuals:
   # predictions_path: 'data/analysis_results/hmm/PRODUCT/Preds_22_to_22_20250220_202010/predictions.csv'
   # predictions_path: 'data/analysis_results/hmm/PRODUCT/RB_22_20250302_185749/predictions.csv' # Good
   # predictions_path: 'data/analysis_results/hmm/FinalPredictions/RB_22_Paper_Model_Preds/predictions.csv' 
-  predictions_path: 'data/analysis_results/hmm/FinalPredictions/RB_Paper_Model_Preds_logmagvar/predictions.csv'
+  # predictions_path: 'data/analysis_results/hmm/FinalPredictions/RB_Paper_Model_Preds_logmagvar/predictions.csv'
   
-  visuals_root_path: "data/visuals/"
+  
+  predictions_path: 'data/predictions/HMM/predictions.csv'
+  visuals_root_path: "data/visuals/HMM/"
+  # predictions_path: 'data/predictions/LSTM/ops/predictions.csv'
+  # visuals_root_path: "data/visuals/LSTM/ops/"
+  # predictions_path: 'data/predictions/LSTM/opo/predictions.csv'
+  # visuals_root_path: "data/visuals/LSTM/opo/"
 
   radar:
-    run: false
+    run: true
     extension: 'RadarPlots01/'
     show_night: true
 
@@ -271,6 +292,11 @@ visuals:
     minimum_required_values: 30
     show_table: true  # Whether to print a comparison table
     export_excel: false  # Whether to export results to Excel
+
+
+    sample_size: 0.7
+
+
 
   feature_dists:
     run: false

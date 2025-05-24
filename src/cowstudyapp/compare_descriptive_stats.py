@@ -120,7 +120,7 @@ def compare_quality_reports(report1: Dict, report2: Dict) -> Dict:
             n_missing = []
             
             for device in report[data_type]['devices'].values():
-                freq_stats = device['preprocessing_stats'].get('frequency_stats', {})
+                freq_stats = device.get('frequency_stats', {})
                 dupes.append(int(freq_stats.get('duplicates', {}).get('n', 0)))
                 n_missing.append(int(freq_stats.get('n_missing', 0)))
 
@@ -136,7 +136,7 @@ def compare_quality_reports(report1: Dict, report2: Dict) -> Dict:
             if data_type == 'gps':
                 n_zeros = []
                 for device in report[data_type]['devices'].values():
-                    zero_stats = device['preprocessing_stats'].get('zero_val_stats', {}).get('zero_coordinates', {})
+                    zero_stats = device.get('zero_val_stats', {}).get('zero_coordinates', {})
                     n_zeros.append(int(zero_stats.get('total_zero_coords', 0)))
 
                 quality[dataset_key] = {
@@ -151,7 +151,7 @@ def compare_quality_reports(report1: Dict, report2: Dict) -> Dict:
                 global_gap_dict = {}
                 
                 for device in report[data_type]['devices'].values():
-                    gap_stats = device['preprocessing_stats'].get('gap_stats', {})
+                    gap_stats = device.get('gap_stats', {})
                     n_interpolated.append(int(gap_stats.get('interpolated_gaps', 0)))
                     
                     gap_dist = gap_stats.get('gap_analysis', {}).get('gap_distribution', {})
@@ -180,8 +180,8 @@ def compare_quality_reports(report1: Dict, report2: Dict) -> Dict:
             
             # First aggregate gaps across all devices
             for device in report[data_type]['devices'].values():
-                if 'gap_analysis' in device['preprocessing_stats']['gap_stats']:
-                    gap_stats = device['preprocessing_stats']['gap_stats']['gap_analysis']
+                if 'gap_analysis' in device['gap_stats']:
+                    gap_stats = device['gap_stats']['gap_analysis']
                     gap_dist = gap_stats.get('gap_distribution', {})
                     
                     # Add this device's gaps to global distribution

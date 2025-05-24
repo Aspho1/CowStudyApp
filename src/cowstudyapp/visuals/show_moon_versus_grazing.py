@@ -41,6 +41,11 @@ class MoonPhasesGrazing:
         self.full_moon_threshold = 95  # Moon illumination percentage to classify as full moon
         self.moon = ephem.Moon()
 
+
+        self.path_out = self.config.visuals.visuals_root_path 
+        if self.config.visuals.moon_phases.extension:
+            self.path_out = self.path_out / self.config.visuals.moon_phases.extension
+
     def get_moon_phase(self, date):
         """Calculate moon phase for given date"""
         self.moon.compute(date)

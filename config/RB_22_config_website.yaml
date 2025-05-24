@@ -1,0 +1,213 @@
+_create_backup: false
+analysis:
+  cv_results: /opt/CowStudyApp/app_data/analysis/cv_results/website_admin/RB_22
+  day_only: false
+  hmm:
+    enabled: true
+    features:
+    - dist: null
+      dist_type: regular
+      name: step
+    - dist: null
+      dist_type: circular
+      name: angle
+    - dist: null
+      dist_type: regular
+      name: magnitude_mean
+    - dist: null
+      dist_type: regular
+      name: magnitude_var
+    options:
+      distributions:
+        circular:
+        - VONMISES
+        - WRAPPEDCAUCHY
+        regular:
+        - LOGNORMAL
+        - GAMMA
+        - NORMAL
+        - EXPONENTIAL
+      number_of_retry_fits: 1
+      remove_outliers: false
+      show_correlation: false
+      show_dist_plots: false
+      show_full_range: false
+    states:
+    - Grazing
+    - Resting
+    - Traveling
+    time_covariate: false
+  lstm:
+    batch_size: 13
+    bayes_opt: false
+    bayes_opt_fast_eval: false
+    bayes_opt_n_calls: 30
+    bayes_opt_resume: true
+    clipnorm: 0.7306814672664718
+    cows_per_cv_fold: 1
+    decay_rate: 0.510164871944301
+    decay_steps: 500
+    enabled: false
+    epochs: 1000
+    features:
+    - step
+    - angle
+    - magnitude_mean
+    - magnitude_var
+    - x_mean
+    - x_var
+    - y_mean
+    - y_var
+    - z_mean
+    - z_var
+    hyperparams_sample: false
+    hyperparams_search: false
+    initial_lr: 0.0008013770340749126
+    max_length: 70
+    max_time_gap: 960
+    min_delta: 8.991637285631857e-07
+    ops: false
+    patience: 50
+    reg_val: 3.415197283259112e-05
+    states:
+    - Grazing
+    - Resting
+    - Traveling
+  mode: LOOCV
+  models: /opt/CowStudyApp/app_data/analysis/models/website_admin/RB_22
+  output_dir: /opt/CowStudyApp/app_data/predictions/website_admin/RB_22
+  predictions: /opt/CowStudyApp/app_data/analysis/predictions/website_admin/RB_22
+  r_executable: C:/Program Files/R/R-4.4.3/bin/Rscript.exe
+  target_dataset: /opt/CowStudyApp/app_data/processeddata/website_admin/RB_22/processed_data.csv
+  training_info_path: /opt/CowStudyApp/app_data/analysis/models/website_admin/RB_22/LSTM/opo/global_lstm_model.keras
+common:
+  accel_sample_interval: 60
+  dataset_name: RB_22
+  excluded_devices:
+  - 841
+  - 1005
+  gps_sample_interval: 300
+  random_seed: 123
+  timezone: America/Denver
+features:
+  enable_axis_features: true
+  enable_magnitude_features: true
+  feature_types:
+  - BASIC_STATS
+io:
+  accelerometer_directory: /opt/CowStudyApp/app_data/rawdata/website_admin/RB_22/accelerometer
+  cow_info_path: /opt/CowStudyApp/app_dataraw/RB_22/cow_info/Aggregate_collar_info.xlsx
+  gps_directory: /opt/CowStudyApp/app_data/rawdata/website_admin/RB_22/gps
+  label_to_value: {}
+  labeled_data_path: /opt/CowStudyApp/app_data/rawdata/website_admin/RB_22/labeled/gps_observations_2022.csv
+  processed_data_path: /opt/CowStudyApp/app_data/processeddata/website_admin/RB_22/processed_data.csv
+  tag_to_device: {}
+labels:
+  labeled_agg_method: RAW
+  valid_activities: []
+validation:
+  COVERAGE_THRESHOLD: 70
+  end_datetime: '2022-03-23 00:00:00'
+  start_datetime: '2022-01-15 00:00:00'
+  validation_rules:
+    altitude:
+      filter_invalid: false
+      is_required: false
+      max_value: 1715
+      min_value: 0
+    dop:
+      filter_invalid: true
+      is_required: true
+      max_value: 10
+    latitude:
+      filter_invalid: false
+      is_required: true
+      max_value: 90
+      min_value: -90
+    longitude:
+      filter_invalid: false
+      is_required: true
+      max_value: 180
+      min_value: -180
+    satellites:
+      filter_invalid: false
+      is_required: true
+      min_value: 0
+    temperature_acc:
+      filter_invalid: false
+      is_required: true
+      max_value: 99
+      min_value: -99
+    temperature_gps:
+      filter_invalid: false
+      is_required: true
+      max_value: 99
+      min_value: -99
+    x:
+      filter_invalid: false
+      is_required: true
+      max_value: 41
+      min_value: -41
+    y:
+      filter_invalid: false
+      is_required: true
+      max_value: 41
+      min_value: -41
+    z:
+      filter_invalid: false
+      is_required: true
+      max_value: 41
+      min_value: -41
+visuals:
+  convolution_surface:
+    run: false
+  cow_info_graph:
+    implemented: true
+    run: false
+  dataset_name: RB_22
+  domain:
+    implemented: true
+    labeled_only: true
+    run: false
+  feature_dists:
+    run: false
+  heatmap:
+    filter_weigh_days: true
+    run: false
+    weigh_days:
+    - '2022-01-14'
+    - '2022-01-25'
+    - '2022-01-26'
+    - '2022-02-22'
+    - '2022-02-23'
+    - '2022-03-22'
+    - '2022-03-23'
+  moon_phases:
+    extension: moon-phases_output/
+    run: false
+  predictions_path: /opt/CowStudyApp/app_data/analysis/predictions/website_admin/RB_22/HMM/predictions.csv
+  radar:
+    extension: radar_output/
+    run: false
+    show_night: true
+  temperature_graph:
+    daynight: day
+    export_excel: true
+    extension: temperature-graph_output/
+    minimum_required_values: 30
+    run: true
+    sample_size: 1
+    show_curve: true
+    show_table: true
+    terms:
+    - hod
+    - temp
+    - time
+    - time^2
+    - time^3
+    - time^4
+    - hod:temp
+    - hod:time
+    - temp:time
+    - temp:time^4
+  visuals_root_path: /opt/CowStudyApp/app_data/visuals/website_admin/RB_22/HMM

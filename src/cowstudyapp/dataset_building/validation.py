@@ -27,22 +27,32 @@ class DataValidator:
 
 
     def validate_gps(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]]:
-        """Validate GPS data and return cleaned DataFrame"""
+        """Validate PS data and return cleaned DataFrame"""
         df = df.copy()
 
         # Initialize stats dictionary
-        stats: Dict[str, Any]= {}
+        stats: Dict[str, Any] = {}
         
         # Apply time range filter
         df, timerange_stats = self._filter_timerange(df)
         stats['points_outside_of_study'] = timerange_stats
+        tr = len(df)
+        # print("!!!!!!!! timerange", tr)
+        stats['valid_timerange'] = tr
 
 
         df, zero_stats = self._filter_zero_vals_gps(df)
         stats['zero_val_stats'] = zero_stats
+        zv = len(df)
+        # print("!!!!!!!! zerovals", zv)
+        stats['non_zero_vals'] = zv
+
+        # print("This SHOULD be positive", tr - zv)
         
         df, frequency_stats = self._validate_time_frequency(df, self.GPS_INTERVAL)
         stats['frequency_stats'] = frequency_stats
+        cols_to_check = [c for c in df.columns if c not in ['device_id', 'posix_time']]
+        stats['non_duplicates_post_standardization'] = len(df[df[cols_to_check].notna().any(axis=1)])
 
 
 
@@ -52,6 +62,11 @@ class DataValidator:
         gps_columns = ['latitude', 'longitude', 'dop', 'satellites', 'altitude', 'temperature_gps']
         df, value_stats = self._validate_and_filter_values(df, gps_columns)
         stats['value_validation_stats'] = value_stats
+        stats['valid_values'] = len(df[df[cols_to_check].notna().any(axis=1)])
+
+    #     print("!!!!!!!! filter values", len(df[df[['latitude', 'longitude', 'altitude',
+    #    'temperature_gps', 'dop', 'satellites', 'utm_easting', 'utm_northing']].notna().any(axis=1)]))
+        # print("!!!!!!!! Values (DOP, NA)", len(df))
         
         # print("!!!!!!!!!")
         # print(df[df.isna().any(axis=1)])
@@ -64,6 +79,8 @@ class DataValidator:
         )
         stats['gap_stats'] = gap_statistics
 
+    #     print("!!!!!!!! filter gaps", len(df[df[['latitude', 'longitude', 'altitude',
+    #    'temperature_gps', 'dop', 'satellites', 'utm_easting', 'utm_northing']].notna().any(axis=1)]))
         # stats["final_rows"] = len(df)
 
         return df, stats
@@ -81,8 +98,12 @@ class DataValidator:
         stats: Dict[str, Any] = {}
         
         # Analyze zero coordinates by day
+        filter_out = pd.Series(False, index=df.index)
         zero_coords = (df['latitude'] == 0) & (df['longitude'] == 0)
-        
+        # filter_out |= zero_coords
+        # filter_out |= df['longitude'] == np.nan
+
+
         if zero_coords.any():
             # Convert posix time to local date
             tz = pytz.timezone(self.config.timezone)
@@ -131,7 +152,7 @@ class DataValidator:
 
     def calculate_expected_records(self, interval:int) -> int:
         if ((self.config.end_datetime is not None) and (self.config.start_datetime is not None)):
-            return int((self.config.end_datetime - self.config.start_datetime).total_seconds() / interval)
+            return int(((self.config.end_datetime - self.config.start_datetime).days + 1) * (86400) / interval)
         raise ValueError("End and Start times must be defined in config")
 
     def validate_accelerometer(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]]:
@@ -144,23 +165,28 @@ class DataValidator:
 
         df, timerange_stats = self._filter_timerange(df)
         stats['points_outside_of_study'] = timerange_stats
-        print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-        print(1, df.head())
+        tr = len(df)
+        stats['valid_timerange'] = tr
+        print(1, df.shape)
         
         df, frequency_stats = self._validate_time_frequency(df, self.ACC_INTERVAL)
         stats['frequency_stats'] = frequency_stats
-        print(2, df.head())
+        cols_to_check = [c for c in df.columns if c not in ['device_id', 'posix_time']]
+        stats['non_duplicates_post_standardization'] = len(df[df[cols_to_check].notna().any(axis=1)])
+        print(2, df.shape)
 
         accel_columns = ['x', 'y', 'z', 'temperature_acc']
         df, value_stats = self._validate_and_filter_values(df, accel_columns)
         stats['value_validation_stats'] = value_stats
-        print(3, df.head())
+        stats['valid_values'] = len(df[df[cols_to_check].notna().any(axis=1)])
+        print(3, df.shape)
 
 
         df, gap_statistics = self._gap_analysis_and_interpolation(df, interval=self.ACC_INTERVAL, interpolate=True)
         stats['gap_stats'] = gap_statistics
-        print(4, df.head())
+        print(4, df.shape)
         
+
         return df, stats
 
 
@@ -199,7 +225,7 @@ class DataValidator:
         full_index = pd.DataFrame({
             'posix_time': range(
                 start_posix,
-                end_posix + interval,
+                end_posix,
                 interval
             )
         })
@@ -251,7 +277,7 @@ class DataValidator:
         print(f"Records present: {records_present}")
         print(f"Missing records: {missing}")
         
-        # print(df[df.isna().any(axis=1)])/
+        # df = df[df.notna().any(axis=1)]
         df.reset_index(inplace=True)
         return df, frequency_stats
     
@@ -280,6 +306,8 @@ class DataValidator:
             # Start new gap when time difference is greater than interval
             gap_breaks = time_diffs > interval
             gap_groups = gap_breaks.cumsum()
+            # df['date'] = df['posix_time'].apply(lambda x: from_posix(x))
+            # print(df.tail(10))
             
             # Group consecutive missing times into gaps
             gaps = []
@@ -293,6 +321,12 @@ class DataValidator:
                 }
                 gaps.append(gap)
             
+
+            # for gap in gaps:
+            #     if gap['gap_length_intervals'] > 100:
+            #         print(gap)
+
+
             # Print gap analysis
             gap_lengths = [gap['gap_length_intervals'] for gap in gaps]
             gap_counts = pd.Series(gap_lengths).value_counts().sort_index()
@@ -315,6 +349,9 @@ class DataValidator:
             }
 
 
+            # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            # print([gap for gap in gaps if gap['gap_length_intervals'] > 1])
+
             if interpolate:
                 # Only interpolate single-interval gaps
                 single_interval_gaps = [
@@ -336,6 +373,7 @@ class DataValidator:
 
                     # Check if we have actual data (not just posix_time) in before and after rows
                     has_before_data = not before_row.drop('posix_time', axis=1).isna().all(axis=1).iloc[0]
+                    
                     has_after_data = not after_row.drop('posix_time', axis=1).isna().all(axis=1).iloc[0]
                     
                     if has_before_data and has_after_data:
@@ -474,16 +512,31 @@ class DataValidator:
                 if rule.filter_invalid:
                     # filter_mask |= violation_mask
                     filter_mask |= bounds_mask
-            
+             
             stats['value_issues'][column] = column_stats
         
         # Apply filtering if needed
         if filter_mask.any():
             original_count = len(df)
-            df = df[~filter_mask]
-            filtered_count = original_count - len(df)
-            stats['filtered_records'] = filtered_count
-            print(f"\nFiltered {filtered_count} records due to validation rules")
+            # Instead of removing rows, set values to np.nan except device_id and posix_time
+            keep_cols = ['device_id', 'posix_time']
+            cols_to_nan = [col for col in df.columns if col not in keep_cols]
+            
+            # Create a copy of the DataFrame to avoid SettingWithCopyWarning
+            df_copy = df.copy()
+            for col in cols_to_nan:
+                df_copy.loc[filter_mask, col] = np.nan
+            
+            df = df_copy
+            affected_count = filter_mask.sum()
+            stats['affected_records'] = affected_count
+            print(f"\nSet values to NaN in {affected_count} records due to validation rules")
+        # if filter_mask.any():
+        #     original_count = len(df)
+        #     df = df[~filter_mask]
+        #     filtered_count = original_count - len(df)
+        #     stats['filtered_records'] = filtered_count
+        #     print(f"\nFiltered {filtered_count} records due to validation rules")
         
         return df, stats
 
@@ -505,7 +558,7 @@ class DataValidator:
         if sum(~after_start) > 0:
             stats['before_study'] = sum(~after_start)
 
-        before_end = df['posix_time'] <= end_time
+        before_end = df['posix_time'] < end_time
         if sum(~before_end) > 0:
             stats['after_study'] = sum(~before_end)
 
@@ -513,7 +566,7 @@ class DataValidator:
         if start_time:
             df = df[df['posix_time'] >= start_time]
         if end_time:
-            df = df[df['posix_time'] <= end_time]
+            df = df[df['posix_time'] < end_time]
 
 
         print("\nTime range analysis:")

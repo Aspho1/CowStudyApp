@@ -120,8 +120,8 @@ class ActivityVersusTemperatureNew:
     def _smooth_surfaces(self, Z_state, Z_temp, sigma=2):
         """Apply Gaussian smoothing to surfaces"""
         import scipy.ndimage as ndimage
-        Z_smooth = ndimage.gaussian_filter(Z_state, sigma=sigma)
-        Z_temp_smooth = ndimage.gaussian_filter(Z_temp, sigma=sigma)
+        Z_smooth = ndimage.gaussian_filter(Z_state, sigma=2)
+        Z_temp_smooth = ndimage.gaussian_filter(Z_temp, sigma=1)
         return Z_smooth, Z_temp_smooth
 
     def _create_meshgrid(self, pivot_state, n_points=288):
@@ -264,6 +264,16 @@ class ActivityVersusTemperatureNew:
         ax1 = fig.add_axes([0.05, 0.15, 0.55, 0.80], projection='3d')
         ax2 = fig.add_axes([0.50, 0.15, 0.40, 0.80], projection='3d')
 
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        print(X.shape, Y.shape, Z_smooth.shape)
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        print(X)
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        print(Y)
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        print(Z_smooth)
+
+
         surf1 = ax1.plot_surface(X, Y, Z_smooth,
                             facecolors=cmap(norm(Z_temp_smooth)),
                             edgecolor='none', alpha=0.9,
@@ -398,71 +408,9 @@ class ActivityVersusTemperatureNew:
             T_scaled.flatten()       # scaled temperature
         ))
         Z_flat = Z.flatten()
-
-        # Create models to try
-        # models = {}
-        # results = {}
-        
         # Define number of Fourier components
         n_components = 5  # Reduced from 5 to improve performance
         
-        # # 1. Basic polynomial model
-        # if model_type in ['polynomial', 'best']:
-        #     poly = PolynomialFeatures(degree=self.degree)
-        #     X_poly = poly.fit_transform(X_flat)
-            
-        #     poly_model = Ridge(alpha=0.1)
-        #     poly_model.fit(X_poly, Z_flat)
-        #     Z_fitted_poly = poly_model.predict(X_poly).reshape(X.shape)
-        #     r2_poly = poly_model.score(X_poly, Z_flat)
-        #     print(f"Polynomial fit R-squared: {r2_poly:.3f}")
-            
-        #     # Store feature information
-        #     poly_model.poly_features = poly
-        #     poly_model.feature_names = poly.get_feature_names_out(['minute', 'day', 'temp'])
-            
-        #     models['polynomial'] = poly_model
-        #     results['polynomial'] = (Z_fitted_poly, r2_poly)
-        
-        # # 2. Fourier features (for periodicity)
-        # if model_type in ['fourier', 'best', 'combined']:
-        #     # Create Fourier features for minute (time of day)
-        #     minutes = X_flat[:, 0] * self.scale_factors['minute']  # back to original scale
-            
-        #     fourier_features = []
-        #     feature_names = []
-            
-        #     # Add time of day fourier components (24-hour periodicity)
-        #     for i in range(1, n_components + 1):
-        #         period = 2 * np.pi * i / 1440
-        #         fourier_features.append(np.sin(minutes * period))
-        #         fourier_features.append(np.cos(minutes * period))
-        #         feature_names.append(f'sin_{i}')
-        #         feature_names.append(f'cos_{i}')
-            
-        #     # Add original features
-        #     X_fourier = np.column_stack([
-        #         *fourier_features, 
-        #         X_flat  # Include all original features
-        #     ])
-        #     all_feature_names = feature_names + ['minute', 'day', 'temp']
-            
-        #     # Fit ridge regression with Fourier features
-        #     fourier_model = Ridge(alpha=0.1)
-        #     fourier_model.fit(X_fourier, Z_flat)
-        #     Z_fitted_fourier = fourier_model.predict(X_fourier).reshape(X.shape)
-        #     r2_fourier = fourier_model.score(X_fourier, Z_flat)
-        #     print(f"Fourier fit R-squared: {r2_fourier:.3f}")
-            
-        #     # Store the feature names and information
-        #     fourier_model.feature_names = all_feature_names
-        #     fourier_model.n_components = n_components
-            
-        #     models['fourier'] = fourier_model
-        #     results['fourier'] = (Z_fitted_fourier, r2_fourier)
-        
-        # # 3. Combined model
-        # if model_type in ['combined', 'best']:
         # Get Fourier features
         minutes = X_flat[:, 0] * self.scale_factors['minute']
         fourier_features = []
@@ -501,15 +449,6 @@ class ActivityVersusTemperatureNew:
         
         model = combined_model
         Z_fitted, r2 = (Z_fitted_combined, r2_combined)
-        
-        # # Select the best model
-        # if model_type == 'best':
-        #     best_model_name = max(results, key=lambda k: results[k][1])
-        #     print(f"\nBest model: {best_model_name} (R² = {results[best_model_name][1]:.3f})")
-        #     Z_fitted, r2 = results[best_model_name]
-        #     model = models[best_model_name]
-        # else:
-
 
         
         # Store additional information for interpretation
@@ -532,22 +471,6 @@ class ActivityVersusTemperatureNew:
                 np.full_like(minutes, temp_scaled)
             ])
             
-            # if model_type == 'polynomial':
-            #     # Use the same polynomial features as during training
-            #     return model.poly_features.transform(X_base)
-                
-            # elif model_type == 'fourier':
-            #     # Create Fourier features
-            #     fourier_features = []
-            #     for i in range(1, model.n_components + 1):
-            #         period = 2 * np.pi * i / 1440
-            #         fourier_features.append(np.sin(minutes * period))
-            #         fourier_features.append(np.cos(minutes * period))
-                
-            #     # Combine with base features
-            #     return np.column_stack([*fourier_features, X_base])
-                
-            # elif model_type == 'combined':
             # Create Fourier features
             fourier_features = []
             for i in range(1, model.n_components + 1):

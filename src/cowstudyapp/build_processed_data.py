@@ -231,6 +231,8 @@ def main(config_path=None, progress_callback=None):
         config_path = args.config_path
         task_id = args.task_id
     else:
+        if not config_path:
+            config_path: Path = Path("config/RB_22_config.yaml")
         # When called programmatically
         task_id = "direct-call"
         if isinstance(config_path, str):

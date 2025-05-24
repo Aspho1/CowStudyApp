@@ -1,32 +1,3 @@
-
-# At the start of run_analysis, after loading config
-create_output_structure <- function(base_output_dir, features) {
-    # Create timestamp
-    timestamp <- format(Sys.time(), "%Y%m%d_%H%M%S")
-    
-    # Create feature hash/identifier
-    feature_names <- sort(features$name)  # Sort to ensure consistency
-    feature_id <- paste(feature_names, collapse="_")
-    feature_id <- substr(feature_id, 1, 50)  # Limit length if needed
-    
-    # Create directory structure
-    run_dir <- file.path(base_output_dir, feature_id, timestamp)
-    dir.create(run_dir, recursive = TRUE, showWarnings = FALSE)
-    
-    # Create subdirectories for different plot types
-    plots_dir <- file.path(run_dir, "plots")
-    dist_plots_dir <- file.path(plots_dir, "distributions")
-    dir.create(dist_plots_dir, recursive = TRUE, showWarnings = FALSE)
-    
-    # Return the directory structure
-    return(list(
-        base_dir = run_dir,
-        plots_dir = plots_dir,
-        dist_plots_dir = dist_plots_dir
-    ))
-}
-
-
 # # Feature configuration helper functions
 get_feature_distributions <- function(features) {
   distributions <- list()
@@ -50,31 +21,31 @@ get_feature_distributions <- function(features) {
 # }
 
 
-create_output_structure <- function(base_output_dir, features) {
-    # Create timestamp
-    timestamp <- format(Sys.time(), "%Y%m%d_%H%M%S")
+# create_output_structure <- function(base_output_dir, features) {
+#     # Create timestamp
+#     timestamp <- format(Sys.time(), "%Y%m%d_%H%M%S")
     
-    # Create feature hash/identifier
-    feature_names <- sort(features$name)  # Sort to ensure consistency
-    feature_id <- paste(feature_names, collapse="_")
-    feature_id <- substr(feature_id, 1, 50)  # Limit length if needed
+#     # Create feature hash/identifier
+#     feature_names <- sort(features$name)  # Sort to ensure consistency
+#     feature_id <- paste(feature_names, collapse="_")
+#     feature_id <- substr(feature_id, 1, 50)  # Limit length if needed
     
-    # Create directory structure
-    run_dir <- file.path(base_output_dir, feature_id, timestamp)
-    dir.create(run_dir, recursive = TRUE, showWarnings = FALSE)
+#     # Create directory structure
+#     run_dir <- file.path(base_output_dir, feature_id, timestamp)
+#     dir.create(run_dir, recursive = TRUE, showWarnings = FALSE)
     
-    # Create subdirectories for different plot types
-    plots_dir <- file.path(run_dir, "plots")
-    dist_plots_dir <- file.path(plots_dir, "distributions")
-    dir.create(dist_plots_dir, recursive = TRUE, showWarnings = FALSE)
+#     # Create subdirectories for different plot types
+#     plots_dir <- file.path(run_dir, "plots")
+#     dist_plots_dir <- file.path(plots_dir, "distributions")
+#     dir.create(dist_plots_dir, recursive = TRUE, showWarnings = FALSE)
     
-    # Return the directory structure
-    return(list(
-        base_dir = run_dir,
-        plots_dir = plots_dir,
-        dist_plots_dir = dist_plots_dir
-    ))
-}
+#     # Return the directory structure
+#     return(list(
+#         base_dir = run_dir,
+#         plots_dir = plots_dir,
+#         dist_plots_dir = dist_plots_dir
+#     ))
+# }
 
 # Modified display_plot function
 save_plot <- function(plot, filename, directory, width = 10, height = 8) {
@@ -487,7 +458,15 @@ plot_correlation_matrix <- function(data, features) {
         labs(title = "Feature Correlation Matrix")
 }
 
-select_best_distributions <- function(data, Options, features, dirs) {
+select_best_distributions <- function(data, Options, features, dir) {
+
+    if (Options$show_dist_plots) {
+        dist_plots_dir <- file.path(dir, "distributions")
+        dir.create(dist_plots_dir, recursive = TRUE, showWarnings = FALSE)
+    } else {
+        dist_plots_dir <- NULL
+    }
+
     # For each feature
     for (i in 1:nrow(features)) {
         feature_name <- features$name[i]
@@ -559,7 +538,7 @@ select_best_distributions <- function(data, Options, features, dirs) {
 
                 save_plot(dist_plot,
                         paste0("distribution_", feature_name),
-                        dirs$dist_plots_dir)
+                        dist_plots_dir)
             }
         }else if (dist_type == "regular")
         {
@@ -603,7 +582,7 @@ select_best_distributions <- function(data, Options, features, dirs) {
                 )
                 save_plot(dist_plot,
                         paste0("distribution_", feature_name),
-                        dirs$dist_plots_dir)
+                        dist_plots_dir)
             }
 
             # # Plot if requested

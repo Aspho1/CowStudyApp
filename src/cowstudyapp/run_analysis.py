@@ -53,6 +53,8 @@ def find_r_executable(config_path):
         # except subprocess.SubprocessError:
         #     pass
 
+
+
         # Return first existing path
         for path in possible_paths:
             print("CHECKING ", path)
@@ -284,18 +286,24 @@ def create_analysis_directories(cv_dir: Path, mod_dir: Path, pred_dir: Path) -> 
 
 
 # def run_hmm_analysis(config: ConfigManager, target_data_path: Path, output_dir: Path):
-def run_hmm_analysis(config: ConfigManager, target_data_path: Path):
+def run_hmm_analysis(config: ConfigManager, target_data_path: Path, progress_callback=None):
     """Run the HMM analysis using R scripts"""
 
+    if progress_callback is None:
+        progress_callback = lambda percent, message: print(f"{percent}%: {message}")
+
+    progress_callback(7, "Locating R executable...")
     analysis = config.analysis
     r_executable = find_r_executable(analysis.r_executable)
+    print(r_executable)
     check_r_packages(r_executable)
 
     # Ensure R script directory exists
-    # try:
-    #     r_script_dir = Path("src/cowstudyapp/analysis/HMM")
-    # except FileNotFoundError:
-    r_script_dir = Path("/SShare/Education/CowStudyApp/src/cowstudyapp/analysis/HMM")
+    ########## This needs cleaning
+    try:
+        r_script_dir = Path("src/cowstudyapp/analysis/HMM")
+    except FileNotFoundError:
+        r_script_dir = Path("/SShare/Education/CowStudyApp/src/cowstudyapp/analysis/HMM")
     
     if not r_script_dir.exists():
         raise FileNotFoundError(f"R script directory not found: {r_script_dir}")
@@ -304,19 +312,11 @@ def run_hmm_analysis(config: ConfigManager, target_data_path: Path):
     if analysis.hmm is None:
         raise ValueError("ERROR: Missing required HMM section in analysis config")  
     
-    # dirs = create_analysis_directories_OLD(
-    #     base_dir=output_dir,
-    #     features=analysis.hmm.features,
-    #     analysis_type=analysis.mode,
-    #     dataset_name=analysis.dataset_name,
-    # )
+    progress_callback(8, "Creating directories...")
     dirs = create_analysis_directories(
         cv_dir=config.analysis.cv_results,
         mod_dir=config.analysis.models,
         pred_dir=config.analysis.predictions,
-        # features=analysis.hmm.features,
-        # analysis_type=analysis.mode,
-        # dataset_name=analysis.dataset_name,
     )
 
     # if analysis.mode == "LOOCV":
@@ -344,9 +344,11 @@ def run_hmm_analysis(config: ConfigManager, target_data_path: Path):
         else analysis.training_info.training_info_path
     )
 
+    progress_callback(9, "Setting Config...")
     # Convert Python config to R format
     r_config = {
         "states": analysis.hmm.states,
+        "random_seed": analysis.random_seed,
         "all_states": config.labels.valid_activities,
         "features": [feature.model_dump() for feature in analysis.hmm.features],
         "mode": analysis.mode,
@@ -402,6 +404,7 @@ def run_hmm_analysis(config: ConfigManager, target_data_path: Path):
         str(dirs["pred_dir"])
     ]
 
+    progress_callback(10, "Starting R subprocess... This may take a while.")
     try:
         process = subprocess.Popen(
             cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1
@@ -432,7 +435,7 @@ def run_hmm_analysis(config: ConfigManager, target_data_path: Path):
         raise
 
 
-def run_lstm_analysis(config: ConfigManager, target_data_path: Path):
+def run_lstm_analysis(config: ConfigManager, target_data_path: Path, progress_callback=None):
     """Run the HMM analysis using R scripts"""
     from cowstudyapp.analysis.RNN.run_lstm import LSTM_Model
 
@@ -440,29 +443,10 @@ def run_lstm_analysis(config: ConfigManager, target_data_path: Path):
     try:
         if analysis.lstm is None:
             raise ValueError("ERROR: Missing required LSTM section in analysis config")  
-    
-        # dirs = create_analysis_directories(
-        #     base_dir=output_dir,
-        #     features=analysis.lstm.features,
-        #     analysis_type=analysis.mode,
-        #     dataset_name=analysis.dataset_name,
-        # )
-
-
 
         lstm = LSTM_Model(config=config)
 
-        lstm.run_LSTM()
-
-        # # print(analysis.mode)
-        # if analysis.mode == AnalysisModes.LOOCV:
-        #     # lstm.do_loocv()
-        #     lstm.dont_do_loocv()
-        #     pass
-
-        # elif analysis.mode == AnalysisModes.PRODUCT:
-        #     pass
-
+        lstm.run_LSTM(progress_callback=progress_callback)
 
         logger.info("LSTM analysis completed successfully")
 
@@ -474,8 +458,11 @@ def run_lstm_analysis(config: ConfigManager, target_data_path: Path):
 
 
 def main(config_path=None, progress_callback=None):
+    if progress_callback is None:
+        progress_callback = lambda percent, message: print(f"{percent}%: {message}")
     logger.info("Starting run_analysis")
     if config_path is None and len(sys.argv) > 1:
+        print('here')
         parser = argparse.ArgumentParser(
             prog="run_analysis",
             description="Perform serial classification on data"
@@ -496,26 +483,28 @@ def main(config_path=None, progress_callback=None):
     else:
         # Load configuration
         # config_path = Path("config/default.yaml")
-        config_path = Path(config_path)
         if not config_path:
             config_path = Path("config/RB_22_config.yaml")
+        config_path = config_path
         # config_path = Path("config/RB_19_22_combined_config.yaml")
         task_id = "direct-call"
+        
     config = ConfigManager.load(config_path)
-
+    progress_callback(6, f"Config {config_path} loaded")
     try:
         if config.analysis.hmm.enabled:
             logger.info("Running HMM analysis...")
             run_hmm_analysis(
                 config=config,
                 target_data_path=Path(config.analysis.target_dataset),
+                progress_callback=progress_callback
             )
         if config.analysis.lstm.enabled:
             logger.info("Running LSTM analysis...")
             run_lstm_analysis(
                 config=config,
                 target_data_path=Path(config.analysis.target_dataset),
-                # output_dir=output_dir / "lstm",
+                progress_callback=progress_callback
             )
 
         return True

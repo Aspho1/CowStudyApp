@@ -41,7 +41,10 @@ class DataLoader:
         if config.features is None:
             raise ValueError("Feature configuration is required")
 
+        # print("!!!!!!!!!!!!!", config.validation.dataset_name)
+
         self.config = config.io
+        self.validation_config = config.validation
         self.validator = DataValidator(config.validation)  # Pass validation config
         self.labeler = LabelAggregation(config.labels)
         self.feature = FeatureComputation(config.features)
@@ -55,9 +58,14 @@ class DataLoader:
             "gps": {
                 "total_initial_records": 0,
                 "total_final_records": 0,
+                "valid_timerange": 0,
+                'non_zero_vals': 0,
+                "non_duplicates_post_standardization": 0,
+                "valid_values": 0,
                 "expected_records_per_device": self.validator.calculate_expected_records(
                     interval=self.config.gps_sample_interval
                 ),
+                'gaps': {},
                 "devices_processed": 0,
                 "devices": {},
             },
@@ -65,10 +73,14 @@ class DataLoader:
             # After all files have been processed, fill in a summary item
             "accelerometer": {
                 "total_initial_records": 0,
+                "valid_timerange": 0,
+                "non_duplicates_post_standardization": 0,
+                "valid_values": 0,
                 "total_final_records": 0,
                 "expected_records_per_device": self.validator.calculate_expected_records(
                     interval=self.config.acc_sample_interval
                 ),
+                "gaps": {},
                 "total_windows_computed": 0,
                 "devices_processed": 0,
                 "devices": {},
@@ -323,24 +335,38 @@ class DataLoader:
                 "initial_records"
             ]
 
-            df, accel_valid_stats = self.validator.validate_accelerometer(df)
-            stats["preprocessing_stats"] = accel_valid_stats
+            df2, accel_valid_stats = self.validator.validate_accelerometer(df)
+            stats.update(accel_valid_stats)
 
-            stats["final_records"] = df.shape[0]
+            stats["final_records"] = df2.shape[0]
             print(f"Final accelerometer records: {stats['final_records']}")
-            # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-            # print(df.columns)
-            self.quality_report["accelerometer"]["total_final_records"] += stats[
-                "final_records"
-            ]
+            self.quality_report["accelerometer"]["total_final_records"] += stats["final_records"]
+            self.quality_report["accelerometer"]["valid_timerange"] += stats["valid_timerange"]
+            self.quality_report["accelerometer"]["non_duplicates_post_standardization"] += stats["non_duplicates_post_standardization"]
+            self.quality_report["accelerometer"]["valid_values"] += stats["valid_values"]
+            # self.quality_report['gps']['gaps'] 
+
+            # Add in gaps
+
+            if 'gap_analysis' in stats['gap_stats']:
+                for k in stats['gap_stats']['gap_analysis']['gap_distribution'].keys():
+                    if k in self.quality_report['accelerometer']['gaps'].keys():
+                        self.quality_report['accelerometer']['gaps'][k] = self.quality_report['accelerometer']['gaps'][k] + stats['gap_stats']['gap_analysis']['gap_distribution'][k]
+                    else:
+                        self.quality_report['accelerometer']['gaps'][k] = stats['gap_stats']['gap_analysis']['gap_distribution'][k]
+
+
+            # self.quality_report["accelerometer"]["total_final_records"] += stats[
+            #     "final_records"
+            # ]
 
             print(f"Computing features for device {device_id}...")
 
             if aggregated:
-                df, feature_stats = self.feature.compute_features(df)
+                df2, feature_stats = self.feature.compute_features(df2)
                 stats["acc_feature_stats"] = feature_stats
 
-                stats["windows_computed"] = df.shape[0]
+                stats["windows_computed"] = df2.shape[0]
                 self.quality_report["accelerometer"]["total_windows_computed"] += stats[
                     "windows_computed"
                 ]
@@ -349,7 +375,7 @@ class DataLoader:
                 self.quality_report["accelerometer"]["devices"][device_id] = stats
 
             self.quality_report["accelerometer"]["devices_processed"] += 1
-            return df
+            return df2
 
         except Exception as e:
             # self._handle_accelerometer_error(device_id, file_path, format_type, e)
@@ -374,7 +400,7 @@ class DataLoader:
             # self.quality_report['gps'][device_id] = {}
 
             initial_records = len(df)
-            # print(f"Initial accelerometer records: {initial_records}")
+            # print(f"!!!!!!Initial GPS records: {initial_records}")
 
             print(
                 f"------------------------------{device_id}---------------------------"
@@ -403,6 +429,7 @@ class DataLoader:
 
             # Add UTM coordinates
             df = GPSFeatures.add_utm_coordinates(df)
+            # print(f"ADDED UTM COORDS: {len(df)}")
 
             # Round timestamps
             df = round_timestamps(
@@ -411,6 +438,7 @@ class DataLoader:
                 interval=self.config.gps_sample_interval,
                 direction="nearest",
             )
+            # print(f"ROUNDED TIME STEPS: {initial_records}")
 
             # Select final columns
             desired_columns = [
@@ -431,15 +459,35 @@ class DataLoader:
 
             # print(df.columns)
             df, valid_gps_stats = self.validator.validate_gps(df)
-            stats["preprocessing_stats"] = valid_gps_stats
+            
+            stats.update(valid_gps_stats)
+            # for k in stats.keys():
+            #     print(k)
+            # print(f"VALIDATED GPS: {len(df)}")
+            # print(f"EXPECTED: {(self.validation_config.end_datetime - self.validation_config.start_datetime).days + 1} -- {((self.validation_config.end_datetime - self.validation_config.start_datetime).days +1)* 288}")
 
             stats["final_records"] = df.shape[0]
             self.quality_report["gps"]["total_final_records"] += stats["final_records"]
+            self.quality_report["gps"]["valid_timerange"] += stats["valid_timerange"]
+            self.quality_report["gps"]["non_zero_vals"] += stats["non_zero_vals"]
+            self.quality_report["gps"]["non_duplicates_post_standardization"] += stats["non_duplicates_post_standardization"]
+            self.quality_report["gps"]["valid_values"] += stats["valid_values"]
+            # self.quality_report['gps']['gaps'] 
+
+            # Add in gaps
+            for k in stats['gap_stats']['gap_analysis']['gap_distribution'].keys():
+                if k in self.quality_report['gps']['gaps'].keys():
+                    self.quality_report['gps']['gaps'][k] = self.quality_report['gps']['gaps'][k] + stats['gap_stats']['gap_analysis']['gap_distribution'][k]
+                else:
+                    self.quality_report['gps']['gaps'][k] = stats['gap_stats']['gap_analysis']['gap_distribution'][k]
+
+
 
             if device_id not in self.quality_report["gps"]["devices"]:
                 self.quality_report["gps"]["devices"][device_id] = stats
 
             self.quality_report["gps"]["devices_processed"] += 1
+            # return 
             return df
 
         except Exception as e:
@@ -734,24 +782,24 @@ class DataLoader:
         # Store in quality report
         self.quality_report["labels"]["standard_format"] = stats
 
-        # Print summary
-        print("\nLabel Quality Summary (Standard Format):")
-        print(f"Total records: {stats['total_records']}")
-        print(f"Unique devices: {stats['unique_devices']}")
-        print(
-            f"\nTime range: {stats['overall_time_range']['start']} to {stats['overall_time_range']['end']}"
-        )
-        print("\nActivity counts:")
-        for activity, count in stats["activity_counts"].items():
-            print(f"{activity}: {count}")
-        print("\nPer-device statistics:")
-        for device_id, device_stats in stats["devices"].items():
-            print(f"\nDevice {device_id}:")
-            print(f"Records: {device_stats['records']}")
-            print(
-                f"Time range: {device_stats['time_range']['start']} to {device_stats['time_range']['end']}"
-            )
-            print("Activities:", device_stats["activity_counts"])
+        # # Print summary
+        # print("\nLabel Quality Summary (Standard Format):")
+        # print(f"Total records: {stats['total_records']}")
+        # print(f"Unique devices: {stats['unique_devices']}")
+        # print(
+        #     f"\nTime range: {stats['overall_time_range']['start']} to {stats['overall_time_range']['end']}"
+        # )
+        # print("\nActivity counts:")
+        # for activity, count in stats["activity_counts"].items():
+        #     print(f"{activity}: {count}")
+        # print("\nPer-device statistics:")
+        # for device_id, device_stats in stats["devices"].items():
+        #     print(f"\nDevice {device_id}:")
+        #     print(f"Records: {device_stats['records']}")
+        #     print(
+        #         f"Time range: {device_stats['time_range']['start']} to {device_stats['time_range']['end']}"
+        #     )
+        #     print("Activities:", device_stats["activity_counts"])
 
         return df, stats
 

@@ -29,6 +29,8 @@ class RadarPlotOfCow:
         self.config = config
         self.figure_size = (10, 6)
         self.dest = self.config.visuals.visuals_root_path / self.config.visuals.radar.extension
+        if not self.dest.exists():
+            self.dest.mkdir(parents=True, exist_ok=True)
 
 
         self.act_map = {
@@ -120,7 +122,8 @@ class RadarPlotOfCow:
                                , subplot_kw={'projection': 'polar'}, dpi=300,layout='constrained')
         
         for ax,id in zip(axs.flatten(), IDs):
-            self.plot_single_cow_radar(ID=id,ax=ax,df=df)
+            cow_data = df[df.ID == id]
+            self.plot_single_cow_radar(ID=id,ax=ax,df=cow_data)
         self.end_plot(fig=fig, end_format=end_format, ID="_".join([str(id) for id in IDs]))
 
         

@@ -11,71 +11,70 @@ import gc
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 import seaborn as sns
+import subprocess
+from pathlib import Path
+import platform
 
+# os.environ['R_HOME'] = "C:\\Program Files\\R\\R-4.4.1"
 
-
-os.environ['R_HOME'] = "C:\\Program Files\\R\\R-4.4.3"
-from pymer4.models import Lmer
-import rpy2.robjects as robjects
-import rpy2
 
 from cowstudyapp.utils import from_posix_col
 from cowstudyapp.config import ConfigManager
 
 
+def find_r_executable(config_path) -> Path:
+    """Find the R executable on the system"""
+    if platform.system() == "Windows":
+        # Common R installation paths on Windows
+        possible_paths = [
+            config_path, 
+            r"C:/Program Files/R/R-4.4.3/bin/Rscript.exe",
+            r"C:/Program Files/R/R-4.4.0/bin/Rscript.exe",
+            r"C:/Program Files/R/R-4.3.2/bin/Rscript.exe",
+            r"C:/Program Files/R/R-4.3.0/bin/Rscript.exe",
+        ]
 
+        # Check R_HOME environment variable
+        r_home = os.environ.get("R_HOME")
+        print("RHOME:", r_home)
+        if r_home:
+            possible_paths.append(Path(r_home) / "bin" / "Rscript.exe")
 
+        # # Try to find Rscript in PATH
+        # try:
+        #     result = subprocess.run(
+        #         ["where", "Rscript.exe"], capture_output=True, text=True
+        #     )
+        #     if result.returncode == 0:
+        #         possible_paths.extend(result.stdout.splitlines())
+        # except subprocess.SubprocessError:
+        #     pass
 
-def optimize_r_performance():
-    try:
+        # Return first existing path
+        for path in possible_paths:
+            print("CHECKING ", path)
+            if Path(path).exists():
+                return Path(path)
 
-        print(f"rpy2 version: {rpy2.__version__}")
-        print(f"Current R_HOME: {os.environ.get('R_HOME', 'Not set')}")
-        print(f"Python executable: {sys.executable}")
+    else:  # Linux/Mac
+        try:
+            # First try to find Rscript on the path
+            rscript_path = subprocess.check_output(["which", "Rscript"]).decode().strip()
+            return Path(rscript_path)
+        except subprocess.SubprocessError:
+            # If which doesn't work, check common locations
+            possible_paths = [
+                "/usr/bin/Rscript",
+                "/usr/local/bin/Rscript"
+            ]
+            for path in possible_paths:
+                if Path(path).exists():
+                    return Path(path)
 
-        print("-"*80)
-
-        r_version = robjects.r('R.version.string')
-        print(f"R version: {r_version[0]}")
-        
-        # Force reinstallation of both Matrix and lme4 in the correct order
-        robjects.r('''
-            # First remove existing packages if they exist
-            # if(requireNamespace("lme4", quietly = TRUE)) {
-            #     remove.packages("lme4")
-            # }
-            # if(requireNamespace("Matrix", quietly = TRUE)) {
-            #     remove.packages("Matrix")
-            # }
-            
-            # # Install Matrix first
-            # install.packages("https://cran.r-project.org/src/contrib/Archive/Matrix/Matrix_1.5-3.tar.gz", 
-            #                 repos=NULL, type="source")
-            # utils::install.packages("Matrix", type = "source")
-            # install.packages("Matrix", dependencies=TRUE, type="source")            
-            library(Matrix)
-            # # Then install lme4 from source (this will build it against the Matrix we just installed)
-            # install.packages("lme4", dependencies=TRUE, type="source")            
-            # utils::install.packages("lme4", type = "source")
-            library(lme4)
-            
-            # Optional: verify installation
-            message("Matrix version: ", packageVersion("Matrix"))
-            message("lme4 version: ", packageVersion("lme4"))
-        ''')
-        
-        # Use multiple cores for BLAS operations
-        robjects.r('library(parallel)')
-        cores = max(1, multiprocessing.cpu_count() - 1)
-        robjects.r(f'options(mc.cores = {cores})')
-        
-        # Set BLAS/LAPACK threading
-        robjects.r('Sys.setenv(OMP_NUM_THREADS = 12)')
-        
-        print("R performance optimizations applied")
-    except Exception as e:
-        print(f"Could not optimize R performance: {e}")
-        print(f"Error details: {str(e)}")
+    raise FileNotFoundError(
+        "Could not find R executable. Please install R and ensure it's in your PATH or "
+        "designated in the `r_executable` field in your configuration file."
+    )
 
 
 
@@ -85,86 +84,8 @@ class TermSelector:
     def __init__(self, base_vars:List[str] = ['temp', 'age', 'weight', 'time'], max_degree:int=4):
         self.base_vars = base_vars
         self.max_degree = max_degree
-        
-    def parse_matrix(self, matrix_text: str) -> Dict[str, bool]:
-        """
-        Parse a correlation matrix text into a dictionary of terms to include
-        
-        Parameters:
-        -----------
-        matrix_text : str
-            Text representing the correlation matrix with 1s and 0s
-            
-        Returns:
-        --------
-        Dict[str, bool]
-            Dictionary with terms as keys and boolean values (True if included)
-        """
-        # Clean up the input text
-        matrix_text = matrix_text.strip().replace('\n', ' ')
-        
-        # Extract tokens (variable names and 0/1 values)
-        tokens = []
-        current_token = ""
-        for char in matrix_text:
-            if char.isalnum() or char in ['^', '_']:
-                current_token += char
-            elif char.strip() and current_token:
-                tokens.append(current_token)
-                current_token = ""
-        if current_token:
-            tokens.append(current_token)
-            
-        # Extract variables from the first row and last row
-        var_indices = {}
-        col_vars = []
-        
-        # Process terms for variables and create a mapping of terms to include
-        term_dict = {}
-        
-        # First, add all main effects
-        for var in self.base_vars:
-            term_dict[var] = False
-            
-        # Then add all polynomial terms
-        for var in self.base_vars:
-            for degree in range(2, self.max_degree + 1):
-                term_dict[f"{var}^{degree}"] = False
-                
-        # Finally, add all interactions
-        all_terms = list(term_dict.keys())
-        for i, term1 in enumerate(all_terms):
-            for term2 in all_terms[i+1:]:
-                term_dict[f"{term1}:{term2}"] = False
-        
-        # Now parse the matrix to set the selected terms
-        row_var = None
-        col_idx = 0
-        
-        # Simplified approach: just look for variable names followed by 1s
-        for i, token in enumerate(tokens):
-            if token in self.base_vars or '^' in token:
-                # This is a variable name
-                if tokens[i+1] == '1':
-                    term_dict[token] = True
-                    
-                # Check for interactions (pairs of 1s)
-                for j in range(i+2, len(tokens)):
-                    if tokens[j] == '1':
-                        # Find what variable this 1 corresponds to
-                        prev_var = None
-                        for k in range(j-1, i, -1):
-                            if tokens[k] in self.base_vars or '^' in tokens[k]:
-                                prev_var = tokens[k]
-                                break
-                        
-                        if prev_var and prev_var != token:
-                            interaction = f"{token}:{prev_var}"
-                            term_dict[interaction] = True
-        
-        return term_dict
     
-    def get_model_terms(self, term_dict: Dict[str, bool]) -> Tuple[List[str], List[str]]:
+    def get_model_terms(self, term_list: List[str]) -> Tuple[List[str], List[str]]:
         """
         Convert term dictionary to lists of main effects and interactions
         
@@ -181,10 +102,7 @@ class TermSelector:
         main_effects = []
         interactions = []
         
-        for term, include in term_dict.items():
-            if not include:
-                continue
-                
+        for term in term_list:
             if ':' in term:
                 interactions.append(term)
             else:
@@ -236,7 +154,6 @@ class TermSelector:
         sorted_terms = [f"{base}^{degree}" if degree > 1 else base for base, degree in sorted_components]
         return ':'.join(sorted_terms)
     
-
     def standardize_term_names(self, terms: List[str]) -> List[str]:
         """Convert human-readable terms to model variable names"""
         term_mapping = {
@@ -284,15 +201,18 @@ class BehaviorModelBuilder:
         self.config = config
         # Set up Norris, MT observer for sun calculations
         self.observer = ephem.Observer()
-        self.observer.lat = '45.575'
-        self.observer.lon = '-111.625'
-        self.observer.elevation = 1715
+        self.observer.lat = '45.575' # Get median lat
+        self.observer.lon = '-111.625' # Get median lon
+        self.observer.elevation = 1715 # Get median alt
         self.observer.pressure = 0
         self.observer.horizon = '-0:34'
         self.sunrise_buffer = -1.5  # After Sunrise
         self.sunset_buffer = 1.5  # After Sunset
 
-        self.base_effects = ['temp', 'age', 'weight', 'time', 'hod']
+        self.base_effects = ['temp', 'time', 'hod']
+        if self.config.io.cow_info_path and self.config.io.cow_info_path.exists():
+            self.base_effects.extend(['age', 'weight'])
+
         self.degree_map = {
             '':1,
             '_sq':2,
@@ -302,7 +222,6 @@ class BehaviorModelBuilder:
 
     def get_z_names(self):
         return [f"{be}_z" for be in self.base_effects]
-
 
     def prepare_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -325,7 +244,8 @@ class BehaviorModelBuilder:
         df = self._add_temp_col(df)
         
         # Add cow metadata (age, weight)
-        df = self._add_meta_info(df, filter_weight=False)
+        if self.config.io.cow_info_path and self.config.io.cow_info_path.exists():
+            df = self._add_meta_info(df, filter_weight=False)
         
         return df
     
@@ -411,15 +331,6 @@ class BehaviorModelBuilder:
                 'max_degree': max_degree
             }
         
-
-
-
-
-
-
-
-
-        # END
         # Handle all other polynomial terms normally
         for effect in self.base_effects:
             if effect != 'time':  # Skip time as we handled it specially
@@ -427,10 +338,6 @@ class BehaviorModelBuilder:
                 for suffix, degree in self.degree_map.items():
                     if f'{z_name}{suffix}' in selected_terms:
                         clean_df[f'{z_name}{suffix}'] = clean_df[z_name] ** degree
-
-
-
-
 
         # Add indicator variables for each state
         for state in self.config.analysis.hmm.states:
@@ -440,7 +347,6 @@ class BehaviorModelBuilder:
         clean_df.attrs['means'] = means
         clean_df.attrs['stds'] = stds
         
-
         # print(clean_df.head())
         return clean_df
     
@@ -616,8 +522,10 @@ class BehaviorAnalyzer:
         self.model_builder = BehaviorModelBuilder(config)
         self.term_selector = TermSelector()
 
-        os.environ['R_HOME'] = str(self.config.analysis.r_executable.parent.parent)
-
+        # Only set R_HOME on Windows, not on Linux
+        if platform.system() == "Windows":
+            r_executable = find_r_executable(self.config.analysis.r_executable)
+            os.environ['R_HOME'] = str(r_executable.parent.parent)
         
         # Display mappings for variable names
         self.display_map = {
@@ -648,6 +556,76 @@ class BehaviorAnalyzer:
         }
 
 
+
+    def optimize_r_performance(self):
+        """Set up R environment and ensure required packages are installed"""
+        try:
+            # First try to import and initialize rpy2
+            import rpy2.robjects as robjects
+            from rpy2.robjects.packages import importr, isinstalled, conversion, default_converter
+            import rpy2
+
+            print(f"rpy2 version: {rpy2.__version__}")
+            print(f"Current R_HOME: {os.environ.get('R_HOME', 'Not set')}")
+            print(f"Python executable: {sys.executable}")
+
+            print("-"*80)
+
+            # Print detailed R environment information
+            with conversion.localconverter(default_converter):
+                r_version = robjects.r('R.version.string')
+                print(f"R version: {r_version[0]}")
+                
+                # Get library paths actually being used by R
+                print("R library paths:")
+                lib_paths = robjects.r('.libPaths()')
+                for i, path in enumerate(lib_paths):
+                    print(f"  [{i}] {path}")
+                
+                # Check for required packages
+                required_packages = ['lme4', 'Matrix', 'lmerTest']
+                missing_packages = []
+                
+                for pkg in required_packages:
+                    if not isinstalled(pkg):
+                        print(f"Package {pkg} is not installed")
+                        missing_packages.append(pkg)
+                    else:
+                        pkg_version = robjects.r(f'packageVersion("{pkg}")')
+                        print(f"Package {pkg} version: {pkg_version[0]}")
+                
+                # Install missing packages if needed
+                if missing_packages:
+                    print(f"Installing missing packages: {', '.join(missing_packages)}")
+                    utils = importr('utils')
+                    for pkg in missing_packages:
+                        print(f"Installing {pkg}...")
+                        utils.install_packages(pkg, repos="https://cloud.r-project.org")
+                        print(f"{pkg} installed")
+                        
+                # Load required packages to ensure they work
+                print("Loading required packages...")
+                matrix = importr('Matrix')
+                lme4 = importr('lme4')
+                print("Required packages loaded successfully")
+                        
+                # Configure R performance settings
+                cores = max(1, multiprocessing.cpu_count() - 4)
+                robjects.r(f'options(mc.cores = {cores})')
+                
+                if 'OMP_NUM_THREADS' not in os.environ:
+                    os.environ['OMP_NUM_THREADS'] = str(min(12, cores))
+                    
+                print("R performance optimizations applied")
+                return True
+            
+        except Exception as e:
+            print(f"Warning: R setup failed: {str(e)}")
+            print("Stack trace:")
+            import traceback
+            traceback.print_exc()
+            print("Continuing without R optimizations...")
+            return False
 
     def _generate_param_labels(self) -> Dict[str, str]:
         """Generate human-readable labels for model parameters"""
@@ -718,56 +696,54 @@ class BehaviorAnalyzer:
             Analysis results
         """
         try:
-            optimize_r_performance()
+            self.optimize_r_performance()
         except Exception as e:
-            print(f"Could not optimize R performance: {e}")
+            print(f"Warning: R optimization failed: {e}")
+            print("Continuing without R optimizations...")
 
         # Prepare the dataset
         prepared_df = self.model_builder.prepare_data(df)
         
         # Sample data if necessary
         if len(prepared_df) > 50000:
-            sample_frac = 1
+            sample_frac = self.config.visuals.temperature_graph.sample_size
             print(f"Using a {sample_frac*100:.0f}% random sample ({len(prepared_df)} -> {int(len(prepared_df)*sample_frac)} rows)")
-            prepared_df = prepared_df.sample(frac=sample_frac, random_state=42)
+            prepared_df = prepared_df.sample(frac=sample_frac, random_state=self.config.visuals.random_seed)
         
         # Split data by day/night
         df_day = prepared_df[prepared_df['is_daylight']].copy()
         df_night = prepared_df[~prepared_df['is_daylight']].copy()
         
-        # Select terms to include in the model
-        selected_term_dict = None
-        if term_matrix:
-            selected_term_dict = self.term_selector.parse_matrix(term_matrix)
-        else:
-            # Default term selection: linear terms + interactions
-            selected_term_dict = {
-                'temp': True, 
-                # 'temp^2': True, 
-                # 'age': True, 
-                # 'hod': True,
-                # 'weight': True,
-                'time': True,
-                'time^2': True,
-                'time^3': True,
-                'time^4': True,
-                # 'hod:time': True,
-                # 'hod:time^2': True,
-                # 'hod:time^3': True,
-                # 'hod:time^4': True,
- 
-                # 'temp:age': True, 
-                # 'temp:weight': False, 
-                # 'age:weight': False,
-                # 'hod:temp': True,
-                'time:temp': True,
-                # 'time^2:temp': True,
-                # 'time^3:temp': True,
-                'time^4:temp': True,
-            }
+
+        # Default term selection: linear terms + interactions
+        # selected_term_list = [
+        #     'temp', 
+        #     'temp^2', 
+        #     # 'age', 
+        #     'hod',
+        #     # 'weight',
+        #     'time',
+        #     # 'time^2',
+        #     # 'time^3',                
+        #     'time^4',
+        #     'hod:time',
+        #     # 'hod:time^2',
+        #     # 'hod:time^3',
+        #     # 'hod:time^4',
+        #     # 'temp:age', 
+        #     # 'temp:weight', 
+        #     # 'age:weight',
+        #     'hod:temp',
+        #     'time:temp',
+        #     'time^2:temp',
+        #     'time^3:temp',
+        #     'time^4:temp'
+        # ]
+
+        selected_term_list = self.config.visuals.temperature_graph.terms
         
         # Get main effects and interactions
-        main_effects, interactions = self.term_selector.get_model_terms(selected_term_dict)
+        main_effects, interactions = self.term_selector.get_model_terms(selected_term_list)
         
         # Standardize term names for modeling
         std_main_effects = self.term_selector.standardize_term_names(main_effects)
@@ -843,6 +819,15 @@ class BehaviorAnalyzer:
         Dict
             Results for this period
         """
+        try:
+            from pymer4.models import Lmer
+        except Exception as e:
+            print(f"Error importing pymer4: {e}")
+            print("This may be due to R configuration issues. Try installing/updating:")
+            print("1. libffi-dev package on your system")
+            print("2. rpy2 with: pip install rpy2==3.5.13")  # Specify a version known to work
+            print("3. Check that R and the required R packages are installed")
+
         print(f"\n{'-'*80}")
         print(f"ANALYZING PARAMETER EFFECTS ON BEHAVIOR DURING {period.upper()}")
         print(f"{'-'*80}")
@@ -850,15 +835,18 @@ class BehaviorAnalyzer:
         # Print data summary
         print(f"\nData Summary for {period}:")
         print(f"Temperature range: {df['temp'].min():.1f} to {df['temp'].max():.1f}°C")
-        print(f"Age range: {df['age'].min()} to {df['age'].max()} years")
-        print(f"Weight range: {df['weight'].min():.1f} to {df['weight'].max():.1f} kg")
         print(f"HOD range: {df['hod'].min():.1f} to {df['hod'].max():.1f} hours")
         print(f"Number of cows: {df['ID'].nunique()}")
         print(f"Total observations: {len(df)}")
         time_min, time_max = df.time.min(), df.time.max()
         print(f"time min {time_min} - {time_max}")
 
-        
+        try:
+            print(f"Age range: {df['age'].min()} to {df['age'].max()} years")
+            print(f"Weight range: {df['weight'].min():.1f} to {df['weight'].max():.1f} kg")
+        except Exception as e:
+            pass
+
         # Create model dataframe
         clean_df = self.model_builder.create_model_dataframe(df, all_terms)
         
@@ -1647,8 +1635,8 @@ class BehaviorAnalyzer:
                     
                     if hasattr(model, 'data') and hasattr(model.data, 'attrs') and 'ortho_time_mapping' in model.data.attrs:
                         orthogonal_data = model.data.attrs['ortho_time_mapping']
-                        print("HAS ORTHOGONAL")
-                        print(orthogonal_data)
+                        # print("HAS ORTHOGONAL")
+                        # print(orthogonal_data)
 
                     # Update this for non temperature 'by'
                     # Create legend labels with actual temperature values

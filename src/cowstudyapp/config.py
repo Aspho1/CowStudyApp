@@ -401,6 +401,7 @@ class AnalysisConfig(CommonConfig):
     mode: AnalysisModes = AnalysisModes.LOOCV
     target_dataset: Path
     training_info: Optional[TrainingInfo] = None
+    training_info_path: Optional[Path] = None
     day_only: bool = False
     r_executable: Optional[Path] = None
     hmm: Optional[HMMConfig] = None
@@ -446,12 +447,17 @@ class RadarConfig(BaseModel):
 
 class TemperatureGraphConfig(BaseModel):
     run: bool
-    minimum_required_values: int
+    minimum_required_values: int = 30
     extension: Optional[str] = Field(default="")
     daynight: str
     show_curve: bool = False
     show_table: bool = False
     export_excel: bool = False
+    terms: List[str] = []
+ 
+    sample_size: int|float = 1
+    # Incude list of terms
+    
 
 
     @field_validator('daynight')
@@ -493,7 +499,7 @@ class ConvolutionSurface(BaseModel):
 
 
 
-class VisualsConfig(BaseModel):
+class VisualsConfig(CommonConfig):
     predictions_path: Optional[Path] = None
     visuals_root_path: Path
     radar: RadarConfig
@@ -507,24 +513,22 @@ class VisualsConfig(BaseModel):
     dataset_name: str = Field(default="")
 
 
-    @model_validator(mode="after")
-    def apply_dataset_folder(cls, m: "VisualsConfig") -> "VisualsConfig":
-        # now you *do* have `m.dataset_name`
+    # @model_validator(mode="after")
+    # def apply_dataset_folder(cls, m: "VisualsConfig") -> "VisualsConfig":
+    #     # now you *do* have `m.dataset_name`
 
-        if not str(m.visuals_root_path).endswith(m.dataset_name):
-            m.visuals_root_path = m.visuals_root_path / Path(m.dataset_name or "UNNAMED")
-        if not m.visuals_root_path.exists():
-            raise ValueError(f"Path `{m.visuals_root_path}` does not exist.")
-        return m
-    # @field_validator('visuals_root_path')
-    # @classmethod
-    # def validate_directory(cls, v: Path, m: "VisualsConfig") -> Path:
-    #     print("H!!!")
-    #     v = v / Path(com.data.get("dataset_name","UNNAMED"))
-    #     print(v)
-    #     if not v.exists():
-    #         raise ValueError(f"Path `{v}` does not exist.")
-    #     return v
+    #     if not str(m.visuals_root_path).endswith(m.dataset_name):
+    #         m.visuals_root_path = m.visuals_root_path / Path(m.dataset_name or "UNNAMED")
+    #         m.visuals_root_path.mkdir(exist_ok=True, parents=True)
+    #     if not m.visuals_root_path.exists():
+    #         raise ValueError(f"Path `{m.visuals_root_path}` does not exist.")
+    #     return m
+    @field_validator('visuals_root_path')
+    @classmethod
+    def validate_directory(cls, v: Path) -> Path:
+        if not v.exists():
+            raise ValueError(f"Path `{v}` does not exist.")
+        return v
 
     # @field_validator('dist')
     # def validate_dist(cls, v, info: ValidationInfo):
