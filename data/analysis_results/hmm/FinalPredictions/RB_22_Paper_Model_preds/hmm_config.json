@@ -1,0 +1,62 @@
+{
+  "states": [
+    "Grazing",
+    "Resting",
+    "Traveling"
+  ],
+  "features": [
+    {
+      "name": "step",
+      "dist": null,
+      "dist_type": "regular"
+    },
+    {
+      "name": "angle",
+      "dist": null,
+      "dist_type": "circular"
+    },
+    {
+      "name": "magnitude_mean",
+      "dist": null,
+      "dist_type": "regular"
+    },
+    {
+      "name": "magnitude_var",
+      "dist": null,
+      "dist_type": "regular"
+    }
+  ],
+  "mode": "PRODUCT",
+  "time_covariate": false,
+  "timezone": "America/Denver",
+  "excluded_devices": [
+    841,
+    1005
+  ],
+  "day_only": false,
+  "options": {
+    "show_dist_plots": true,
+    "remove_outliers": true,
+    "show_full_range": true,
+    "show_correlation": true,
+    "number_of_retry_fits": 2,
+    "distributions": {
+      "regular": [
+        "lnorm",
+        "gamma",
+        "norm",
+        "exp"
+      ],
+      "circular": [
+        "vm",
+        "wrpcauchy"
+      ]
+    }
+  },
+  "training_info": [
+    {
+      "training_info_type": "model",
+      "training_info_path": "data/analysis_results/hmm/FinalModels/RB22_Paper_Model/trained_model.rds"
+    }
+  ]
+}

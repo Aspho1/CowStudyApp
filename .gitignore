@@ -42,10 +42,16 @@ output/
 # config/*.yaml
 # !config/default.yaml
 
-data/*.csv
-data/*.xlsx
-data/*.pkl
-data/*.rds
+# Ignore specific data file formats
+data/**/*.csv
+data/**/*.xlsx
+data/**/*.pkl
+data/**/*.rds
+data/**/shp/**
+
+# Keep folder structure
+!data/**/
+!data/**/.gitkeep
 
 .RDataTmp
 # .workspace

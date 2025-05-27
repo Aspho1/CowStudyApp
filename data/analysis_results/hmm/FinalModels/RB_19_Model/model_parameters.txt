@@ -1,0 +1,65 @@
+
+Model Parameters Summary
+=====================
+
+Transition Probability Matrix:
+            Grazing    Resting  Traveling
+Grazing   0.9407042 0.05123274 0.00806308
+Resting   0.1199292 0.84861233 0.03145843
+Traveling 0.1818317 0.11364414 0.70452412
+
+Initial State Distribution:
+        Grazing   Resting Traveling
+ID:600 0.144563 0.4018696 0.4535674
+ID:602 0.144563 0.4018696 0.4535674
+ID:603 0.144563 0.4018696 0.4535674
+ID:604 0.144563 0.4018696 0.4535674
+ID:605 0.144563 0.4018696 0.4535674
+ID:606 0.144563 0.4018696 0.4535674
+ID:608 0.144563 0.4018696 0.4535674
+ID:610 0.144563 0.4018696 0.4535674
+ID:611 0.144563 0.4018696 0.4535674
+ID:613 0.144563 0.4018696 0.4535674
+ID:615 0.144563 0.4018696 0.4535674
+ID:616 0.144563 0.4018696 0.4535674
+ID:617 0.144563 0.4018696 0.4535674
+
+Feature Distribution Parameters:
+
+step:
+           Grazing  Resting Traveling
+location 2.9360778 2.303175 5.0996792
+scale    0.9219463 1.151730 0.5628188
+zeromass 0.0001000 0.000100 0.0001000
+
+angle:
+                  Grazing  Resting   Traveling
+mean          -0.08590609 3.023961 -0.07501338
+concentration  0.31994098 0.209020  0.85015027
+
+magnitude_mean:
+            Grazing    Resting Traveling
+location 2.26384164 2.26086781  2.283868
+scale    0.04672646 0.04477835  0.104045
+
+magnitude_var:
+             Grazing       Resting     Traveling
+location -3.30399654 -3.705197e+00 -3.487585e+00
+scale     2.22231627  1.934988e+00  1.573248e+00
+zeromass  0.00262382  1.379464e-13  7.278254e-08
+
+beta:
+              1 -> 2    1 -> 3    2 -> 1    2 -> 3    3 -> 1    3 -> 2
+(Intercept) -2.91025 -4.759333 -1.956701 -3.294936 -1.354441 -1.824451
+
+Predicted State Distribution:
+      State  Count Percentage
+1   Grazing 145459      47.65
+2   Resting 145994      47.83
+3 Traveling  13812       4.52
+
+Average State Duration (in seconds):
+              State Mean_Duration_Sec Median_Duration_Sec Max_Duration_Sec
+Grazing     Grazing          7134.957                5400            64500
+Resting     Resting          9049.215                6000            93900
+Traveling Traveling          1156.138                 600            10500

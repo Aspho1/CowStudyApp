@@ -1,0 +1,30 @@
+Confusion Matrix:
+=================
+           Predicted
+Actual      Grazing Resting Traveling
+  Grazing       170       1         1
+  Resting         6     208         3
+  Traveling       8       1        34
+
+Performance Metrics by State:
+============================
+
+State: Grazing
+Accuracy: 0.963
+Sensitivity: 0.988
+Specificity: 0.946
+F1 Score: 0.955
+
+State: Resting
+Accuracy: 0.975
+Sensitivity: 0.959
+Specificity: 0.991
+F1 Score: 0.974
+
+State: Traveling
+Accuracy: 0.970
+Sensitivity: 0.791
+Specificity: 0.990
+F1 Score: 0.840
+
+Overall Accuracy: 0.954

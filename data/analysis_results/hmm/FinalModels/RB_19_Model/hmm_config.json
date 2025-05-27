@@ -1,0 +1,67 @@
+{
+  "states": [
+    "Grazing",
+    "Resting",
+    "Traveling"
+  ],
+  "all_states": [
+    "Resting",
+    "Grazing",
+    "Traveling",
+    "Fighting",
+    "Grooming",
+    "Drinking",
+    "Mineral"
+  ],
+  "features": [
+    {
+      "name": "step",
+      "dist": null,
+      "dist_type": "regular"
+    },
+    {
+      "name": "angle",
+      "dist": null,
+      "dist_type": "circular"
+    },
+    {
+      "name": "magnitude_mean",
+      "dist": null,
+      "dist_type": "regular"
+    },
+    {
+      "name": "magnitude_var",
+      "dist": null,
+      "dist_type": "regular"
+    }
+  ],
+  "mode": "PRODUCT",
+  "time_covariate": false,
+  "timezone": "America/Denver",
+  "excluded_devices": [
+    609,
+    612,
+    607,
+    614
+  ],
+  "day_only": true,
+  "options": {
+    "show_dist_plots": true,
+    "remove_outliers": true,
+    "show_full_range": true,
+    "show_correlation": true,
+    "number_of_retry_fits": 1,
+    "distributions": {
+      "regular": [
+        "lnorm",
+        "gamma",
+        "norm",
+        "exp"
+      ],
+      "circular": [
+        "vm",
+        "wrpcauchy"
+      ]
+    }
+  }
+}
