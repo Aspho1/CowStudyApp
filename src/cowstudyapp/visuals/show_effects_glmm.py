@@ -903,11 +903,15 @@ class BehaviorAnalyzer:
             print(f"Model formula: {formula}")
             
             try:
+                import rpy2
+                import rpy2.robjects as robjects
+
                 # Run garbage collection before fitting
                 gc.collect()
-                if 'rpy2.robjects' in sys.modules:
-                    import rpy2.robjects as ro
-                    ro.r('gc()')
+                # if 'rpy2.robjects' in sys.modules:
+                #     from rpy2.robjects.packages import conversion, default_converter
+                #     with conversion.localconverter(default_converter):
+                #         robjects.r('gc()')
                 
                 # Fit the model
                 model = Lmer(formula, data=clean_df, family='binomial')
