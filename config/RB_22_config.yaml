@@ -130,15 +130,15 @@ analysis:
 
 
 
-  cv_results: "data/cv_results"
-  models: "data/models"
-  predictions: "data/predictions"
+  cv_results: "data/cv_results/RB_22_raw_features"
+  models: "data/models/RB_22_raw_features"
+  predictions: "data/predictions/RB_22_raw_features"
 
 
   day_only: false
 
   hmm:
-    enabled: true
+    enabled: false
     time_covariate: false
 
     states: # The states to use in the HMM
@@ -195,15 +195,15 @@ analysis:
           - "WRAPPEDCAUCHY"
 
   lstm:
-    enabled: false
+    enabled: true
     
-    ops: true
+    ops: false
 
 
     ################ Warning these two will SIGNIFICANTLY increase runtime to find parameters 
     # BAYESIAN Optimization
-    bayes_opt: false                # Whether to use Bayesian optimization 
-    bayes_opt_n_calls: 20          # Number of evaluations to perform
+    bayes_opt: true                # Whether to use Bayesian optimization 
+    bayes_opt_n_calls: 40          # Number of evaluations to perform
     bayes_opt_resume: true         # Whether to resume from previous optimization
     bayes_opt_fast_eval: false      # Use faster evaluation during optimization
 
@@ -219,10 +219,15 @@ analysis:
       # - "Fighting"
       # - "Mineral"
     features:
-      - "step"
-      - "angle"
-      - "magnitude_mean"
-      - "magnitude_var"
+      # - "step"
+      # - "angle"
+      # - "magnitude_mean"
+      # - "magnitude_var"
+      - x_mean
+      - y_mean
+      - z_mean
+      - utm_easting
+      - utm_northing
       # - "x_mean"
       # - "x_var"
       # - "y_mean"
@@ -234,26 +239,30 @@ analysis:
     # max_length: 20
     max_time_gap: 960
     epochs: 1000
-    cows_per_cv_fold: 3
+    cows_per_cv_fold: 1
 
+    # max_length: 36
+    # batch_size: 32
 
     #### OPO
-    # max_length: 70
-    # batch_size: 13
-    ## max_length: 36
-    ## batch_size: 32
-    # initial_lr: 0.0008013770340749126
-    # decay_steps: 500
-    # decay_rate: 0.510164871944301
-    # clipnorm: 0.7306814672664718
-    # patience: 50
-    # min_delta: 8.991637285631857e-07
-    # reg_val: 3.415197283259112e-05
+    max_length: 70
+    batch_size: 13
+    initial_lr: 0.0008013770340749126
+    decay_steps: 500
+    decay_rate: 0.510164871944301
+    clipnorm: 0.7306814672664718
+    patience: 50
+    min_delta: 8.991637285631857e-07
+    reg_val: 3.415197283259112e-05
+    # ===== OVERALL RESULTS =====
+    # Total accuracy: 0.8358
+    # Grazing accuracy: 0.9901 (n=203)
+    # Resting accuracy: 0.7026 (n=232)
+    # Traveling accuracy: 0.8261 (n=46)
 
 
 
-
-    #### OPS
+    ################### OPS FROM ????
     max_length: 160
     batch_size: 22
     initial_lr: 0.001
@@ -263,7 +272,11 @@ analysis:
     patience: 13
     min_delta: 1.6850428524897937e-07
     reg_val: 1e-07
-
+    # ===== OVERALL RESULTS =====
+    # Total accuracy: 0.9459
+    # Grazing accuracy: 0.9901 (n=203)
+    # Resting accuracy: 0.9138 (n=232)
+    # Traveling accuracy: 0.9130 (n=46)
 
 visuals:
   # predictions_path: 'data/analysis_results/hmm/PRODUCT/Preds_22_to_22_20250220_202010/predictions.csv'
@@ -272,8 +285,9 @@ visuals:
   # predictions_path: 'data/analysis_results/hmm/FinalPredictions/RB_Paper_Model_Preds_logmagvar/predictions.csv'
   
   
-  predictions_path: 'data/predictions/HMM/predictions.csv'
-  visuals_root_path: "data/visuals/HMM/"
+  # predictions_path: 'data/predictions/HMM/predictions.csv'
+  predictions_path: 'data/predictions/RB_22_raw_features/predictions.csv'
+  visuals_root_path: "data/visuals/RB_22_raw_features/"
   # predictions_path: 'data/predictions/LSTM/ops/predictions.csv'
   # visuals_root_path: "data/visuals/LSTM/ops/"
   # predictions_path: 'data/predictions/LSTM/opo/predictions.csv'
