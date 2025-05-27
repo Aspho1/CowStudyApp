@@ -197,7 +197,7 @@ analysis:
   lstm:
     enabled: true
     
-    ops: false
+    ops: true
 
 
     ################ Warning these two will SIGNIFICANTLY increase runtime to find parameters 

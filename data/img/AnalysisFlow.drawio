@@ -1,0 +1,50 @@
+<mxfile host="Electron" modified="2025-03-10T18:11:29.577Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/21.2.8 Chrome/112.0.5615.165 Electron/24.2.0 Safari/537.36" etag="QKvHRAVH1045JlKzXYUF" version="21.2.8" type="device">
+  <diagram name="Page-1" id="B5fRm28gHAX6T-xVceC0">
+    <mxGraphModel dx="766" dy="448" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="xzKrCO7bltBIr_o1gJ06-12" value="" style="rounded=0;whiteSpace=wrap;html=1;align=left;" vertex="1" parent="1">
+          <mxGeometry x="30" y="40" width="560" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="xzKrCO7bltBIr_o1gJ06-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="xzKrCO7bltBIr_o1gJ06-1" target="xzKrCO7bltBIr_o1gJ06-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="xzKrCO7bltBIr_o1gJ06-4" value="LOOCV" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="xzKrCO7bltBIr_o1gJ06-3">
+          <mxGeometry x="0.1872" y="-1" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="xzKrCO7bltBIr_o1gJ06-6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="xzKrCO7bltBIr_o1gJ06-1" target="xzKrCO7bltBIr_o1gJ06-5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="xzKrCO7bltBIr_o1gJ06-7" value="PRODUCT" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="xzKrCO7bltBIr_o1gJ06-6">
+          <mxGeometry x="0.1618" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="xzKrCO7bltBIr_o1gJ06-1" value="mode" style="rhombus;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="160" width="80" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="xzKrCO7bltBIr_o1gJ06-9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="xzKrCO7bltBIr_o1gJ06-2" target="xzKrCO7bltBIr_o1gJ06-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="xzKrCO7bltBIr_o1gJ06-2" value="Requires:&amp;nbsp;&lt;br&gt;target_dataset" style="rounded=0;whiteSpace=wrap;html=1;align=left;" vertex="1" parent="1">
+          <mxGeometry x="200" y="110" width="200" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="xzKrCO7bltBIr_o1gJ06-11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="xzKrCO7bltBIr_o1gJ06-5" target="xzKrCO7bltBIr_o1gJ06-10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="xzKrCO7bltBIr_o1gJ06-5" value="Requires:&amp;nbsp;&lt;br style=&quot;border-color: var(--border-color);&quot;&gt;target_dataset&amp;nbsp;&lt;br&gt;training_info.training_info_type&lt;br&gt;training_info.training_info_path" style="rounded=0;whiteSpace=wrap;html=1;align=left;" vertex="1" parent="1">
+          <mxGeometry x="200" y="250" width="200" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="xzKrCO7bltBIr_o1gJ06-8" value="Produces a report on the estimated accuracy of the model on the data" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" vertex="1" parent="1">
+          <mxGeometry x="440" y="60" width="140" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="xzKrCO7bltBIr_o1gJ06-10" value="Assigns activity labels to target_dataset based off the model defined in training info" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" vertex="1" parent="1">
+          <mxGeometry x="440" y="220" width="140" height="140" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

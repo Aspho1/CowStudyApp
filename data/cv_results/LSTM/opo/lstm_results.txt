@@ -1,0 +1,6 @@
+Overall accuracy: 0.8607
+
+Class-wise accuracy:
+Grazing: 0.8177 (n=203)
+Resting: 0.8922 (n=232)
+Traveling: 0.8913 (n=46)

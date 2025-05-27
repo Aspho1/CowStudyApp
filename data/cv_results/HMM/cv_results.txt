@@ -1,0 +1,29 @@
+
+=================================================
+===================== Results ===================
+=================================================
+
+Overall Accuracy: 0.919 
+
+State Statistics:
+State               : Grazing Resting Traveling
+N_Actual            : 203 232 46
+N_Predicted         : 212 224 45
+Specificity         : 0.921 0.956 0.986
+Sensitivity         : 0.936 0.918 0.848
+F1                  : 0.916 0.934 0.857
+
+Confusion Matrix:
+           Reference
+Prediction  Grazing Resting Traveling
+  Grazing   "190"   " 16"   "  6"    
+  Resting   " 10"   "213"   "  1"    
+  Traveling "  3"   "  3"   " 39"    
+
+Transition Matrix (mean +/- sd):
+From/To:   Grazing    Resting  Traveling 
+Grazing  :      0.928+/-0.004      0.045+/-0.004      0.028+/-0.002  
+Resting  :      0.022+/-0.002      0.916+/-0.002      0.062+/-0.001  
+Traveling:      0.113+/-0.010      0.132+/-0.016      0.755+/-0.014  
+
+Emission Parameters (mean +/- sd):

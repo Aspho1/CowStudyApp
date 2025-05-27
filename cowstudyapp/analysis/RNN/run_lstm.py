@@ -55,12 +55,12 @@ import os
 class BayesianOptSearch:
     """Bayesian optimization for hyperparameter tuning using Gaussian Processes"""
     
-    def __init__(self, config):
+    def __init__(self, config, df: pd.DataFrame):
         self.config = config
         self.results = []
-        self.lstm_model = None
+        self.lstm_model=None
         self.sequences = None
-        self.df = None
+        self.df:pd.DataFrame = df
 
         ops = 'ops' if self.config.analysis.lstm.ops else 'opo'
 
@@ -95,12 +95,9 @@ class BayesianOptSearch:
         # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         # print(self.results_path, os.path.exists(self.results_path))
         
-    def run_search(self, lstm_model, sequences, df):
+    def run_search(self, lstm_model):
         """Run Bayesian optimization search"""
         self.lstm_model = lstm_model
-        self.sequences = sequences
-        self.df = df
-
 
         # Instead of trying to use a decorator, use a simple function
         def objective(x):
@@ -178,10 +175,18 @@ class BayesianOptSearch:
         
         # Set the parameters on the model (using original values)
         self._set_params(params)
+
+
         
         # Run a small LOOCV with current parameters
         start_time = time.time()
-        
+
+        self.lstm_model.build_model() # progress_callback
+
+        self.sequences = self.lstm_model.build_sequences(self.df) #, progress_callback
+
+        # print("!!!!!!!!!!!!!!!!!!!!!!!!!!",self.lstm_model.sequence_length)
+
         # Use fewer CV splits for speed
         cows_per_fold = self.config.analysis.lstm.cows_per_cv_fold
         
@@ -256,7 +261,6 @@ class BayesianOptSearch:
             # Special case for max_length which also needs to update sequence_length
             if param_name == 'max_length':
                 self.lstm_model.sequence_length = param_value
-                self.lstm_model.config.analysis.lstm.max_length = param_value
     
 
 
@@ -357,7 +361,6 @@ class HyperparamSearch:
     def _set_params(self, lstm_model, params):
         """Set hyperparameters on the LSTM model"""
         # Assign parameters to the model
-        lstm_model.config.analysis.lstm.max_length = params['max_length']
         lstm_model.sequence_length = params['max_length']
         lstm_model.config.analysis.lstm.epochs = params['epochs']
         lstm_model.batch_size = params['batch_size']
@@ -468,10 +471,10 @@ class LSTM_Model:
         random.seed(self.config.analysis.random_seed)
         self.masking_val = -9999
 
-        self.layers = [
-            Input((self.sequence_length, self.nfeatures)),
-            Masking(mask_value=self.masking_val),      
-            ]
+        # self.layers = [
+        #     Input((self.sequence_length, self.nfeatures)),
+        #     Masking(mask_value=self.masking_val),      
+        #     ]
 
 
 
@@ -492,54 +495,59 @@ class LSTM_Model:
         transformed = self._normalize_features(transformed, self.config.analysis.lstm.features)
         # df = df[required_cols].copy()
 
-        # Build sequences based on configuration
-        if self.config.analysis.lstm.ops:
-            progress_callback(20, "Building sequences for one-per-sample (OPS) analysis")
-            sequences = self._build_sequences_ops(transformed, progress_callback)
-            progress_callback(40, "Building OPS model architecture")
-            self._build_ops_architecture()
-        else:
-            progress_callback(20, "Building sequences for one-per-observation (OPO) analysis")
-            sequences = self._build_sequences_opo(transformed, progress_callback)
-            progress_callback(40, "Building OPO model architecture")
-            self._build_opo_architecture()
+
+
         # Check if we're doing Bayesian optimization
         if self.config.analysis.lstm.bayes_opt:
-            bayes_opt = BayesianOptSearch(self.config)
-            best_params = bayes_opt.run_search(self, sequences, transformed)
+            bayes_opt = BayesianOptSearch(self.config, transformed)
+            best_params = bayes_opt.run_search(self)
             
             # Set the best parameters
             for key, value in best_params.items():
                 setattr(self, key, value)
                 if key == 'max_length':
                     self.sequence_length = value
-                    self.config.analysis.lstm.max_length = value
 
-            # Rebuild model architecture with optimized parameters
-            self.layers = [
-                Input((self.sequence_length, self.nfeatures)),
-                Masking(mask_value=self.masking_val),
-            ]
-            if self.config.analysis.lstm.ops:
-                self._build_ops_architecture()
-            else:
-                self._build_opo_architecture()
+            # # Rebuild model architecture with optimized parameters
+            # self.layers = [
+            #     Input((self.sequence_length, self.nfeatures)),
+            #     Masking(mask_value=self.masking_val),
+            # ]
+            # if self.config.analysis.lstm.ops:
+            #     self._build_ops_architecture()
+            # else:
+            #     self._build_opo_architecture()
+
+        self.build_model() # progress_callback
+
+        sequences = self.build_sequences(transformed) #, progress_callback
+
+        # # Build sequences based on configuration
+        # if self.config.analysis.lstm.ops:
+        #     progress_callback(20, "Building sequences for one-per-sample (OPS) analysis")
+        #     sequences = self._build_sequences_ops(transformed, progress_callback)
+        #     progress_callback(40, "Building OPS model architecture")
+        #     self._build_ops_architecture()
+        # else:
+        #     progress_callback(20, "Building sequences for one-per-observation (OPO) analysis")
+        #     sequences = self._build_sequences_opo(transformed, progress_callback)
+        #     progress_callback(40, "Building OPO model architecture")
+        #     self._build_opo_architecture()
 
         # print("run3")
         # Check if we're doing hyperparameter search
-        if self.config.analysis.lstm.hyperparams_search:
-            search = HyperparamSearch(self.config)
-            results = search.run_search(self, sequences, transformed)
-            # Use the best parameters
-            best_params = max(results, key=lambda x: x['f1_score'])['params']
-            print("\nUsing best parameters for final model:")
-            print(json.dumps(best_params, indent=2))
-            # Set the best parameters
-            for key, value in best_params.items():
-                setattr(self, key, value)
-                if key == 'max_length':
-                    self.sequence_length = value
-                    self.config.analysis.lstm.max_length = value
+        # if self.config.analysis.lstm.hyperparams_search:
+        #     search = HyperparamSearch(self.config)
+        #     results = search.run_search(lstm_model=self, sequences=sequences, df=transformed)
+        #     # Use the best parameters
+        #     best_params = max(results, key=lambda x: x['f1_score'])['params']
+        #     print("\nUsing best parameters for final model:")
+        #     print(json.dumps(best_params, indent=2))
+        #     # Set the best parameters
+        #     for key, value in best_params.items():
+        #         setattr(self, key, value)
+        #         if key == 'max_length':
+        #             self.sequence_length = value
 
 
         # Do either LOOCV or product
@@ -557,24 +565,42 @@ class LSTM_Model:
         else:
             raise ValueError(f"Unknown config mode {self.config.analysis.mode}.")
 
+    def build_model(self,progress_callback=None):
+
+        self.layers = [
+            Input((self.sequence_length, self.nfeatures)),
+            Masking(mask_value=self.masking_val),
+        ]
+
+        if self.config.analysis.lstm.ops:
+
+            # progress_callback(40, "Building OPS model architecture")
+            self._build_ops_architecture()
+        else:
+            # progress_callback(40, "Building OPO model architecture")
+            self._build_opo_architecture()
+
+    def build_sequences(self,df,progress_callback=None):
+        if self.config.analysis.lstm.ops:
+            # progress_callback(20, "Building sequences for one-per-sample (OPS) analysis")
+            return self._build_sequences_ops(df, progress_callback)
+        else:
+            # progress_callback(20, "Building sequences for one-per-observation (OPO) analysis")
+            return self._build_sequences_opo(df, progress_callback)
+
+
+
     def _build_ops_architecture(self):
         """Build model architecture for one-per-observation"""
         self.layers.extend([
-            LSTM(16, 
+            LSTM(32, 
                 return_sequences=False,
                 recurrent_dropout=self.dropout_rate,
                 dropout=self.dropout_rate,
                 kernel_regularizer=L2(self.reg_val),
                 recurrent_regularizer=L2(self.reg_val)
                 ),
-            # LSTM(128, 
-            #     return_sequences=False,
-            #     recurrent_dropout=self.dropout_rate,
-            #     dropout=self.dropout_rate,
-            #     kernel_regularizer=L2(self.reg_val),
-            #     recurrent_regularizer=L2(self.reg_val)
-            #     ),
-            Dense(16, activation='relu'),
+            Dense(32, activation='relu'),
             Dropout(self.dropout_rate),  
             Dense(self.nclasses, activation='softmax')
         ])
@@ -583,16 +609,6 @@ class LSTM_Model:
     def _build_opo_architecture(self):
         """Build model architecture for one-per-sequence"""
         self.layers.extend([
-            # LSTM(256, 
-            #     return_sequences=True,
-            #     recurrent_dropout=self.dropout_rate,
-            #     dropout=self.dropout_rate,
-            #     kernel_regularizer=L2(self.reg_val),
-            #     recurrent_regularizer=L2(self.reg_val)
-            #     ),
-            # MaskedConv1D(filters=32, kernel_size=35, padding='same', activation='relu'),
-            # MaskedConv1D(filters=32, kernel_size=3, padding='same', activation='relu')(m),
-
             LSTM(32, 
                 return_sequences=True,
                 recurrent_dropout=self.dropout_rate,
@@ -600,21 +616,6 @@ class LSTM_Model:
                 kernel_regularizer=L2(self.reg_val),
                 recurrent_regularizer=L2(self.reg_val)
                 ),
-
-
-            # LSTM(64, 
-            #     return_sequences=True,
-            #     recurrent_dropout=self.dropout_rate,
-            #     dropout=self.dropout_rate,
-            #     kernel_regularizer=L2(self.reg_val),
-            #     recurrent_regularizer=L2(self.reg_val)
-            #     ),
-            # Time distributed layers
-            # TimeDistributed(Dense(32, activation='relu')),
-            # TimeDistributed(Dropout(self.dropout_rate)),
-            # TimeDistributed(Dense(self.nclasses, activation='softmax'))
-
-
             Dense(32, activation='relu'),  # This will be applied to each timestep
             Dropout(self.dropout_rate),
             Dense(self.nclasses, activation='softmax')  # This will be applied to each timestep
@@ -1395,9 +1396,9 @@ class LSTM_Model:
         
 
         groups:np.ndarray = Cow_Date_Key[:,0]
-        print("ALL GROUPS", groups) 
+        # print("ALL GROUPS", groups) 
         unique_cows = np.unique(groups)
-        print("ALL unique groups", unique_cows)
+        # print("ALL unique groups", unique_cows)
         test_chunks = self.manual_chunking(unique_cows, n)
 
         # Determine number of processes
