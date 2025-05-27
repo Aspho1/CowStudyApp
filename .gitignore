@@ -42,7 +42,10 @@ output/
 # config/*.yaml
 # !config/default.yaml
 
-data/*
+data/*.csv
+data/*.xlsx
+data/*.pkl
+data/*.rds
 
 .RDataTmp
 # .workspace
