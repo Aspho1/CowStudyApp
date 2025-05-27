@@ -130,9 +130,9 @@ analysis:
 
 
 
-  cv_results: "data/cv_results/RB_22_raw_features"
-  models: "data/models/RB_22_raw_features"
-  predictions: "data/predictions/RB_22_raw_features"
+  cv_results: "data/cv_results/RB_22"
+  models: "data/models/RB_22"
+  predictions: "data/predictions/RB_22"
 
 
   day_only: false
@@ -203,9 +203,9 @@ analysis:
     ################ Warning these two will SIGNIFICANTLY increase runtime to find parameters 
     # BAYESIAN Optimization
     bayes_opt: true                # Whether to use Bayesian optimization 
-    bayes_opt_n_calls: 40          # Number of evaluations to perform
+    bayes_opt_n_calls: 30          # Number of evaluations to perform
     bayes_opt_resume: true         # Whether to resume from previous optimization
-    bayes_opt_fast_eval: false      # Use faster evaluation during optimization
+    bayes_opt_fast_eval: true      # Use faster evaluation during optimization
 
     # GRID SEARCH
     hyperparams_search: false   # Whether to run hyperparameter search
@@ -219,15 +219,15 @@ analysis:
       # - "Fighting"
       # - "Mineral"
     features:
-      # - "step"
-      # - "angle"
-      # - "magnitude_mean"
-      # - "magnitude_var"
-      - x_mean
-      - y_mean
-      - z_mean
-      - utm_easting
-      - utm_northing
+      - "step"
+      - "angle"
+      - "magnitude_mean"
+      - "magnitude_var"
+      # - x_mean
+      # - y_mean
+      # - z_mean
+      # - utm_easting
+      # - utm_northing
       # - "x_mean"
       # - "x_var"
       # - "y_mean"
@@ -239,7 +239,7 @@ analysis:
     # max_length: 20
     max_time_gap: 960
     epochs: 1000
-    cows_per_cv_fold: 1
+    cows_per_cv_fold: 3
 
     # max_length: 36
     # batch_size: 32
@@ -286,8 +286,8 @@ visuals:
   
   
   # predictions_path: 'data/predictions/HMM/predictions.csv'
-  predictions_path: 'data/predictions/RB_22_raw_features/predictions.csv'
-  visuals_root_path: "data/visuals/RB_22_raw_features/"
+  predictions_path: 'data/predictions/RB_22/predictions.csv'
+  visuals_root_path: "data/visuals/RB_22/"
   # predictions_path: 'data/predictions/LSTM/ops/predictions.csv'
   # visuals_root_path: "data/visuals/LSTM/ops/"
   # predictions_path: 'data/predictions/LSTM/opo/predictions.csv'

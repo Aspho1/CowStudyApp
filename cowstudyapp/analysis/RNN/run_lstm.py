@@ -63,7 +63,11 @@ class BayesianOptSearch:
         self.df = None
 
         ops = 'ops' if self.config.analysis.lstm.ops else 'opo'
-        self.output_dir = f"data/analysis_results/{ops}/v2"
+
+        self.output_dir = self.config.analysis.cv_results / 'lstm' / ops / 'v2'
+        self.output_dir = Path(self.output_dir)
+        self.output_dir.mkdir(parents=True,exist_ok=True)
+        
         # self.output_dir = self.config.analysis.output_dir
         
         # Define the search space
@@ -86,8 +90,10 @@ class BayesianOptSearch:
         self.n_calls = config.analysis.lstm.bayes_opt_n_calls
         
         # Path to save/load optimization results
-        io_type = 'ops' if self.config.analysis.lstm.ops else 'opo'
-        self.results_path = os.path.join(self.output_dir, io_type, "bayes_opt_results.pkl")
+        # io_type = 'ops' if self.config.analysis.lstm.ops else 'opo'
+        self.results_path = self.output_dir / "bayes_opt_results.pkl"
+        # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        # print(self.results_path, os.path.exists(self.results_path))
         
     def run_search(self, lstm_model, sequences, df):
         """Run Bayesian optimization search"""
@@ -103,8 +109,8 @@ class BayesianOptSearch:
             return self._objective(params)
 
         # Check if we should resume from previous run
-        if os.path.exists(self.results_path) and self.config.analysis.lstm.bayes_opt_resume:
-            print(f"Resuming optimization from {self.results_path}")
+        if self.results_path.exists() and self.config.analysis.lstm.bayes_opt_resume:
+            print(f"Resuming optimization from `{self.results_path}`")
             previous_result = load(self.results_path)
             
             # Call optimization with previous result as starting point
@@ -177,7 +183,7 @@ class BayesianOptSearch:
         start_time = time.time()
         
         # Use fewer CV splits for speed
-        cows_per_fold = 7 if self.config.analysis.lstm.bayes_opt_fast_eval else 3
+        cows_per_fold = self.config.analysis.lstm.cows_per_cv_fold
         
         if self.config.analysis.mode == "LOOCV":
             _, _ = self.lstm_model.do_loocv(
@@ -256,20 +262,18 @@ class BayesianOptSearch:
 
     def _save_optimization_plots(self, result):
         """Save optimization visualization plots"""
-        output_dir = Path(self.output_dir)
-        
+
         # Plot convergence
         plt.figure(figsize=(10, 6))
         plot_convergence(result)
-        io_type = 'ops' if self.config.analysis.lstm.ops else 'opo'
-        plt.savefig(output_dir / io_type / "bayes_opt_convergence.png", dpi=300)
+        plt.savefig(self.output_dir / "bayes_opt_convergence.png", dpi=300)
         plt.close()
         
         # Plot individual parameter effects (partial dependence)
-        fig, ax = plt.subplots(3, 3, figsize=(15, 12))
-        plot_objective(result, dimensions=range(len(self.space)), n_points=10, ax=ax.ravel())
+        # fig, ax = plt.subplots(3, 3, figsize=(15, 12))
+        plot_objective(result, dimensions=range(len(self.space)), n_points=10)
         plt.tight_layout()
-        plt.savefig(output_dir / "bayes_opt_parameters.png", dpi=300)
+        plt.savefig(self.output_dir / "bayes_opt_parameters.png", dpi=300)
         plt.close()
 
 class HyperparamSearch:
@@ -420,8 +424,6 @@ class LSTM_Model:
         self.last_f1_score = 0
         self.last_class_accuracies = {}
 
-        self.eval_method = self.acc_eval
-
         self.activity_map = {}
         for idx, state in enumerate(self.config.analysis.lstm.states):# 
             self.activity_map[state] = idx
@@ -471,21 +473,6 @@ class LSTM_Model:
             Masking(mask_value=self.masking_val),      
             ]
 
-    def acc_eval(actual:np.ndarray,pred:np.ndarray, class_id=None):
-        '''
-        Shape (N,) actual and pred collections to get the accuracy of
-        '''
-        if class_id:
-            return np.sum((actual==class_id) == (pred==class_id))
-        return np.sum(actual == pred)
-    
-    def f1_eval(actual:np.ndarray,pred:np.ndarray, class_id=None):
-        '''
-        Shape (N,) actual and pred collections to get the classwise f1 of
-        '''
-        if class_id:
-            return f1_score(actual==class_id == pred==class_id)
-        return f1_score(actual,pred)
 
 
     def run_LSTM(self, progress_callback=None):
@@ -495,9 +482,9 @@ class LSTM_Model:
         progress_callback(7, "Preparing dataset for LSTM analysis")
         untransformed = self._get_target_dataset(add_step_and_angle=True)
 
-        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-        print(untransformed.head(20))
-        print(untransformed.columns)
+        # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        # print(untransformed.head(20))
+        # print(untransformed.columns)
         
         required_cols: List[str] = self.config.analysis.lstm.features + ["posix_time", "date", 'device_id', 'activity']
         progress_callback(10, f"Normalizing features: {', '.join(self.config.analysis.lstm.features)}")
@@ -1369,7 +1356,7 @@ class LSTM_Model:
         sequences: Dictionary with Cow_Date_Key, X, and Y arrays
         df: Original dataframe
         n: Number of folds
-        compute_metrics_only: If True, uses a faster approach for hyperparameter tuning
+        compute_metrics_only: If True, does not plot each fold
         n_jobs: Number of parallel processes to use (-1 for all available)
         """
         if n is None:
@@ -1432,7 +1419,7 @@ class LSTM_Model:
             test_X, test_Y = X[test_mask], Y[test_mask]
             train_X, train_Y = X[train_mask], Y[train_mask]
             progress_callback(45, f"Initializing fold with held out device_ids: {test_chunk}")
-            fold_args.append((test_chunk, train_X, train_Y, test_X, test_Y, compute_metrics_only))
+            fold_args.append((test_chunk, train_X, train_Y, test_X, test_Y))
         
         # Process folds in parallel
         if n_jobs > 1:
@@ -1475,46 +1462,16 @@ class LSTM_Model:
         return [], []
 
     # Add this method to your class to be used by multiprocessing
-    def _process_fold_mp(self, test_chunk, train_X, train_Y, test_X, test_Y, compute_metrics_only):
+    def _process_fold_mp(self, test_chunk, train_X, train_Y, test_X, test_Y):
         """
         Process a single fold in LOOCV - this method is designed to be called via multiprocessing
         """
 
-        import matplotlib
-        matplotlib.use('Agg')
-        # Create a fresh model for this process
-        if compute_metrics_only:
-            # Fast training for hyperparameter search
-            model = Sequential(self.layers)
-            model.compile(
-                optimizer='adam',
-                loss='sparse_categorical_crossentropy',
-                metrics=['accuracy'],
-            )
-            
-            # Train for just a few epochs
-            history = model.fit(
-                train_X, 
-                np.where(train_Y == -1, 0, train_Y), 
-                epochs=10,  # Reduced epochs for speed
-                batch_size=self.batch_size,
-                verbose=0
-            )
-            
-            # Predict
-            pred_y = model.predict(test_X, verbose=0)
-            if len(train_Y.shape) == 1:
-                pred_y_classes = np.argmax(pred_y, axis=1)
-            else:
-                pred_y_classes = np.argmax(pred_y, axis=2)
-                
-            history_dict = history
-        else:
-            # Full training
-            model, history, pred_y_classes = self._make_LSTM(
-                test_X=test_X, test_Y=test_Y, train_X=train_X, train_Y=train_Y
-            )
-            history_dict = history
+        # Full training
+        model, history, pred_y_classes = self._make_LSTM(
+            test_X=test_X, test_Y=test_Y, train_X=train_X, train_Y=train_Y
+        )
+        history_dict = history
         
         if len(test_Y.shape) > 1:
             flat_pred = pred_y_classes.flatten()
