@@ -32,8 +32,12 @@ from sklearn.preprocessing import StandardScaler
 # from sklearn.utils.class_weight import compute_class_weight
 # from sklearn.metrics import classification_report
 import matplotlib
-# Use a non-interactive backend that works well with multiprocessing
-matplotlib.use('Agg')  # This must be done before importing pyplot
+
+if False:
+    # Use a non-interactive backend that works well with multiprocessing
+    matplotlib.use('Agg')  # This must be done before importing pyplot
+else:
+    matplotlib.use('QtAgg')  # This must be done before importing pyplot
 
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -84,6 +88,18 @@ class BayesianOptSearch:
             # Optional: Categorical parameters
             # Categorical(['adam', 'rmsprop'], name='optimizer'),
             # Categorical(['relu', 'tanh'], name='activation'),
+        ]
+
+        self.param_labels = [
+            "max_length",
+            "batch_size",
+            "initial_lr",
+            "decay_steps",
+            "decay_rate",
+            "clipnorm",
+            "patience",
+            "min_delta",
+            "reg_val"
         ]
         
         # Number of calls to make to the objective function
@@ -275,7 +291,7 @@ class BayesianOptSearch:
         
         # Plot individual parameter effects (partial dependence)
         # fig, ax = plt.subplots(3, 3, figsize=(15, 12))
-        plot_objective(result, dimensions=range(len(self.space)), n_points=10)
+        plot_objective(result,dimensions=self.param_labels) #, dimensions=range(len(self.space))
         plt.tight_layout()
         plt.savefig(self.output_dir / "bayes_opt_parameters.png", dpi=300)
         plt.close()
@@ -464,6 +480,8 @@ class LSTM_Model:
         self.patience = lstm_cfg.patience
         self.min_delta = lstm_cfg.min_delta
         self.reg_val = lstm_cfg.reg_val
+
+
 
 
         set_seed(self.config.analysis.random_seed)

@@ -1,12 +1,23 @@
 import numpy as np
 from skopt import load
+
+import matplotlib
+print("Matplotlib configuration directory:", matplotlib.get_configdir())
+print("Matplotlib configuration file:", matplotlib.matplotlib_fname())
+
+matplotlib.use('QtAgg')
+
 from matplotlib import pyplot as plt
+
 from pathlib import Path
 
 
+import pandas as pd
+import seaborn as sns
+
 mode = 'opo'
 # Path to your optimization results file - you can edit this directly
-pkl_path = f"data/analysis_results/{mode}/bayes_opt_results.pkl"
+pkl_path = f"data/cv_results/RB_22/LSTM/{mode}/v2/bayes_opt_results.pkl"
 
 # Load the optimization results
 result = load(pkl_path)
@@ -37,6 +48,8 @@ lbls = [
 ]
 
 lens = [len(i) for i in lbls]
+
+print(len(func_vals))
 
 # print(result)
 print(" | ".join([x for x in lbls]))
@@ -91,13 +104,17 @@ for i, (ax, param_name, values) in enumerate(zip(axes, param_names, param_values
             # Some parameters might not be numeric or cause fitting issues
             pass
 
-plt.tight_layout()
+plt.subplots_adjust(
+    top=0.96,
+    bottom=0.064,
+    left=0.071,
+    right=0.966,
+    hspace=0.42,
+    wspace=0.323
+)
 plt.savefig(Path(pkl_path).parent / f'parameter_performance_plots_{mode}.png')
-plt.show()
 
-# You could also create a correlation heatmap
-import pandas as pd
-import seaborn as sns
+plt.show()
 
 # Create a DataFrame with all parameters and performance
 data = {param_name: values for param_name, values in zip(param_names, param_values)}
@@ -114,3 +131,6 @@ plt.title('Parameter Correlation Matrix')
 plt.tight_layout()
 plt.savefig(Path(pkl_path).parent / f'parameter_correlation_heatmap_{mode}.png')
 plt.show()
+
+# readingpkl.py:122: UserWarning: FigureCanvasAgg is non-interactive, and thus cannot be shown
+#   plt.show()
