@@ -197,13 +197,13 @@ analysis:
   lstm:
     enabled: true
     
-    ops: true
+    ops: false
 
 
     ################ Warning these two will SIGNIFICANTLY increase runtime to find parameters 
     # BAYESIAN Optimization
     bayes_opt: true                # Whether to use Bayesian optimization 
-    bayes_opt_n_calls: 30          # Number of evaluations to perform
+    bayes_opt_n_calls: 20          # Number of evaluations to perform
     bayes_opt_resume: true         # Whether to resume from previous optimization
     bayes_opt_fast_eval: true      # Use faster evaluation during optimization
 
@@ -239,44 +239,50 @@ analysis:
     # max_length: 20
     max_time_gap: 960
     epochs: 1000
-    cows_per_cv_fold: 3
+    cows_per_cv_fold: 1
 
     # max_length: 36
     # batch_size: 32
 
-    #### OPO
-    max_length: 70
-    batch_size: 13
-    initial_lr: 0.0008013770340749126
-    decay_steps: 500
-    decay_rate: 0.510164871944301
-    clipnorm: 0.7306814672664718
-    patience: 50
-    min_delta: 8.991637285631857e-07
-    reg_val: 3.415197283259112e-05
+    # OPO cv=2
     # ===== OVERALL RESULTS =====
-    # Total accuracy: 0.8358
-    # Grazing accuracy: 0.9901 (n=203)
-    # Resting accuracy: 0.7026 (n=232)
-    # Traveling accuracy: 0.8261 (n=46)
+    # Total accuracy: 0.8170
+    # Grazing accuracy: 0.7291 (n=203)
+    # Resting accuracy: 0.8836 (n=232)
+    # Traveling accuracy: 0.8696 (n=46)
+
+    ################### OPO BO Paper parameters
+    max_length: 288
+    batch_size: 5
+    initial_lr: 0.0007918
+    decay_steps: 3704
+    decay_rate: 0.1
+    clipnorm: 1.2775850
+    patience: 37
+    min_delta: 0.0001
+    reg_val: 0.0000038
+    # max_length: 271
+    # batch_size: 2
+    # initial_lr: 0.0001000
+    # decay_steps: 3188
+    # decay_rate: 0.7066770
+    # clipnorm: 1.0862404
+    # patience: 60
+    # min_delta: 0.0001000
+    # reg_val: 0.0000125
 
 
+    ################### OPS BO Paper parameters
+    # max_length: 184
+    # batch_size: 32
+    # initial_lr: 0.0079165
+    # decay_steps: 4255
+    # decay_rate: 0.2829337
+    # clipnorm: 0.4411081
+    # patience: 57
+    # min_delta: 0.0000017
+    # reg_val: 0.0000139
 
-    ################### OPS FROM ????
-    max_length: 160
-    batch_size: 22
-    initial_lr: 0.001
-    decay_steps: 10000
-    decay_rate: 0.4
-    clipnorm: 1.9493856438736408
-    patience: 13
-    min_delta: 1.6850428524897937e-07
-    reg_val: 1e-07
-    # ===== OVERALL RESULTS =====
-    # Total accuracy: 0.9459
-    # Grazing accuracy: 0.9901 (n=203)
-    # Resting accuracy: 0.9138 (n=232)
-    # Traveling accuracy: 0.9130 (n=46)
 
 visuals:
   # predictions_path: 'data/analysis_results/hmm/PRODUCT/Preds_22_to_22_20250220_202010/predictions.csv'
@@ -285,21 +291,21 @@ visuals:
   # predictions_path: 'data/analysis_results/hmm/FinalPredictions/RB_Paper_Model_Preds_logmagvar/predictions.csv'
   
   
-  # predictions_path: 'data/predictions/HMM/predictions.csv'
-  predictions_path: 'data/predictions/RB_22/predictions.csv'
-  visuals_root_path: "data/visuals/RB_22/"
-  # predictions_path: 'data/predictions/LSTM/ops/predictions.csv'
+  # predictions_path: 'data/predictions/RB_22/HMM/predictions.csv'
+  predictions_path: 'data/predictions/RB_22/LSTM/opo/predictions.csv'
+  # predictions_path: 'data/predictions/RB_22/LSTM/ops/predictions.csv'
+
+  # visuals_root_path: "data/visuals/RB_22/HMM"
+  visuals_root_path: "data/visuals/LSTM/opo/"
   # visuals_root_path: "data/visuals/LSTM/ops/"
-  # predictions_path: 'data/predictions/LSTM/opo/predictions.csv'
-  # visuals_root_path: "data/visuals/LSTM/opo/"
 
   radar:
-    run: true
+    run: false
     extension: 'RadarPlots01/'
     show_night: true
 
   temperature_graph:
-    run: false
+    run: true
     daynight: 'day' #'day' #'night' 'both'
     show_curve: true
     # extension: 'MDT_Plots/'
@@ -309,6 +315,19 @@ visuals:
 
 
     sample_size: 0.7
+
+    terms:
+    - hod
+    - temp
+    - time
+    - time^2
+    - time^3
+    - time^4
+    - hod:temp
+    - hod:time
+    - temp:time
+    - temp:time^4
+    - temp:time^2
 
 
 

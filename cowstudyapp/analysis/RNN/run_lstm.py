@@ -33,7 +33,7 @@ from sklearn.preprocessing import StandardScaler
 # from sklearn.metrics import classification_report
 import matplotlib
 
-if False:
+if True:
     # Use a non-interactive backend that works well with multiprocessing
     matplotlib.use('Agg')  # This must be done before importing pyplot
 else:
@@ -68,8 +68,8 @@ class BayesianOptSearch:
 
         ops = 'ops' if self.config.analysis.lstm.ops else 'opo'
 
-        self.output_dir = self.config.analysis.cv_results / 'lstm' / ops / 'v2'
-        self.output_dir = Path(self.output_dir)
+        self.output_dir = self.config.analysis.cv_results / 'lstm' / ops / 'v3'
+        # self.output_dir = Path(self.output_dir)
         self.output_dir.mkdir(parents=True,exist_ok=True)
         
         # self.output_dir = self.config.analysis.output_dir
@@ -109,7 +109,7 @@ class BayesianOptSearch:
         # io_type = 'ops' if self.config.analysis.lstm.ops else 'opo'
         self.results_path = self.output_dir / "bayes_opt_results.pkl"
         # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-        # print(self.results_path, os.path.exists(self.results_path))
+        print(f"Setting results path to `{self.results_path}`")
         
     def run_search(self, lstm_model):
         """Run Bayesian optimization search"""
@@ -221,6 +221,8 @@ class BayesianOptSearch:
             
         elapsed_time = time.time() - start_time
         
+        # Get the accuracy
+        # score = self.lstm_model.last_accuracy
         # Get the negative F1 score (we want to maximize F1, but gp_minimize minimizes)
         score = -self.lstm_model.last_f1_score
         
@@ -282,7 +284,7 @@ class BayesianOptSearch:
 
     def _save_optimization_plots(self, result):
         """Save optimization visualization plots"""
-
+        print(f"Saving plots to `{self.output_dir}`")
         # Plot convergence
         plt.figure(figsize=(10, 6))
         plot_convergence(result)
@@ -1013,7 +1015,7 @@ class LSTM_Model:
         if progress_callback is None:
             progress_callback = lambda percent, message: None
         
-        print(df.head(20))
+        # print(df.head(20))
 
         import gc
 
@@ -1205,7 +1207,7 @@ class LSTM_Model:
         del all_cow_preds_aligned, predicted_classes, predictions, X_full, Y_full
         gc.collect()
 
-        
+        results_df[self.features] = self.scaler.inverse_transform(results_df[self.features])
         # Reorder columns for clarity
         results_df = results_df[
                             ['device_id', 'posix_time'] + 
