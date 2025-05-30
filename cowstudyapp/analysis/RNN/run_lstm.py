@@ -33,6 +33,14 @@ from sklearn.preprocessing import StandardScaler
 # from sklearn.metrics import classification_report
 import matplotlib
 
+
+import platform 
+import pathlib 
+
+if platform.system()  == 'Linux': 
+    pathlib.WindowsPath = pathlib.PosixPath
+
+
 if True:
     # Use a non-interactive backend that works well with multiprocessing
     matplotlib.use('Agg')  # This must be done before importing pyplot
@@ -65,6 +73,8 @@ class BayesianOptSearch:
         self.lstm_model=None
         self.sequences = None
         self.df:pd.DataFrame = df
+        self.random_seed = self.config.analysis.random_seed
+
 
         ops = 'ops' if self.config.analysis.lstm.ops else 'opo'
 
@@ -107,14 +117,14 @@ class BayesianOptSearch:
         
         # Path to save/load optimization results
         # io_type = 'ops' if self.config.analysis.lstm.ops else 'opo'
-        self.results_path = self.output_dir / "bayes_opt_results.pkl"
+        self.results_path = str(self.output_dir / "bayes_opt_results.pkl")
+
         # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         print(f"Setting results path to `{self.results_path}`")
         
     def run_search(self, lstm_model):
         """Run Bayesian optimization search"""
         self.lstm_model = lstm_model
-
         # Instead of trying to use a decorator, use a simple function
         def objective(x):
             # Convert the parameter vector to a dictionary
@@ -122,9 +132,10 @@ class BayesianOptSearch:
             return self._objective(params)
 
         # Check if we should resume from previous run
-        if self.results_path.exists() and self.config.analysis.lstm.bayes_opt_resume:
-            print(f"Resuming optimization from `{self.results_path}`")
-            previous_result = load(self.results_path)
+        if os.path.exists(self.results_path) and self.config.analysis.lstm.bayes_opt_resume:
+            print(f"Resuming optimization from `{self.results_path}`", type(self.results_path))
+
+            previous_result = load(str(self.results_path))
             
             # Call optimization with previous result as starting point
             result = gp_minimize(
@@ -138,6 +149,7 @@ class BayesianOptSearch:
                 verbose=True,
                 callback=self._on_step
             )
+
         else:
             # Start fresh optimization
             result = gp_minimize(
@@ -170,13 +182,25 @@ class BayesianOptSearch:
         
         # Generate and save plots
         self._save_optimization_plots(result)
-        
+
         return best_params
 
 
     def _objective(self, params):
         """Objective function to minimize (negative F1 score)"""
         # Convert any NumPy types to native Python types for JSON serialization
+
+
+
+        param_hash = hash(frozenset(params.items())) & 0xFFFFFFFF
+        derived_seed = (self.random_seed + param_hash) & 0xFFFFFFFF
+
+        # Set seeds for this evaluation
+        set_seed(derived_seed)
+        np.random.seed(derived_seed)
+        random.seed(derived_seed)
+
+
         printable_params = {}
         for key, value in params.items():
             if isinstance(value, (np.integer, np.int32, np.int64)):
@@ -192,7 +216,9 @@ class BayesianOptSearch:
         # Set the parameters on the model (using original values)
         self._set_params(params)
 
-
+        set_seed(self.config.analysis.random_seed)
+        np.random.seed(self.config.analysis.random_seed)
+        random.seed(self.config.analysis.random_seed)
         
         # Run a small LOOCV with current parameters
         start_time = time.time()

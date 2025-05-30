@@ -197,13 +197,13 @@ analysis:
   lstm:
     enabled: true
     
-    ops: false
+    ops: true
 
 
     ################ Warning these two will SIGNIFICANTLY increase runtime to find parameters 
     # BAYESIAN Optimization
     bayes_opt: true                # Whether to use Bayesian optimization 
-    bayes_opt_n_calls: 20          # Number of evaluations to perform
+    bayes_opt_n_calls: 40          # Number of evaluations to perform
     bayes_opt_resume: true         # Whether to resume from previous optimization
     bayes_opt_fast_eval: true      # Use faster evaluation during optimization
 
@@ -292,12 +292,12 @@ visuals:
   
   
   # predictions_path: 'data/predictions/RB_22/HMM/predictions.csv'
-  predictions_path: 'data/predictions/RB_22/LSTM/opo/predictions.csv'
-  # predictions_path: 'data/predictions/RB_22/LSTM/ops/predictions.csv'
+  # predictions_path: 'data/predictions/RB_22/LSTM/opo/predictions.csv'
+  predictions_path: 'data/predictions/RB_22/LSTM/ops/predictions.csv'
 
   # visuals_root_path: "data/visuals/RB_22/HMM"
-  visuals_root_path: "data/visuals/LSTM/opo/"
-  # visuals_root_path: "data/visuals/LSTM/ops/"
+  # visuals_root_path: "data/visuals/LSTM/opo/"
+  visuals_root_path: "data/visuals/LSTM/ops/"
 
   radar:
     run: false
