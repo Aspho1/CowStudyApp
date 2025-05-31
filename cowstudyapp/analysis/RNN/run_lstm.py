@@ -64,6 +64,48 @@ from skopt.plots import plot_convergence, plot_objective
 from skopt import dump, load
 import os
 
+
+
+def manual_chunking(cow_ids, chunk_size):
+    """
+    Divide cow_ids into chunks of approximately chunk_size.
+
+    Parameters:
+    - cow_ids: List of cow IDs to divide
+    - chunk_size: Desired size for each chunk
+
+    Returns:
+    - List of lists, where each inner list contains cow IDs for one chunk
+    """
+    # 1) Shuffle a copy (so we don't clobber the original)
+    cows = cow_ids[:]
+    random.shuffle(cows)
+
+    # 2) Compute how many chunks we need
+    total_cows = len(cows)
+    n_chunks = (total_cows + chunk_size - 1) // chunk_size  # Ceiling division
+
+
+    print("TOTAL COWS", total_cows)
+    print("N_CHUNKS", n_chunks)
+    # 3) Compute the actual chunk sizes
+    k, r = divmod(total_cows, n_chunks)
+    # First 'r' chunks get size k+1, the rest get k
+
+    # 4) Create the chunks
+    chunks = []
+    idx = 0
+    for i in range(n_chunks):
+        size = k + 1 if i < r else k
+        chunks.append(cows[idx:idx + size])
+        idx += size
+
+    # 5) Shuffle the chunks
+    random.shuffle(chunks)
+    print(chunks)
+
+    return chunks
+
 class BayesianOptSearch:
     """Bayesian optimization for hyperparameter tuning using Gaussian Processes"""
     
@@ -1348,52 +1390,6 @@ class LSTM_Model:
 
 
 
-
-
-
-
-
-    def manual_chunking(self, cow_ids, chunk_size):
-        """
-        Divide cow_ids into chunks of approximately chunk_size.
-        
-        Parameters:
-        - cow_ids: List of cow IDs to divide
-        - chunk_size: Desired size for each chunk
-        
-        Returns:
-        - List of lists, where each inner list contains cow IDs for one chunk
-        """
-        # 1) Shuffle a copy (so we don't clobber the original)
-        cows = cow_ids[:]
-        random.shuffle(cows)
-        
-        # 2) Compute how many chunks we need
-        total_cows = len(cows)
-        n_chunks = (total_cows + chunk_size - 1) // chunk_size  # Ceiling division
-        
-
-        print("TOTAL COWS", total_cows)
-        print("N_CHUNKS", n_chunks)
-        # 3) Compute the actual chunk sizes
-        k, r = divmod(total_cows, n_chunks)
-        # First 'r' chunks get size k+1, the rest get k
-        
-        # 4) Create the chunks
-        chunks = []
-        idx = 0
-        for i in range(n_chunks):
-            size = k + 1 if i < r else k
-            chunks.append(cows[idx:idx + size])
-            idx += size
-        
-        # 5) Shuffle the chunks
-        random.shuffle(chunks)
-        print(chunks)
-        
-        return chunks
-
-
     def do_loocv(self, sequences: Dict[str, np.ndarray], df, n=None, compute_metrics_only=False, n_jobs=-1,progress_callback=None):
         """
         Run Leave-One-Out Cross Validation with parallelization
@@ -1445,7 +1441,7 @@ class LSTM_Model:
         # print("ALL GROUPS", groups) 
         unique_cows = np.unique(groups)
         # print("ALL unique groups", unique_cows)
-        test_chunks = self.manual_chunking(unique_cows, n)
+        test_chunks = manual_chunking(unique_cows, n)
 
         # Determine number of processes
         n_jobs = (mp.cpu_count()-2) if n_jobs == -1 else n_jobs

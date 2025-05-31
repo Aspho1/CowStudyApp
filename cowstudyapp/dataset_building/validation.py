@@ -64,8 +64,8 @@ class DataValidator:
         stats['value_validation_stats'] = value_stats
         stats['valid_values'] = len(df[df[cols_to_check].notna().any(axis=1)])
 
-    #     print("!!!!!!!! filter values", len(df[df[['latitude', 'longitude', 'altitude',
-    #    'temperature_gps', 'dop', 'satellites', 'utm_easting', 'utm_northing']].notna().any(axis=1)]))
+        #     print("!!!!!!!! filter values", len(df[df[['latitude', 'longitude', 'altitude',
+        #    'temperature_gps', 'dop', 'satellites', 'utm_easting', 'utm_northing']].notna().any(axis=1)]))
         # print("!!!!!!!! Values (DOP, NA)", len(df))
         
         # print("!!!!!!!!!")
@@ -79,8 +79,10 @@ class DataValidator:
         )
         stats['gap_stats'] = gap_statistics
 
-    #     print("!!!!!!!! filter gaps", len(df[df[['latitude', 'longitude', 'altitude',
-    #    'temperature_gps', 'dop', 'satellites', 'utm_easting', 'utm_northing']].notna().any(axis=1)]))
+        # df = df.reset_index(drop=True)
+
+        #     print("!!!!!!!! filter gaps", len(df[df[['latitude', 'longitude', 'altitude',
+        #    'temperature_gps', 'dop', 'satellites', 'utm_easting', 'utm_northing']].notna().any(axis=1)]))
         # stats["final_rows"] = len(df)
 
         return df, stats
@@ -167,25 +169,36 @@ class DataValidator:
         stats['points_outside_of_study'] = timerange_stats
         tr = len(df)
         stats['valid_timerange'] = tr
-        print(1, df.shape)
+        # print(1, df.shape)
         
         df, frequency_stats = self._validate_time_frequency(df, self.ACC_INTERVAL)
         stats['frequency_stats'] = frequency_stats
         cols_to_check = [c for c in df.columns if c not in ['device_id', 'posix_time']]
         stats['non_duplicates_post_standardization'] = len(df[df[cols_to_check].notna().any(axis=1)])
-        print(2, df.shape)
+        # print(2, df.shape)
 
         accel_columns = ['x', 'y', 'z', 'temperature_acc']
         df, value_stats = self._validate_and_filter_values(df, accel_columns)
         stats['value_validation_stats'] = value_stats
         stats['valid_values'] = len(df[df[cols_to_check].notna().any(axis=1)])
-        print(3, df.shape)
+        # print(3, df.shape)
 
 
         df, gap_statistics = self._gap_analysis_and_interpolation(df, interval=self.ACC_INTERVAL, interpolate=True)
         stats['gap_stats'] = gap_statistics
-        print(4, df.shape)
-        
+        # print(4, df.shape)
+
+
+        # df = df.reset_index(drop=True)
+        # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        # print(df)
+
 
         return df, stats
 
