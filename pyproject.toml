@@ -67,3 +67,7 @@ include = '\.pyi?$'
 [tool.isort]
 profile = "black"
 multi_line_output = 3
+
+[tool.mypy]
+ignore_missing_imports = true
+

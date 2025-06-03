@@ -537,7 +537,7 @@ class LSTM_Model:
         for p in [self.cv_path, self.pred_path, self.model_path]:
             p.mkdir(parents=True, exist_ok=True)
 
-        self.sequence_length = lstm_cfg.max_length
+        self.sequence_length: int = lstm_cfg.max_length
         self.max_time_gap = lstm_cfg.max_time_gap
         self.epochs = lstm_cfg.epochs
         self.cows_per_cv_fold = lstm_cfg.cows_per_cv_fold
