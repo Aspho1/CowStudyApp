@@ -50,10 +50,10 @@ dependencies = [
         
     
 # TEMP REMOVING FOR DOCKER
-# [tool.hatch.metadata]
-# requires-external = [
-#     "R >= 4.0.0",
-# ]
+[tool.hatch.metadata]
+requires-external = [
+    "R >= 4.4.1",
+]
 
 [tool.hatch.build.targets.wheel]
 # packages = ["src/cowstudyapp"]
