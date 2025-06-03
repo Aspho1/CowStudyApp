@@ -1,9 +1,9 @@
 # src/cowstudyapp/features.py
 import numpy as np
 import pandas as pd
-from typing import Any, List, Dict, Optional, Set, Tuple
+from typing import Any, Dict, Tuple
 from pyproj import Transformer
-from ..config import FeatureType, FeatureConfig  # Import from config instead
+from cowstudyapp.config import FeatureType, FeatureConfig  # Import from config instead
 
 
 class FeatureValidationError(Exception):

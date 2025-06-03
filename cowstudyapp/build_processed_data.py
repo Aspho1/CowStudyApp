@@ -3,7 +3,7 @@ from cowstudyapp.dataset_building.io import DataLoader
 
 import argparse
 
-from cowstudyapp.utils import from_posix
+# from cowstudyapp.utils import from_posix
 from cowstudyapp.config import ConfigManager
 
 from cowstudyapp.dataset_building.merge import DataMerger

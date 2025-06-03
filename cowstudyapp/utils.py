@@ -1,7 +1,7 @@
 # src/cowstudyapp/utils.py
 from datetime import datetime
 import pandas as pd
-import numpy as np
+# import numpy as np
 import pytz
 
 def to_posix(timestamp: pd.Timestamp | datetime | str) -> int:

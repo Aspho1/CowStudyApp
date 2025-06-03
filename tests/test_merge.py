@@ -1,6 +1,6 @@
 # scripts/test_merge.py
 from pathlib import Path
-import pandas as pd
+# import pandas as pd
 from cowstudyapp.config import ConfigManager
 from cowstudyapp.dataset_building.io import DataLoader
 from cowstudyapp.dataset_building.merge import DataMerger

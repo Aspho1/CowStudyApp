@@ -1,36 +1,34 @@
 import json
 from statistics import mean
-from typing import Any, Dict, List
+from typing import Any, Dict
 import numpy as np
 import pandas as pd
-
-
 
 
 def compute_gap_stats(gap_distribution: Dict[str, str]) -> Dict[str, float]:
     """
     Compute average and max gap length from gap distribution dictionary
-    
+
     Args:
-        gap_distribution: Dictionary with gap lengths as keys and counts as values
-        
+        gap_distribution: Dictionary with gap lengths as keys and
+        counts as values
+
     Returns:
         Dictionary containing average_gap_length and max_gap_length
     """
     total_gaps = 0
     total_length = 0
     max_length = 0
-    
+
     for length_str, count_str in gap_distribution.items():
         length = int(length_str)
         count = int(count_str)
-        
         total_gaps += count
         total_length += length * count
         max_length = max(max_length, length)
-        
+
     avg_length = total_length / total_gaps if total_gaps > 0 else 0
-    
+
     return {
         'avg_gap_length': avg_length,
         'max_gap_length': max_length,
@@ -38,11 +36,11 @@ def compute_gap_stats(gap_distribution: Dict[str, str]) -> Dict[str, float]:
     }
 
 
-
-
 def compare_quality_reports(report1: Dict, report2: Dict) -> Dict:
-    """Compare two data quality reports and highlight significant differences."""
-    comparison: Dict[str,Any] = {
+    """
+    Compare two data quality reports and highlight significant differences.
+    """
+    comparison: Dict[str, Any] = {
         'temporal_coverage': {
             report1["config"]["validation"].get("dataset_name"): {},
             report2["config"]["validation"].get("dataset_name"): {},
@@ -74,91 +72,115 @@ def compare_quality_reports(report1: Dict, report2: Dict) -> Dict:
     for dataset_idx, report in enumerate([report1, report2], 1):
         dataset_key = report["config"]["validation"].get("dataset_name")
         coverage = comparison['temporal_coverage'][dataset_key]
-        
-        coverage['study_duration_days'] = (pd.to_datetime(report['end_datetime']) - pd.to_datetime(report['start_datetime'])).days
-        
+        coverage['study_duration_days'] = (
+            pd.to_datetime(report['end_datetime'])
+            - pd.to_datetime(report['start_datetime'])
+            ).days
+
         # GPS metrics
         n_gps_devices = len(report['gps']['devices'])
         coverage['gps'] = {
             'n_devices': n_gps_devices,
-            'n_days': (pd.to_datetime(report['end_datetime']) - pd.to_datetime(report['start_datetime'])).days,
+            'n_days': (
+                pd.to_datetime(report['end_datetime'])
+                - pd.to_datetime(report['start_datetime'])
+                ).days,
             'expected_records': int(report['gps']['total_expected_records']),
             'actual_records': int(report['gps']['total_final_records']),
-            'coverage_pct': (int(report['gps']['total_final_records']) / int(report['gps']['total_expected_records'])) * 100,
-            'avg_records_per_device_per_day': (int(report['gps']['total_final_records']) / 
-                                             coverage['study_duration_days'] / 
-                                             n_gps_devices)
+            'coverage_pct': (
+                int(report['gps']['total_final_records'])
+                / int(report['gps']['total_expected_records'])
+                ) * 100,
+            'avg_records_per_device_per_day': (
+                int(report['gps']['total_final_records']) /
+                coverage['study_duration_days'] /
+                n_gps_devices)
         }
 
         # Accelerometer metrics
         n_acc_devices = len(report['accelerometer']['devices'])
         coverage['accelerometer'] = {
             'n_devices': n_acc_devices,
-            'n_days': (pd.to_datetime(report['end_datetime']) - pd.to_datetime(report['start_datetime'])).days,
-            'expected_records': int(report['accelerometer']['total_expected_records']),
-            'actual_records': int(report['accelerometer']['total_final_records']),
-            'coverage_pct': (int(report['accelerometer']['total_final_records']) / 
-                           int(report['accelerometer']['total_expected_records'])) * 100,
-            'avg_records_per_device_per_day': (int(report['accelerometer']['total_final_records']) / 
-                                             coverage['study_duration_days'] / 
-                                             n_acc_devices),
-            'total_windows': int(report['accelerometer']['total_windows_computed']),
-            'avg_windows_per_device_per_day': (int(report['accelerometer']['total_windows_computed']) / 
-                                             coverage['study_duration_days'] / 
-                                             n_acc_devices)
+            'n_days': (pd.to_datetime(report['end_datetime'])
+                       - pd.to_datetime(report['start_datetime'])).days,
+            'expected_records':
+                int(report['accelerometer']['total_expected_records']),
+            'actual_records':
+                int(report['accelerometer']['total_final_records']),
+            'coverage_pct': (
+                int(report['accelerometer']['total_final_records']) /
+                int(report['accelerometer']['total_expected_records'])
+                ) * 100,
+            'avg_records_per_device_per_day': (
+                int(report['accelerometer']['total_final_records']) /
+                coverage['study_duration_days'] /
+                n_acc_devices),
+            'total_windows': int(
+                report['accelerometer']['total_windows_computed']),
+            'avg_windows_per_device_per_day': (
+                int(report['accelerometer']['total_windows_computed']) /
+                coverage['study_duration_days'] /
+                n_acc_devices)
         }
 
     # 2. Data Quality Metrics
     for data_type in ['gps', 'accelerometer']:
         quality = comparison['data_quality'][data_type]
-        
+
         for dataset_idx, report in enumerate([report1, report2], 1):
             dataset_key = report["config"]["validation"].get("dataset_name")
-            
+
             # Common stats for both types
             dupes = []
             n_missing = []
-            
+
             for device in report[data_type]['devices'].values():
                 freq_stats = device.get('frequency_stats', {})
                 dupes.append(int(freq_stats.get('duplicates', {}).get('n', 0)))
                 n_missing.append(int(freq_stats.get('n_missing', 0)))
-
             base_metrics = {
                 'total_duplicates': sum(dupes),
                 'avg_duplicates_per_device': mean(dupes),
-                'avg_duplicates_per_device_per_day': mean(dupes) / comparison['temporal_coverage'][dataset_key]['study_duration_days'],
-                'total_missing': sum(n_missing),
-                'avg_missing_per_day': mean(n_missing),
-                'avg_missing_per_device_per_day': mean(n_missing) / comparison['temporal_coverage'][dataset_key]['study_duration_days']
+                'avg_duplicates_per_device_per_day':
+                mean(dupes) /
+                comparison['temporal_coverage'][dataset_key]
+                    ['study_duration_days'],
+                    'total_missing': sum(n_missing),
+                    'avg_missing_per_day': mean(n_missing),
+                'avg_missing_per_device_per_day': mean(n_missing) /
+                    comparison['temporal_coverage'][dataset_key]
+                    ['study_duration_days']
             }
 
             if data_type == 'gps':
                 n_zeros = []
                 for device in report[data_type]['devices'].values():
-                    zero_stats = device.get('zero_val_stats', {}).get('zero_coordinates', {})
+                    zero_stats = device.get('zero_val_stats', {})\
+                            .get('zero_coordinates', {})
                     n_zeros.append(int(zero_stats.get('total_zero_coords', 0)))
 
                 quality[dataset_key] = {
                     **base_metrics,
                     'total_zeros': sum(n_zeros),
                     'avg_zeros_per_day': mean(n_zeros),
-                    'avg_zeros_per_device_per_day': mean(n_zeros) / comparison['temporal_coverage'][dataset_key]['study_duration_days']
+                    'avg_zeros_per_device_per_day':
+                        mean(n_zeros) /
+                        comparison['temporal_coverage'][dataset_key]
+                        ['study_duration_days']
                 }
 
             else:  # accelerometer
                 n_interpolated = []
                 global_gap_dict = {}
-                
+
                 for device in report[data_type]['devices'].values():
                     gap_stats = device.get('gap_stats', {})
                     n_interpolated.append(int(gap_stats.get('interpolated_gaps', 0)))
-                    
+
                     gap_dist = gap_stats.get('gap_analysis', {}).get('gap_distribution', {})
                     for k, v in gap_dist.items():
                         k = int(k)
                         global_gap_dict[k] = global_gap_dict.get(k, 0) + int(v)
-
                 quality[dataset_key] = {
                     **base_metrics,
                     'total_interpolated': sum(n_interpolated),

@@ -14,7 +14,7 @@ import ephem
 
 
 # Import necessary libraries for parallelization
-import concurrent.futures
+# import concurrent.futures
 import multiprocessing
 
 from cowstudyapp.utils import from_posix_col
@@ -36,7 +36,6 @@ if sys.platform == 'win32':
 
 # Configure threading for numpy/scipy
 try:
-    import numpy as np
     np.seterr(all='ignore')  # Ignore numerical warnings
     os.environ["OMP_NUM_THREADS"] = "4"  # Control OpenMP threads
     os.environ["MKL_NUM_THREADS"] = "4"  # Control MKL threads
@@ -1226,7 +1225,7 @@ class GrazingVersusTemperatureBayes:
         # Create a new Excel workbook
         from openpyxl import Workbook
         from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-        from openpyxl.utils.dataframe import dataframe_to_rows
+        # from openpyxl.utils.dataframe import dataframe_to_rows
         
         wb = Workbook()
         ws = wb.active

@@ -2,10 +2,10 @@ from typing import List, Optional
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from matplotlib.dates import MO, DateFormatter, WeekdayLocator, DayLocator, HourLocator
-import matplotlib.patches as mpatches
+from matplotlib.dates import MO, DateFormatter, WeekdayLocator, HourLocator
+# import matplotlib.patches as mpatches
 
-from pathlib import Path
+# from pathlib import Path
 import logging
 from datetime import datetime
 

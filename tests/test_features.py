@@ -19,6 +19,7 @@ def sample_gps_data():
         'posix_time': [1000, 1300, 1600]
     })
 
+
 @pytest.fixture
 def sample_acc_data():
     return pd.DataFrame({
@@ -28,6 +29,7 @@ def sample_acc_data():
         'device_id': ['dev1'] * 5,
         'posix_time': [1000, 1060, 1120, 1180, 1240]
     })
+
 
 @pytest.fixture
 def sample_signals():
@@ -91,7 +93,9 @@ class TestAccelerometerFeatures:
 
     def test_compute_correlation_features(self, sample_signals):
         """Test correlation features computation"""
-        corr = AccelerometerFeatures.compute_correlation_features(sample_signals)
+        corr = AccelerometerFeatures.compute_correlation_features(
+                                sample_signals
+                                )
 
         # Check all correlation pairs
         assert 'xy_corr' in corr
@@ -108,7 +112,8 @@ class TestAccelerometerFeatures:
             'x': np.array([1.0, np.nan]),
             'y': np.array([1.0, 2.0])
         }
-        with pytest.raises(FeatureValidationError, match="Signals contain NaN values"):
+        with pytest.raises(FeatureValidationError,
+                           match="Signals contain NaN values"):
             AccelerometerFeatures.validate_signals(signals_with_nan)
 
         # Test different lengths validation
@@ -116,8 +121,10 @@ class TestAccelerometerFeatures:
             'x': np.array([1.0, 2.0]),
             'y': np.array([1.0])
         }
-        with pytest.raises(FeatureValidationError, match="All signals must have same length"):
+        with pytest.raises(FeatureValidationError,
+                           match="All signals must have same length"):
             AccelerometerFeatures.validate_signals(signals_different_lengths)
+
 
 # GPSFeatures Tests
 class TestGPSFeatures:
@@ -133,12 +140,15 @@ class TestGPSFeatures:
         assert df['utm_easting'].between(400000, 600000).all()
         assert df['utm_northing'].between(5000000, 5200000).all()
 
+
 # FeatureComputation Tests
 class TestFeatureComputation:
-    def test_compute_window_features(self, sample_acc_data, basic_feature_config):
+    def test_compute_window_features(self, sample_acc_data,
+                                     basic_feature_config):
         """Test feature computation for a window of data"""
         computer = FeatureComputation(basic_feature_config)
-        features, stats = computer._compute_window_features(sample_acc_data)
+        features, stats = computer._compute_window_features(
+            sample_acc_data)
 
         # Check basic stats features
         assert 'x_mean' in features
@@ -158,7 +168,6 @@ class TestFeatureComputation:
         # Check magnitude feature if enabled
         if basic_feature_config.enable_magnitude_features:
             assert 'magnitude_mean' in features
-
 
     def test_compute_features(self, sample_acc_data, basic_feature_config):
         """Test the main compute_features method"""

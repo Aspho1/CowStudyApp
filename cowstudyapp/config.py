@@ -1,11 +1,11 @@
 # cowstudyapp/config.py
 from datetime import datetime
-from enum import Enum, auto
+from enum import Enum #, auto
 import os
 from pathlib import Path
 import platform
-from typing import Literal, Optional, Dict, List, Set
-from pydantic import BaseModel, DirectoryPath, FilePath, Field, field_validator, ValidationInfo, model_validator
+from typing import Optional, Dict, List, Set
+from pydantic import BaseModel, Field, field_validator, ValidationInfo
 import pytz
 import yaml
 from .utils import list_valid_timezones

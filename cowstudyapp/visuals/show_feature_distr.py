@@ -1,10 +1,10 @@
-from typing import List, Optional
+# from typing import Optional
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
+# import seaborn as sns
 # from matplotlib.dates import MO, DateFormatter, WeekdayLocator, DayLocator
-import matplotlib.patches as mpatches
+# import matplotlib.patches as mpatches
 from matplotlib.lines import Line2D  # Add this import at the top
 
 
@@ -14,7 +14,7 @@ from pathlib import Path
 
 from scipy import stats
 
-from cowstudyapp.utils import from_posix
+# from cowstudyapp.utils import from_posix
 from cowstudyapp.config import ConfigManager
 
 class Feature_Plotter:

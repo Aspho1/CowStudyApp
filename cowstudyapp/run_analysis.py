@@ -5,11 +5,11 @@ import sys
 from datetime import datetime
 from cowstudyapp.config import (
     ConfigManager,
-    AnalysisConfig,
-    HMMConfig,
-    LSTMConfig,
-    DistributionTypes,
-    AnalysisModes
+    # AnalysisConfig,
+    # HMMConfig,
+    # LSTMConfig,
+    DistributionTypes
+    # AnalysisModes
 )
 from pathlib import Path
 import subprocess

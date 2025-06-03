@@ -17,7 +17,7 @@ from ..utils import (
 from .features import GPSFeatures, FeatureComputation  # apply_feature_extraction
 
 from .labels import LabelAggregation
-from ..config import ConfigManager
+from cowstudyapp.config import ConfigManager
 from .validation import DataValidator
 
 

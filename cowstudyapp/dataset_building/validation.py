@@ -1,12 +1,12 @@
 # src/cowstudyapp/validation.py
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+# from datetime import datetime
+from typing import Any, Dict, List, Tuple
 import numpy as np
 import pandas as pd
 import pytz
 from cowstudyapp.utils import from_posix
 
-from ..config import DataValidationConfig
+from cowstudyapp.config import DataValidationConfig
 # from .config import DataValidationConfig
 
 class DataValidator:

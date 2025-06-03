@@ -1,18 +1,15 @@
-from typing import List, Optional
+# from typing import List, Optional
 import numpy as np
 import pandas as pd
 
-from matplotlib.dates import MO, DateFormatter, WeekdayLocator, DayLocator
-import matplotlib.patches as mpatches
-import seaborn as sns
+# from matplotlib.dates import WeekdayLocator
+# import matplotlib.patches as mpatches
+# import seaborn as sns
 
-from pathlib import Path
-from matplotlib import colors as mcolors, pyplot as plt, cm
+# from pathlib import Path
+from matplotlib import pyplot as plt
 
-from matplotlib.dates import MO, DateFormatter, DayLocator, WeekdayLocator
-import matplotlib.patches as mpatches
-
-from datetime import datetime, timedelta
+# from datetime import datetime, timedelta
 
 from cowstudyapp.utils import from_posix
 from cowstudyapp.config import ConfigManager
