@@ -335,7 +335,7 @@ def print_significant_differences(comparison: Dict, k1, k2):
         print(f"  Dataset 2: {coverage2['n_devices']}")
 
         print("Number of days")
-        print(f"  Dataset 1: {coverage1["n_days"]}")
+        print(f"  Dataset 1: {coverage1['n_days']}") #Fixed these quotes again..
         print(f"  Dataset 2: {coverage2['n_days']}")
         
 
@@ -507,9 +507,9 @@ def print_significant_differences(comparison: Dict, k1, k2):
 
 
 if __name__ == "__main__":
-    with open('data\\processed\\RB_19\\all_cows_labeled.csv_dqr.json', 'r') as f1:
+    with open('data/processed/RB_19/all_cows_labeled.csv_dqr.json', 'r') as f1:
         RB19_Stats = json.load(f1)
-    with open('data\\processed\\RB_22\\all_cows_labeled.csv_dqr.json', 'r') as f2:
+    with open('data/processed/RB_22/all_cows_labeled.csv_dqr.json', 'r') as f2:
         RB22_Stats = json.load(f2)
     
     comp = compare_quality_reports(RB19_Stats, RB22_Stats)
