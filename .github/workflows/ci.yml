@@ -35,5 +35,8 @@ jobs:
       run: |
         black . # --check
         isort . # --check
-        # flake8 .
-        mypy cowstudyapp
+
+
+    - name: Type check
+      run: |
+        mypy cowstudyapp --config-file mypy.ini
