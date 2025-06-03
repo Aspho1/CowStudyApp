@@ -19,5 +19,3 @@ def test_round_to_interval():
     assert round_to_interval(61, interval=60) == 60
     assert round_to_interval(89, interval=60) == 60
     assert round_to_interval(90, interval=60) == 120
-
-test_round_to_interval()
