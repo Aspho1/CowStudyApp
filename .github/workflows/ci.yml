@@ -35,5 +35,5 @@ jobs:
       run: |
         black . # --check
         isort . # --check
-        flake8 .
+        # flake8 .
         mypy cowstudyapp

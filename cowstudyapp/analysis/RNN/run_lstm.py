@@ -1,8 +1,8 @@
-from datetime import datetime
+# from datetime import datetime
 import itertools
 import json
 from pathlib import Path
-import logging
+# import logging
 # from dataclasses import dataclass
 import random
 import time
@@ -15,19 +15,19 @@ from sklearn.model_selection import train_test_split
 import tensorflow as tf
 import keras
 # from sklearn.model_selection import GroupKFold
-from tensorflow.keras.models import Sequential, Model
-from tensorflow.keras.layers import Dense, LSTM, Dropout, Masking, Input, BatchNormalization, Conv1D, TimeDistributed, Flatten, GlobalAveragePooling1D, Attention, Add, LayerNormalization, MultiHeadAttention
-from tensorflow.keras.callbacks import EarlyStopping, TensorBoard, ReduceLROnPlateau
+from tensorflow.keras.models import Sequential  #, Model
+from tensorflow.keras.layers import Dense, LSTM, Dropout, Masking, Input
+from tensorflow.keras.callbacks import EarlyStopping #, TensorBoard, ReduceLROnPlateau
 from tensorflow.keras.optimizers.schedules import ExponentialDecay
-from tensorflow.keras.losses import SparseCategoricalCrossentropy
+# from tensorflow.keras.losses import SparseCategoricalCrossentropy
 from tensorflow.random import set_seed
 from tensorflow.keras.regularizers import L2
 from tensorflow.keras.optimizers import Adam
 
 
 
-from keras import metrics
-from sklearn.utils.class_weight import compute_class_weight
+# from keras import metrics
+# from sklearn.utils.class_weight import compute_class_weight
 from sklearn.preprocessing import StandardScaler
 # from sklearn.utils.class_weight import compute_class_weight
 # from sklearn.metrics import classification_report
@@ -50,16 +50,16 @@ else:
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from cowstudyapp.config import ConfigManager, LSTMConfig, AnalysisConfig
-from cowstudyapp.utils import from_posix, from_posix_col
+from cowstudyapp.config import ConfigManager
+from cowstudyapp.utils import from_posix_col
 
 from sklearn.metrics import confusion_matrix, f1_score, accuracy_score
 import multiprocessing as mp
-from functools import partial
+# from functools import partial
 
 from skopt import gp_minimize
-from skopt.space import Real, Integer, Categorical
-from skopt.utils import use_named_args
+from skopt.space import Real, Integer #, Categorical
+# from skopt.utils import use_named_args
 from skopt.plots import plot_convergence, plot_objective
 from skopt import dump, load
 import os
@@ -114,7 +114,7 @@ class BayesianOptSearch:
         self.results = []
         self.lstm_model=None
         self.sequences = None
-        self.df:pd.DataFrame = df
+        self.df: pd.DataFrame = df
         self.random_seed = self.config.analysis.random_seed
 
 
