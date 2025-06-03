@@ -1,5 +1,5 @@
 # tests/test_utils.py
-import pytest
+# import pytest
 from cowstudyapp.utils import round_to_interval
 
 def test_round_to_interval():
