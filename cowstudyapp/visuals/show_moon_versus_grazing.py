@@ -4,10 +4,10 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 import ephem
-import pytz
+# import pytz
 from scipy import stats
-from statsmodels.regression.mixed_linear_model import MixedLM
-import statsmodels.api as sm
+# from statsmodels.regression.mixed_linear_model import MixedLM
+# import statsmodels.api as sm
 
 from cowstudyapp.utils import from_posix_col
 from cowstudyapp.config import ConfigManager

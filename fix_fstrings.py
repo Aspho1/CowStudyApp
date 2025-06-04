@@ -5,7 +5,7 @@ Python code fixer for CowStudyApp - fixes common f-string syntax errors.
 import os
 import re
 import sys
-from pathlib import Path
+# from pathlib import Path
 
 
 

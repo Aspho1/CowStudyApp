@@ -1,20 +1,20 @@
 import os
-from typing import List, Optional
+from typing import Optional
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from matplotlib.dates import MO, DateFormatter, WeekdayLocator, DayLocator
-import matplotlib.patches as mpatches
+# from matplotlib.dates import WeekdayLocator
+# import matplotlib.patches as mpatches
 import seaborn as sns
 
-from pathlib import Path
-import logging
-from datetime import datetime
+# from pathlib import Path
+# import logging
+# from datetime import datetime
 
 from scipy import stats
 from statsmodels.stats.multicomp import pairwise_tukeyhsd
-import statsmodels.api as sm
+# import statsmodels.api as sm
 
 from cowstudyapp.utils import from_posix_col
 from cowstudyapp.config import ConfigManager

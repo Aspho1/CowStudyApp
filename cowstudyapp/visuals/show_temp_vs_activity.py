@@ -9,7 +9,7 @@ import warnings
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
 
 import ephem
-from datetime import datetime
+# from datetime import datetime
 
 
 
@@ -906,7 +906,6 @@ class GrazingVersusTemperature:
 
     def _add_polynomial_curve(self, ax, poly_model, data, state, index):
         """Add a polynomial curve to the plot"""
-        import numpy as np
         
         # Get temperature range for the curve
         temp_min = data['temperature'].min()

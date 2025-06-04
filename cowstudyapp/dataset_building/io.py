@@ -17,7 +17,7 @@ from ..utils import (
 from .features import GPSFeatures, FeatureComputation  # apply_feature_extraction
 
 from .labels import LabelAggregation
-from ..config import ConfigManager
+from cowstudyapp.config import ConfigManager
 from .validation import DataValidator
 
 
@@ -182,7 +182,14 @@ class DataLoader:
         self.quality_report["start_datetime"] = startt.strftime(self.DATEFORMATS[0])
         self.quality_report["end_datetime"] = endt.strftime(self.DATEFORMATS[0])
 
-        out['gps'] = pd.concat([self._process_gps(f) for f in gps_files])
+        if len(gps_files) > 1:
+            out['gps'] = pd.concat([self._process_gps(f) for f in gps_files])
+        else:
+            print(gps_files)
+            print(len(gps_files))
+            print(gps_files[0])
+
+            out['gps'] = self._process_gps(gps_files[0])
 
 
         self.quality_report["gps"]["total_expected_records"] = (
@@ -190,9 +197,14 @@ class DataLoader:
             * self.quality_report["gps"]["devices_processed"]
         )
 
-        out['accelerometer'] = pd.concat(
-            [self._process_accel(f, aggregated=aggregated) for f in accel_files]
-        )
+        if len(accel_files) > 1:
+            out['accelerometer'] = pd.concat([self._process_accel(f, aggregated=aggregated) for f in accel_files])
+        else:
+
+            out['accelerometer'] = self._process_accel(accel_files[0], aggregated=aggregated)
+
+
+
         self.quality_report["accelerometer"]["total_expected_records"] = (
             self.quality_report["accelerometer"]["expected_records_per_device"]
             * self.quality_report["accelerometer"]["devices_processed"]

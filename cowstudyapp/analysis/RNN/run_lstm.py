@@ -1,8 +1,8 @@
-from datetime import datetime
+# from datetime import datetime
 import itertools
 import json
 from pathlib import Path
-import logging
+# import logging
 # from dataclasses import dataclass
 import random
 import time
@@ -15,23 +15,31 @@ from sklearn.model_selection import train_test_split
 import tensorflow as tf
 import keras
 # from sklearn.model_selection import GroupKFold
-from tensorflow.keras.models import Sequential, Model
-from tensorflow.keras.layers import Dense, LSTM, Dropout, Masking, Input, BatchNormalization, Conv1D, TimeDistributed, Flatten, GlobalAveragePooling1D, Attention, Add, LayerNormalization, MultiHeadAttention
-from tensorflow.keras.callbacks import EarlyStopping, TensorBoard, ReduceLROnPlateau
+from tensorflow.keras.models import Sequential  #, Model
+from tensorflow.keras.layers import Dense, LSTM, Dropout, Masking, Input
+from tensorflow.keras.callbacks import EarlyStopping #, TensorBoard, ReduceLROnPlateau
 from tensorflow.keras.optimizers.schedules import ExponentialDecay
-from tensorflow.keras.losses import SparseCategoricalCrossentropy
+# from tensorflow.keras.losses import SparseCategoricalCrossentropy
 from tensorflow.random import set_seed
 from tensorflow.keras.regularizers import L2
 from tensorflow.keras.optimizers import Adam
 
 
 
-from keras import metrics
-from sklearn.utils.class_weight import compute_class_weight
+# from keras import metrics
+# from sklearn.utils.class_weight import compute_class_weight
 from sklearn.preprocessing import StandardScaler
 # from sklearn.utils.class_weight import compute_class_weight
 # from sklearn.metrics import classification_report
 import matplotlib
+
+
+import platform 
+import pathlib 
+
+if platform.system()  == 'Linux': 
+    pathlib.WindowsPath = pathlib.PosixPath
+
 
 if True:
     # Use a non-interactive backend that works well with multiprocessing
@@ -42,19 +50,61 @@ else:
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from cowstudyapp.config import ConfigManager, LSTMConfig, AnalysisConfig
-from cowstudyapp.utils import from_posix, from_posix_col
+from cowstudyapp.config import ConfigManager
+from cowstudyapp.utils import from_posix_col
 
 from sklearn.metrics import confusion_matrix, f1_score, accuracy_score
 import multiprocessing as mp
-from functools import partial
+# from functools import partial
 
 from skopt import gp_minimize
-from skopt.space import Real, Integer, Categorical
-from skopt.utils import use_named_args
+from skopt.space import Real, Integer #, Categorical
+# from skopt.utils import use_named_args
 from skopt.plots import plot_convergence, plot_objective
 from skopt import dump, load
 import os
+
+
+
+def manual_chunking(cow_ids, chunk_size):
+    """
+    Divide cow_ids into chunks of approximately chunk_size.
+
+    Parameters:
+    - cow_ids: List of cow IDs to divide
+    - chunk_size: Desired size for each chunk
+
+    Returns:
+    - List of lists, where each inner list contains cow IDs for one chunk
+    """
+    # 1) Shuffle a copy (so we don't clobber the original)
+    cows = cow_ids[:]
+    random.shuffle(cows)
+
+    # 2) Compute how many chunks we need
+    total_cows = len(cows)
+    n_chunks = (total_cows + chunk_size - 1) // chunk_size  # Ceiling division
+
+
+    print("TOTAL COWS", total_cows)
+    print("N_CHUNKS", n_chunks)
+    # 3) Compute the actual chunk sizes
+    k, r = divmod(total_cows, n_chunks)
+    # First 'r' chunks get size k+1, the rest get k
+
+    # 4) Create the chunks
+    chunks = []
+    idx = 0
+    for i in range(n_chunks):
+        size = k + 1 if i < r else k
+        chunks.append(cows[idx:idx + size])
+        idx += size
+
+    # 5) Shuffle the chunks
+    random.shuffle(chunks)
+    print(chunks)
+
+    return chunks
 
 class BayesianOptSearch:
     """Bayesian optimization for hyperparameter tuning using Gaussian Processes"""
@@ -64,7 +114,9 @@ class BayesianOptSearch:
         self.results = []
         self.lstm_model=None
         self.sequences = None
-        self.df:pd.DataFrame = df
+        self.df: pd.DataFrame = df
+        self.random_seed = self.config.analysis.random_seed
+
 
         ops = 'ops' if self.config.analysis.lstm.ops else 'opo'
 
@@ -107,14 +159,14 @@ class BayesianOptSearch:
         
         # Path to save/load optimization results
         # io_type = 'ops' if self.config.analysis.lstm.ops else 'opo'
-        self.results_path = self.output_dir / "bayes_opt_results.pkl"
+        self.results_path = str(self.output_dir / "bayes_opt_results.pkl")
+
         # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         print(f"Setting results path to `{self.results_path}`")
         
     def run_search(self, lstm_model):
         """Run Bayesian optimization search"""
         self.lstm_model = lstm_model
-
         # Instead of trying to use a decorator, use a simple function
         def objective(x):
             # Convert the parameter vector to a dictionary
@@ -122,9 +174,10 @@ class BayesianOptSearch:
             return self._objective(params)
 
         # Check if we should resume from previous run
-        if self.results_path.exists() and self.config.analysis.lstm.bayes_opt_resume:
-            print(f"Resuming optimization from `{self.results_path}`")
-            previous_result = load(self.results_path)
+        if os.path.exists(self.results_path) and self.config.analysis.lstm.bayes_opt_resume:
+            print(f"Resuming optimization from `{self.results_path}`", type(self.results_path))
+
+            previous_result = load(str(self.results_path))
             
             # Call optimization with previous result as starting point
             result = gp_minimize(
@@ -138,6 +191,7 @@ class BayesianOptSearch:
                 verbose=True,
                 callback=self._on_step
             )
+
         else:
             # Start fresh optimization
             result = gp_minimize(
@@ -170,13 +224,25 @@ class BayesianOptSearch:
         
         # Generate and save plots
         self._save_optimization_plots(result)
-        
+
         return best_params
 
 
     def _objective(self, params):
         """Objective function to minimize (negative F1 score)"""
         # Convert any NumPy types to native Python types for JSON serialization
+
+
+
+        param_hash = hash(frozenset(params.items())) & 0xFFFFFFFF
+        derived_seed = (self.random_seed + param_hash) & 0xFFFFFFFF
+
+        # Set seeds for this evaluation
+        set_seed(derived_seed)
+        np.random.seed(derived_seed)
+        random.seed(derived_seed)
+
+
         printable_params = {}
         for key, value in params.items():
             if isinstance(value, (np.integer, np.int32, np.int64)):
@@ -192,7 +258,9 @@ class BayesianOptSearch:
         # Set the parameters on the model (using original values)
         self._set_params(params)
 
-
+        set_seed(self.config.analysis.random_seed)
+        np.random.seed(self.config.analysis.random_seed)
+        random.seed(self.config.analysis.random_seed)
         
         # Run a small LOOCV with current parameters
         start_time = time.time()
@@ -469,7 +537,7 @@ class LSTM_Model:
         for p in [self.cv_path, self.pred_path, self.model_path]:
             p.mkdir(parents=True, exist_ok=True)
 
-        self.sequence_length = lstm_cfg.max_length
+        self.sequence_length: int = lstm_cfg.max_length
         self.max_time_gap = lstm_cfg.max_time_gap
         self.epochs = lstm_cfg.epochs
         self.cows_per_cv_fold = lstm_cfg.cows_per_cv_fold
@@ -1322,52 +1390,6 @@ class LSTM_Model:
 
 
 
-
-
-
-
-
-    def manual_chunking(self, cow_ids, chunk_size):
-        """
-        Divide cow_ids into chunks of approximately chunk_size.
-        
-        Parameters:
-        - cow_ids: List of cow IDs to divide
-        - chunk_size: Desired size for each chunk
-        
-        Returns:
-        - List of lists, where each inner list contains cow IDs for one chunk
-        """
-        # 1) Shuffle a copy (so we don't clobber the original)
-        cows = cow_ids[:]
-        random.shuffle(cows)
-        
-        # 2) Compute how many chunks we need
-        total_cows = len(cows)
-        n_chunks = (total_cows + chunk_size - 1) // chunk_size  # Ceiling division
-        
-
-        print("TOTAL COWS", total_cows)
-        print("N_CHUNKS", n_chunks)
-        # 3) Compute the actual chunk sizes
-        k, r = divmod(total_cows, n_chunks)
-        # First 'r' chunks get size k+1, the rest get k
-        
-        # 4) Create the chunks
-        chunks = []
-        idx = 0
-        for i in range(n_chunks):
-            size = k + 1 if i < r else k
-            chunks.append(cows[idx:idx + size])
-            idx += size
-        
-        # 5) Shuffle the chunks
-        random.shuffle(chunks)
-        print(chunks)
-        
-        return chunks
-
-
     def do_loocv(self, sequences: Dict[str, np.ndarray], df, n=None, compute_metrics_only=False, n_jobs=-1,progress_callback=None):
         """
         Run Leave-One-Out Cross Validation with parallelization
@@ -1419,7 +1441,7 @@ class LSTM_Model:
         # print("ALL GROUPS", groups) 
         unique_cows = np.unique(groups)
         # print("ALL unique groups", unique_cows)
-        test_chunks = self.manual_chunking(unique_cows, n)
+        test_chunks = manual_chunking(unique_cows, n)
 
         # Determine number of processes
         n_jobs = (mp.cpu_count()-2) if n_jobs == -1 else n_jobs

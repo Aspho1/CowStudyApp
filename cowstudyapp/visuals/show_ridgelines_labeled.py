@@ -1,11 +1,11 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
+# import seaborn as sns
 from scipy import stats
-import matplotlib.ticker as ticker
-from matplotlib.gridspec import GridSpec
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
+# import matplotlib.ticker as ticker
+# from matplotlib.gridspec import GridSpec
+# from sklearn.metrics import confusion_matrix
 
 
 # Define features to analyze

@@ -1,11 +1,11 @@
-# src/cowstudyapp/config.py
+# cowstudyapp/config.py
 from datetime import datetime
-from enum import Enum, auto
+from enum import Enum #, auto
 import os
 from pathlib import Path
 import platform
-from typing import Literal, Optional, Dict, List, Set
-from pydantic import BaseModel, DirectoryPath, FilePath, Field, field_validator, ValidationInfo, model_validator
+from typing import Optional, Dict, List, Set
+from pydantic import BaseModel, Field, field_validator, ValidationInfo
 import pytz
 import yaml
 from .utils import list_valid_timezones
@@ -125,7 +125,7 @@ class DataValidationConfig(CommonConfig):
     # timezone: str = "America/Denver"
     start_datetime: Optional[datetime] = None
     end_datetime: Optional[datetime] = None
-    COVERAGE_THRESHOLD: float = Field(50) 
+    COVERAGE_THRESHOLD: float = Field(70)
     
     validation_rules: Dict[str, ValidationRule] = Field(
         default_factory=lambda: {
@@ -263,14 +263,9 @@ class IoConfig(CommonConfig):
     @field_validator('gps_directory', 'accelerometer_directory')
     @classmethod
     def validate_directory(cls, v: Path) -> Path:
-        if not v:
-            raise ValueError("Directory path must be provided")
-        if not v.exists():
-            raise ValueError(f"Directory does not exist: {v}")
-        if not v.is_dir():
-            raise ValueError(f"Path is not a directory: {v}")
+        if isinstance(v, str):
+            return Path(v)
         return v
-
     
 
 
@@ -422,10 +417,12 @@ class AnalysisConfig(CommonConfig):
     #     return v
 
     # @field_validator('output_dir')
+
     @field_validator('cv_results', 'models', 'predictions')
     @classmethod
     def validate_output_dir(cls, v: Path) -> Path:
-        v.mkdir(parents=True, exist_ok=True)
+        if isinstance(v, str):
+            return Path(v)
         return v
 
     @field_validator('training_info')
@@ -441,15 +438,15 @@ class AnalysisConfig(CommonConfig):
 ##################################### Visualizations Config #####################################
 
 class RadarConfig(BaseModel):
-    run: bool
-    extension: str
-    show_night: bool
+    run: bool = False
+    extension: str = 'Radar_Plots'
+    show_night: bool = True
 
 class TemperatureGraphConfig(BaseModel):
-    run: bool
+    run: bool = False
     minimum_required_values: int = 30
     extension: Optional[str] = Field(default="")
-    daynight: str
+    daynight: str = 'day'
     show_curve: bool = False
     show_table: bool = False
     export_excel: bool = False
@@ -470,82 +467,61 @@ class TemperatureGraphConfig(BaseModel):
 
 
 class CowInfoGraphConfig(BaseModel):
-    run: bool
-    # implemented: bool
+    run: bool = False
+    implemented: bool = False
     extension: Optional[str] = Field(default="")
 
 class MoonPhasesConfig(BaseModel):
-    run: bool
-    # implemented: bool
+    run: bool = False
+    implemented: bool = True
     extension: Optional[str] = Field(default="")
 
 class DomainGraphConfig(BaseModel):
-    run: bool
-    # implemented: bool
-    labeled_only: bool
+    run: bool = False
+    implemented: bool = False
+    labeled_only: bool = False
     extension: Optional[str] = Field(default="")
 
 class HeatmapConfig(BaseModel):
-    run: bool
-    filter_weigh_days: bool
-    weigh_days: List[str]
+    run: bool = False
+    filter_weigh_days: bool = False
+    weigh_days: List[str] = []
     extension: Optional[str] = Field(default="")
 
 class FeatureDists(BaseModel):
-    run: bool
+    run: bool = False
 
 class ConvolutionSurface(BaseModel):
-    run: bool
+    run: bool = False
 
 
 
 class VisualsConfig(CommonConfig):
     predictions_path: Optional[Path] = None
-    visuals_root_path: Path
-    radar: RadarConfig
-    domain: DomainGraphConfig
-    feature_dists: FeatureDists
-    convolution_surface: ConvolutionSurface
-    temperature_graph: TemperatureGraphConfig
-    moon_phases: MoonPhasesConfig
-    cow_info_graph: CowInfoGraphConfig
-    heatmap: HeatmapConfig
+    visuals_root_path: Optional[Path] = None
+    radar: RadarConfig = Field(default_factory=RadarConfig)
+    domain: DomainGraphConfig = Field(default_factory=DomainGraphConfig)
+    feature_dists: FeatureDists = Field(default_factory=FeatureDists)
+    convolution_surface: ConvolutionSurface = Field(default_factory=ConvolutionSurface)
+    temperature_graph: TemperatureGraphConfig = Field(default_factory=TemperatureGraphConfig)
+    moon_phases: MoonPhasesConfig = Field(default_factory=MoonPhasesConfig)
+    cow_info_graph: CowInfoGraphConfig = Field(default_factory=CowInfoGraphConfig)
+    heatmap: HeatmapConfig = Field(default_factory=HeatmapConfig)
     dataset_name: str = Field(default="")
 
-
-    # @model_validator(mode="after")
-    # def apply_dataset_folder(cls, m: "VisualsConfig") -> "VisualsConfig":
-    #     # now you *do* have `m.dataset_name`
-
-    #     if not str(m.visuals_root_path).endswith(m.dataset_name):
-    #         m.visuals_root_path = m.visuals_root_path / Path(m.dataset_name or "UNNAMED")
-    #         m.visuals_root_path.mkdir(exist_ok=True, parents=True)
-    #     if not m.visuals_root_path.exists():
-    #         raise ValueError(f"Path `{m.visuals_root_path}` does not exist.")
-    #     return m
     @field_validator('visuals_root_path')
     @classmethod
     def validate_directory(cls, v: Path) -> Path:
-        if not v.exists():
-            raise ValueError(f"Path `{v}` does not exist.")
+        if isinstance(v, str):
+            return Path(v)
         return v
-
-    # @field_validator('dist')
-    # def validate_dist(cls, v, info: ValidationInfo):
-    #     # Covariates don't need a distribution
-    #     if info.data.get('dist_type') == FeatureDistType.COVARIATE:
-    #         return None
-    #     return v
 
     @field_validator('predictions_path')
     @classmethod
     def validate_file_path(cls, v: Optional[Path]) -> Optional[Path]:
-        if v is not None and not v.exists():
-            print(f"Warning: Path `{v}` does not exist. Visuals will not work "
-                  "without a correctly defined predictions_path")
+        if v is not None and isinstance(v, str):
+            return Path(v)
         return v
-    
-
 
     @field_validator('heatmap')
     def convert_weigh_days(cls, v: HeatmapConfig, values):
@@ -630,18 +606,19 @@ class ConfigManager:
     def validate(self) -> None:
         """Validate cross-component configuration compatibility"""
         # Ensure required components exist
+        print("!!!!!!!!!!!!!!!!!!     config.ConfigManager.validate called. this is a progress inhibitor.")
         if not all([self.validation, self.features, self.io]):
             raise ValueError("Missing required configuration components")
-        
+
         # Ensure consistent timezone across components
         timezones = {
-            config.timezone 
-            for config in [self.validation, self.features, self.labels, self.io] 
+            config.timezone
+            for config in [self.validation, self.features, self.labels, self.io]
             if config is not None
         }
         if len(timezones) > 1:
             raise ValueError(f"Inconsistent timezones across components: {timezones}")
-   
+
         
     @classmethod
     def load(cls, config_path: Optional[Path] = None) -> 'ConfigManager':
@@ -660,7 +637,6 @@ class ConfigManager:
 
         raise FileNotFoundError("No config file found in any standard location")
     
-
 
 
 

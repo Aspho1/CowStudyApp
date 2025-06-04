@@ -1,6 +1,6 @@
 # src/cowstudyapp/visuals/show_temp_vs_activity_Bayes.py
 
-from typing import List, Dict, Tuple, Optional, Union
+from typing import List, Dict, Tuple, Optional
 import pandas as pd
 import numpy as np
 import os
@@ -9,7 +9,7 @@ import multiprocessing
 import sys
 import gc
 import matplotlib.pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap
+# from matplotlib.colors import LinearSegmentedColormap
 import seaborn as sns
 import subprocess
 from pathlib import Path
@@ -295,7 +295,7 @@ class BehaviorModelBuilder:
                     max_degree = max(max_degree, degree)
             
             # Generate orthogonal polynomial basis
-            from numpy.polynomial import polynomial as P
+            # from numpy.polynomial import polynomial as P
             time_values = clean_df['time_z'].values
             
             # Create orthogonal polynomial terms

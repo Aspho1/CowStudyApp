@@ -1,26 +1,13 @@
 # src/cowstudyapp/features.py
 import numpy as np
 import pandas as pd
-from typing import Any, List, Dict, Optional, Set, Tuple
+from typing import Any, Dict, Tuple
 from pyproj import Transformer
-
-# from dataclasses import dataclass
-# from enum import Enum, auto
-from ..config import FeatureType, FeatureConfig  # Import from config instead
-
-# from .config import FeatureType, FeatureConfig  # Import from config instead
-
-# @dataclass
-# class TimeDomainFeature:
-#     """Base class for time domain features with LaTeX equations"""
-#     name: str
-#     description: str
-#     equation: str
+from cowstudyapp.config import FeatureType, FeatureConfig  # Import from config instead
 
 
 class FeatureValidationError(Exception):
     """Raised when feature computation fails validation"""
-
     pass
 
 
@@ -390,7 +377,7 @@ class FeatureComputation:
         if self.config.enable_axis_features:
             required_cols.extend(["x", "y", "z"])
 
-        print(df.head())
+        # print(df.head())
         missing_cols = [col for col in required_cols if col not in df.columns]
         if missing_cols:
             raise FeatureValidationError(f"Missing columns: {missing_cols}")
@@ -453,15 +440,15 @@ class FeatureComputation:
 
         return pd.DataFrame(results), stats
 
-    def _compute_window_features(
-        self, window: pd.DataFrame
-    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    def _compute_window_features(self, window: pd.DataFrame) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         """
         Compute all enabled features for a window of data.
 
         Returns:
             Tuple[Dict[str, Any], Dict[str, Any]]: (Features, Statistics)
         """
+
+        # print("I EXIST!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         features: Dict[str, Any] = {}
         stats: Dict[str, Any] = {"window_size": len(window), "feature_computation": {}}
 
@@ -534,69 +521,3 @@ class FeatureComputation:
                 raise
             raise FeatureValidationError(f"Feature computation failed: {str(e)}")
 
-    def _compute_window_features_old(self, window: pd.DataFrame) -> pd.Series:
-        """
-        Compute all enabled features for a window of data.
-        """
-        features: dict[str, Any] = {}
-        try:
-            # # Validate input data
-            # required_cols = ['x', 'y', 'z'] if self.config.enable_axis_features else []
-            # missing_cols = [col for col in required_cols if col not in window_data.columns]
-            # if missing_cols:
-            #     raise FeatureValidationError(f"Missing required columns: {missing_cols}")
-
-            # Prepare signals dictionary
-            signals = {}
-            if self.config.enable_axis_features:
-                signals.update(
-                    {
-                        "x": window["x"].values,
-                        "y": window["y"].values,
-                        "z": window["z"].values,
-                    }
-                )
-
-            if self.config.enable_magnitude_features:
-                signals["magnitude"] = AccelerometerFeatures.compute_magnitude(signals)
-
-            # Validate signals before processing
-            AccelerometerFeatures.validate_signals(signals)
-
-            # Compute enabled features
-            for feature_type in self.config.feature_types:
-                if feature_type == FeatureType.BASIC_STATS:
-                    stats = AccelerometerFeatures.compute_basic_stats(signals)
-                    features.update(stats)
-
-                elif feature_type == FeatureType.ZERO_CROSSINGS:
-                    zcr = AccelerometerFeatures.compute_zero_crossings(signals)
-                    features.update(zcr)
-
-                elif feature_type == FeatureType.PEAK_FEATURES:
-                    peaks = AccelerometerFeatures.compute_peak_features(signals)
-                    features.update(peaks)
-
-                elif feature_type == FeatureType.ENTROPY:
-                    entropy = AccelerometerFeatures.compute_entropy(signals)
-                    features.update(entropy)
-
-                elif (
-                    feature_type == FeatureType.CORRELATION
-                    and self.config.enable_axis_features
-                ):
-                    corr = AccelerometerFeatures.compute_correlation_features(signals)
-                    features.update(corr)
-
-                elif feature_type == FeatureType.SPECTRAL:
-                    spectral = AccelerometerFeatures.compute_spectral_features(
-                        signals, sample_rate=(1 / self.config.acc_sample_interval)
-                    )
-                    features.update(spectral)
-
-            return pd.Series(features)
-
-        except Exception as e:
-            if isinstance(e, FeatureValidationError):
-                raise
-            raise FeatureValidationError(f"Feature computation failed: {str(e)}")
