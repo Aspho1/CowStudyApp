@@ -362,6 +362,9 @@ class LSTMConfig(CommonConfig):
 
     hyperparams_search: bool = False
     hyperparams_sample: bool = False
+    validation_method: str = 'random'
+    validation_size: float = 0.3
+
 
 
     bayes_opt: bool = False

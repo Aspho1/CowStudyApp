@@ -12,8 +12,10 @@ import pandas as pd
 import numpy as np
 
 from sklearn.model_selection import train_test_split 
+from sklearn.preprocessing import StandardScaler
+
 import tensorflow as tf
-import keras
+
 # from sklearn.model_selection import GroupKFold
 from tensorflow.keras.models import Sequential  #, Model
 from tensorflow.keras.layers import Dense, LSTM, Dropout, Masking, Input
@@ -24,16 +26,26 @@ from tensorflow.random import set_seed
 from tensorflow.keras.regularizers import L2
 from tensorflow.keras.optimizers import Adam
 
+from cowstudyapp.analysis.RNN.utils import (
+    random_validation_split,
+    sequence_aware_validation_split,
+    interleaved_validation_split,
+    balanced_class_validation_split,
+    stratified_sequence_split,
+    get_sequence_ids,
+    manual_chunking,
+    MaskedAccuracy,
+    MaskedSparseCategoricalCrossentropy,
+    LabeledDataMetricsCallback
 
+)
 
-# from keras import metrics
-# from sklearn.utils.class_weight import compute_class_weight
-from sklearn.preprocessing import StandardScaler
-# from sklearn.utils.class_weight import compute_class_weight
-# from sklearn.metrics import classification_report
+from cowstudyapp.analysis.RNN.hyper_parameter_tuning import (
+    BayesianOptSearch,
+    HyperparamSearch
+)
+
 import matplotlib
-
-
 import platform 
 import pathlib 
 
@@ -57,452 +69,12 @@ from sklearn.metrics import confusion_matrix, f1_score, accuracy_score
 import multiprocessing as mp
 # from functools import partial
 
-from skopt import gp_minimize
-from skopt.space import Real, Integer #, Categorical
-# from skopt.utils import use_named_args
-from skopt.plots import plot_convergence, plot_objective
-from skopt import dump, load
-import os
-
-
-
-def manual_chunking(cow_ids, chunk_size):
-    """
-    Divide cow_ids into chunks of approximately chunk_size.
-
-    Parameters:
-    - cow_ids: List of cow IDs to divide
-    - chunk_size: Desired size for each chunk
-
-    Returns:
-    - List of lists, where each inner list contains cow IDs for one chunk
-    """
-    # 1) Shuffle a copy (so we don't clobber the original)
-    cows = cow_ids[:]
-    random.shuffle(cows)
-
-    # 2) Compute how many chunks we need
-    total_cows = len(cows)
-    n_chunks = (total_cows + chunk_size - 1) // chunk_size  # Ceiling division
-
-
-    print("TOTAL COWS", total_cows)
-    print("N_CHUNKS", n_chunks)
-    # 3) Compute the actual chunk sizes
-    k, r = divmod(total_cows, n_chunks)
-    # First 'r' chunks get size k+1, the rest get k
-
-    # 4) Create the chunks
-    chunks = []
-    idx = 0
-    for i in range(n_chunks):
-        size = k + 1 if i < r else k
-        chunks.append(cows[idx:idx + size])
-        idx += size
-
-    # 5) Shuffle the chunks
-    random.shuffle(chunks)
-    print(chunks)
-
-    return chunks
-
-class BayesianOptSearch:
-    """Bayesian optimization for hyperparameter tuning using Gaussian Processes"""
-    
-    def __init__(self, config, df: pd.DataFrame):
-        self.config = config
-        self.results = []
-        self.lstm_model=None
-        self.sequences = None
-        self.df: pd.DataFrame = df
-        self.random_seed = self.config.analysis.random_seed
-
-
-        ops = 'ops' if self.config.analysis.lstm.ops else 'opo'
-
-        self.output_dir = self.config.analysis.cv_results / 'lstm' / ops / 'v3'
-        # self.output_dir = Path(self.output_dir)
-        self.output_dir.mkdir(parents=True,exist_ok=True)
-        
-        # self.output_dir = self.config.analysis.output_dir
-        
-        # Define the search space
-        self.space = [
-            Integer(10, 288, name='max_length'),
-            Integer(2, 32, name='batch_size'),
-            Real(1e-4, 1e-2, "log-uniform", name='initial_lr'),
-            Integer(100, 5000, name='decay_steps'),
-            Real(0.1, 0.95, name='decay_rate'),
-            Real(0.1, 2.0, name='clipnorm'),
-            Integer(20, 60, name='patience'),
-            Real(1e-6, 1e-4, "log-uniform", name='min_delta'),
-            Real(1e-6, 1e-4, "log-uniform", name='reg_val'),
-            # Optional: Categorical parameters
-            # Categorical(['adam', 'rmsprop'], name='optimizer'),
-            # Categorical(['relu', 'tanh'], name='activation'),
-        ]
-
-        self.param_labels = [
-            "max_length",
-            "batch_size",
-            "initial_lr",
-            "decay_steps",
-            "decay_rate",
-            "clipnorm",
-            "patience",
-            "min_delta",
-            "reg_val"
-        ]
-        
-        # Number of calls to make to the objective function
-        self.n_calls = config.analysis.lstm.bayes_opt_n_calls
-        
-        # Path to save/load optimization results
-        # io_type = 'ops' if self.config.analysis.lstm.ops else 'opo'
-        self.results_path = str(self.output_dir / "bayes_opt_results.pkl")
-
-        # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-        print(f"Setting results path to `{self.results_path}`")
-        
-    def run_search(self, lstm_model):
-        """Run Bayesian optimization search"""
-        self.lstm_model = lstm_model
-        # Instead of trying to use a decorator, use a simple function
-        def objective(x):
-            # Convert the parameter vector to a dictionary
-            params = {dim.name: x[i] for i, dim in enumerate(self.space)}
-            return self._objective(params)
-
-        # Check if we should resume from previous run
-        if os.path.exists(self.results_path) and self.config.analysis.lstm.bayes_opt_resume:
-            print(f"Resuming optimization from `{self.results_path}`", type(self.results_path))
-
-            previous_result = load(str(self.results_path))
-            
-            # Call optimization with previous result as starting point
-            result = gp_minimize(
-                objective,
-                self.space,
-                n_calls=self.n_calls,
-                x0=previous_result.x_iters,  # Use previous iterations
-                y0=previous_result.func_vals,  # Use previous function values
-                random_state=self.config.analysis.random_seed,
-                n_random_starts=0,  # No random starts since we're using previous results
-                verbose=True,
-                callback=self._on_step
-            )
-
-        else:
-            # Start fresh optimization
-            result = gp_minimize(
-                objective,
-                self.space,
-                n_calls=self.n_calls,
-                random_state=self.config.analysis.random_seed,
-                verbose=True,
-                callback=self._on_step
-            )
-        
-        # Save the final results
-        dump(result, self.results_path, store_objective=False)
-        
-        # Get best parameters
-        best_params = {}
-        for key, val in zip([dim.name for dim in self.space], result.x):
-
-            if isinstance(val, (np.integer, np.int32, np.int64)):
-                best_params[key] = int(val)
-            elif isinstance(val, (np.floating, np.float32, np.float64)):
-                best_params[key] = float(val)
-            else:
-                best_params[key] = val
-
-        # best_params = dict(zip([dim.name for dim in self.space], result.x))
-        print("\nBest parameters found:")
-        print(json.dumps(best_params, indent=2))
-        print(f"Best F1 score: {-result.fun:.4f}")  # Negative because we're minimizing
-        
-        # Generate and save plots
-        self._save_optimization_plots(result)
-
-        return best_params
-
-
-    def _objective(self, params):
-        """Objective function to minimize (negative F1 score)"""
-        # Convert any NumPy types to native Python types for JSON serialization
-
-
-
-        param_hash = hash(frozenset(params.items())) & 0xFFFFFFFF
-        derived_seed = (self.random_seed + param_hash) & 0xFFFFFFFF
-
-        # Set seeds for this evaluation
-        set_seed(derived_seed)
-        np.random.seed(derived_seed)
-        random.seed(derived_seed)
-
-
-        printable_params = {}
-        for key, value in params.items():
-            if isinstance(value, (np.integer, np.int32, np.int64)):
-                printable_params[key] = int(value)
-            elif isinstance(value, (np.floating, np.float32, np.float64)):
-                printable_params[key] = float(value)
-            else:
-                printable_params[key] = value
-        
-        print(f"\n{'='*20} Testing parameters: {'='*20}")
-        print(json.dumps(printable_params, indent=2))
-        
-        # Set the parameters on the model (using original values)
-        self._set_params(params)
-
-        set_seed(self.config.analysis.random_seed)
-        np.random.seed(self.config.analysis.random_seed)
-        random.seed(self.config.analysis.random_seed)
-        
-        # Run a small LOOCV with current parameters
-        start_time = time.time()
-
-        self.lstm_model.build_model() # progress_callback
-
-        self.sequences = self.lstm_model.build_sequences(self.df) #, progress_callback
-
-        # print("!!!!!!!!!!!!!!!!!!!!!!!!!!",self.lstm_model.sequence_length)
-
-        # Use fewer CV splits for speed
-        cows_per_fold = self.config.analysis.lstm.cows_per_cv_fold
-        
-        if self.config.analysis.mode == "LOOCV":
-            _, _ = self.lstm_model.do_loocv(
-                sequences=self.sequences, 
-                df=self.df, 
-                n=cows_per_fold, 
-                compute_metrics_only=self.config.analysis.lstm.bayes_opt_fast_eval
-            )
-        else:  # PRODUCT mode
-            _, _ = self.lstm_model.dont_do_loocv(
-                sequences=self.sequences, 
-                df=self.df
-            )
-            
-        elapsed_time = time.time() - start_time
-        
-        # Get the accuracy
-        # score = self.lstm_model.last_accuracy
-        # Get the negative F1 score (we want to maximize F1, but gp_minimize minimizes)
-        score = -self.lstm_model.last_f1_score
-        
-        # Store result with Python native types
-        result = {
-            'params': printable_params,
-            'accuracy': float(self.lstm_model.last_accuracy),
-            'f1_score': float(self.lstm_model.last_f1_score),
-            'class_accuracies': {k: float(v) for k, v in self.lstm_model.last_class_accuracies.items()},
-            'elapsed_time': float(elapsed_time)
-        }
-        self.results.append(result)
-        
-        print(f"F1 Score: {self.lstm_model.last_f1_score:.4f}, Accuracy: {self.lstm_model.last_accuracy:.4f}")
-        print(f"Class accuracies: {self.lstm_model.last_class_accuracies}")
-        print(f"Evaluation time: {elapsed_time:.1f} seconds")
-        
-        return score
-
-    def _on_step(self, res):
-        """Callback function called after each iteration"""
-        # Save intermediate results
-        try:
-            dump(res, self.results_path, store_objective=False)
-        except Exception as e:
-            print(f"Warning: Could not save intermediate results: {e}")
-        
-        # Print current best with proper type conversion
-        print(f"Current best F1 score: {-res.fun:.4f} with parameters: ")
-        best_params = {}
-        for i, dim in enumerate(self.space):
-            value = res.x[i]
-            if isinstance(value, (np.integer, np.int32, np.int64)):
-                best_params[dim.name] = int(value)
-            elif isinstance(value, (np.floating, np.float32, np.float64)):
-                best_params[dim.name] = float(value) 
-            else:
-                best_params[dim.name] = value
-        
-        try:
-            print(json.dumps(best_params, indent=2))
-        except TypeError as e:
-            print(f"Warning: Could not print parameters as JSON: {e}")
-            print(f"Parameters: {best_params}")
-
-
-
-    def _set_params(self, params):
-        """Set hyperparameters on the LSTM model"""
-        # Assign parameters to the model
-        for param_name, param_value in params.items():
-            setattr(self.lstm_model, param_name, param_value)
-            
-            # Special case for max_length which also needs to update sequence_length
-            if param_name == 'max_length':
-                self.lstm_model.sequence_length = param_value
-    
-
-
-    def _save_optimization_plots(self, result):
-        """Save optimization visualization plots"""
-        print(f"Saving plots to `{self.output_dir}`")
-        # Plot convergence
-        plt.figure(figsize=(10, 6))
-        plot_convergence(result)
-        plt.savefig(self.output_dir / "bayes_opt_convergence.png", dpi=300)
-        plt.close()
-        
-        # Plot individual parameter effects (partial dependence)
-        # fig, ax = plt.subplots(3, 3, figsize=(15, 12))
-        plot_objective(result,dimensions=self.param_labels) #, dimensions=range(len(self.space))
-        plt.tight_layout()
-        plt.savefig(self.output_dir / "bayes_opt_parameters.png", dpi=300)
-        plt.close()
-
-class HyperparamSearch:
-    """Hyperparameter search for LSTM models"""
-    
-    def __init__(self, config):
-        self.config = config
-        self.results = []
-        
-        # Define hyperparameter grid
-        self.param_grid = {
-            'max_length': [10, 20, 30, 40] if not config.analysis.lstm.ops else [20],
-            'epochs': [1000],  # Keep fixed to save time, rely on early stopping
-            'batch_size': [8, 16],
-            'initial_lr': [1e-4, 5e-4],
-            'decay_steps': [1000, 5000],
-            'decay_rate': [0.75, 0.85],
-            'clipnorm': [0.5, 1.0],
-            'patience': [10, 20, 40],
-            'min_delta': [1e-6],
-            'reg_val': [1e-5, 1e-6],
-            # Add more parameters as needed
-        }
-        
-        # For quick testing, use a small subset
-        if config.analysis.lstm.hyperparams_sample:
-            # Randomly sample a smaller grid for testing
-            self.param_combinations = self._sample_params(400)  # Test 5 random combinations
-        else:
-            # Generate all combinations (warning: could be a lot!)
-            keys = list(self.param_grid.keys())
-            values = list(itertools.product(*[self.param_grid[key] for key in keys]))
-            self.param_combinations = [dict(zip(keys, v)) for v in values]
-            print(f"Generated {len(self.param_combinations)} parameter combinations")
-
-    def _sample_params(self, n_samples):
-        """Randomly sample n_samples parameter combinations"""
-        sampled_params = []
-        for _ in range(n_samples):
-            params = {}
-            for key, values in self.param_grid.items():
-                params[key] = random.choice(values)
-            sampled_params.append(params)
-        return sampled_params
-        
-    def run_search(self, lstm_model, sequences, df):
-        """Run hyperparameter search"""
-        for i, params in enumerate(self.param_combinations):
-            print(f"\n{'='*30} Testing hyperparameter set {i+1}/{len(self.param_combinations)} {'='*30}")
-            print(json.dumps(params, indent=2))
-            
-            # Set the parameters
-            self._set_params(lstm_model, params)
-            
-            # Run LOOCV with current parameters
-            start_time = time.time()
-            if self.config.analysis.mode == "LOOCV":
-                models, histories = lstm_model.do_loocv(sequences=sequences, df=df, n=6)  # Use fewer splits for speed
-            else:  # PRODUCT mode
-                models, histories = lstm_model.dont_do_loocv(sequences=sequences, df=df)
-                
-            elapsed_time = time.time() - start_time
-            
-            # Store results
-            result = {
-                'params': params,
-                'accuracy': lstm_model.last_accuracy,
-                'f1_score': lstm_model.last_f1_score,
-                'class_accuracies': lstm_model.last_class_accuracies,
-                'elapsed_time': elapsed_time
-            }
-            self.results.append(result)
-            
-            # Save intermediate results
-            self._save_results()
-            
-        # Sort and print final results
-        self._print_best_results()
-        return self.results
-        
-    def _set_params(self, lstm_model, params):
-        """Set hyperparameters on the LSTM model"""
-        # Assign parameters to the model
-        lstm_model.sequence_length = params['max_length']
-        lstm_model.config.analysis.lstm.epochs = params['epochs']
-        lstm_model.batch_size = params['batch_size']
-        lstm_model.initial_lr = params['initial_lr']
-        lstm_model.decay_steps = params['decay_steps']
-        lstm_model.decay_rate = params['decay_rate']
-        lstm_model.clipnorm = params['clipnorm']
-        lstm_model.patience = params['patience']
-        lstm_model.min_delta = params['min_delta']
-        lstm_model.reg_val = params['reg_val']
-        
-    def _save_results(self):
-        """Save current results to file"""
-        output_dir = Path(self.output_dir)
-
-        io_type = 'ops' if self.config.analysis.lstm.ops else 'opo'
-        results_file = output_dir / io_type / "hyperparam_search_results.json"
-        
-        # Sort results by validation accuracy
-        sorted_results = sorted(self.results, key=lambda x: x['f1_score'], reverse=True)
-        
-        with open(results_file, 'w') as f:
-            json.dump({
-                'results': sorted_results,
-                'best_params': sorted_results[0]['params'] if sorted_results else None
-            }, f, indent=2)
-            
-    def _print_best_results(self):
-        """Print the best hyperparameter combinations"""
-        # Sort by validation accuracy
-        sorted_results = sorted(self.results, key=lambda x: x['f1_score'], reverse=True)
-        
-        print("\n===== HYPERPARAMETER SEARCH RESULTS =====")
-        print(f"Total combinations tested: {len(self.results)}")
-        
-        if sorted_results:
-            print("\nTop 3 configurations:")
-            for i, result in enumerate(sorted_results[:3]):
-                print(f"\n{i+1}. F1 Score: {result['f1_score']:.4f}, Accuracy: {result['accuracy']:.4f}")
-                print(f"   Class accuracies: {result['class_accuracies']}")
-                print(f"   Time: {result['elapsed_time']:.1f} seconds")
-                print("   Parameters:")
-                for k, v in result['params'].items():
-                    print(f"     {k}: {v}")
-
-@keras.saving.register_keras_serializable()
-class MaskedConv1D(tf.keras.layers.Conv1D):
-    def compute_mask(self, inputs, mask=None):
-        # preserve the time-step mask (True = valid) 
-        return mask
-    def call(self, inputs, mask=None):
-        out = super().call(inputs)
-        if mask is not None:
-            # zero out conv outputs at masked positions
-            out *= tf.cast(tf.expand_dims(mask, -1), out.dtype)
-        return out
+# from skopt import gp_minimize
+# from skopt.space import Real, Integer #, Categorical
+# # from skopt.utils import use_named_args
+# from skopt.plots import plot_convergence, plot_objective
+# from skopt import dump, load
+# import os
 
 class LSTM_Model:
 
@@ -516,6 +88,8 @@ class LSTM_Model:
         self.activity_map = {}
         for idx, state in enumerate(self.config.analysis.lstm.states):# 
             self.activity_map[state] = idx
+
+        # print(self.activity_map)
         # {"Grazing": 0, "Resting":1, "Traveling": 2, np.nan:-1}
         self.UNLABELED_VALUE = -1
 
@@ -697,6 +271,13 @@ class LSTM_Model:
     def _build_opo_architecture(self):
         """Build model architecture for one-per-sequence"""
         self.layers.extend([
+            LSTM(64, 
+                return_sequences=True,
+                recurrent_dropout=self.dropout_rate,
+                dropout=self.dropout_rate,
+                kernel_regularizer=L2(self.reg_val),
+                recurrent_regularizer=L2(self.reg_val)
+                ),
             LSTM(32, 
                 return_sequences=True,
                 recurrent_dropout=self.dropout_rate,
@@ -1491,7 +1072,8 @@ class LSTM_Model:
                 count = result['class_counts'].get(class_name, 0)
                 f1 = result['class_f1'].get(class_name,np.nan)
                 print(f"    Class {class_name} | accuracy: {acc:.4f} | f1: {f1:.4f} | (n={count})")
-            print(result['confusion_matrix'])
+            for i in range(len(result['confusion_matrix'])):
+                print(" | ".join([f"{x:<2}" for x in result['confusion_matrix'][i]]))
             print(f"{'-'*182}")
         
         # Calculate overall metrics
@@ -1522,6 +1104,11 @@ class LSTM_Model:
         else:
             flat_actual = test_Y
             flat_pred = pred_y_classes
+
+        # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        # for i in range(len(flat_pred)):
+        #     print(flat_pred[i], flat_actual[i])
+
         
         # Only evaluate on valid data points
         valid_indices = flat_actual != self.UNLABELED_VALUE
@@ -1547,15 +1134,12 @@ class LSTM_Model:
                 class_counts[class_name] = int(np.sum(class_mask))
         
         # Confusion matrix - create it from flattened arrays
-        # try:
         cm = confusion_matrix(
             valid_actual, 
             valid_pred,
             labels=sorted([v for k,v in self.activity_map.items() if k is not np.nan])
         ).tolist()  # Convert to list for serialization
 
-        # except Exception as e:
-        #     cm = f"Error generating confusion matrix: {e}"
         
         # print(class_f1)
         # Return a dictionary of results
@@ -1573,6 +1157,198 @@ class LSTM_Model:
 
 
 
+    # def _make_LSTM(self, train_X, train_Y, test_X, test_Y, progress_callback=None):
+    #     """Build and train LSTM model with improved handling of imbalanced data
+        
+    #     Parameters:
+    #     -----------
+    #     train_X, train_Y: Training data
+    #     test_X, test_Y: Test data
+    #     Returns:
+    #     --------
+    #     model, history, pred_final
+    #     """
+    #     if progress_callback is None:
+    #         progress_callback = lambda percent, message: None
+        
+    #     progress_callback(73, "Building and compiling LSTM model")
+        
+    #     ops_mode = len(train_Y.shape) == 1
+            
+    #     n_epochs = self.config.analysis.lstm.epochs
+
+    #     model = Sequential(self.layers)
+    #     # learning rate schedule
+
+    #     lr_schedule = ExponentialDecay(
+    #         self.initial_lr,
+    #         decay_steps=self.decay_steps,
+    #         decay_rate=self.decay_steps
+    #     )
+
+    #     optimizer = Adam(learning_rate=lr_schedule, clipnorm=self.clipnorm)
+
+
+    #     model.compile(
+    #         optimizer=optimizer,
+    #         loss='sparse_categorical_crossentropy',
+    #         metrics=['accuracy']
+    #     )
+    #     # model.summary()
+        
+    #     if ops_mode:
+    #         flat_labels = train_Y[train_Y != self.UNLABELED_VALUE]
+    #     else:
+    #         flat_labels = train_Y[train_Y != self.UNLABELED_VALUE].flatten()
+
+
+    #     present = np.unique(flat_labels)
+    #     class_counts = np.bincount(flat_labels.astype(int))[present]
+    #     total = np.sum(class_counts)
+
+    #     class_weights = total / (class_counts * len(present))
+    #     class_weights = class_weights / np.min(class_weights)  # Normalize
+        
+    #     # Create weight array and mapping
+    #     cw_dict_present = dict(zip(present, class_weights))
+    #     cw_arr = np.ones(self.nclasses, dtype='float32')
+
+    #     for cls, w in cw_dict_present.items():
+    #         cw_arr[cls] = w
+        
+    #     # Create mask for labeled data and placeholder for unlabeled
+    #     mask = (train_Y != self.UNLABELED_VALUE).astype('float32')
+
+
+    #     if ops_mode:
+    #         sw = mask * np.vectorize(lambda x: cw_arr[x] if x != self.UNLABELED_VALUE else 0)(train_Y)
+    #     else:
+    #         # For 2D array, we need a different approach
+    #         sw = np.zeros_like(train_Y, dtype=float)
+    #         for i in range(len(train_Y)):
+    #             for j in range(len(train_Y[i])):
+    #                 if train_Y[i, j] != self.UNLABELED_VALUE:
+    #                     sw[i, j] = cw_arr[train_Y[i, j]]
+        
+
+    #     # train_Y_clipped = np.where(train_Y == self.UNLABELED_VALUE, 0, train_Y)  # Use class 0 as placeholder
+        
+    #     # Compute sample weights - 0 weight for unlabeled data
+    #     # sw = mask * cw_arr[train_Y_clipped]
+        
+    #     # Print diagnostic information
+    #     # n_total_labels = np.sum(train_Y != self.UNLABELED_VALUE)
+    #     # print(f"Total labeled examples: {n_total_labels}")
+        
+    #     # for i in range(self.nclasses):
+    #     #     n_class = np.sum(train_Y == i)
+    #     #     if n_total_labels > 0:
+    #     #         pct = (n_class / n_total_labels) * 100
+    #     #     else:
+    #     #         pct = 0
+    #     #     print(f"Class {i} ({self.inv_activity_map.get(i, 'Unknown')}): {n_class} examples ({pct:.2f}%)")
+        
+
+    #     validation_method = self.config.analysis.lstm.validation_method
+    #     test_size = self.config.analysis.lstm.validation_size
+        
+    #     # Create sequence IDs if needed for sequence-aware methods
+    #     if validation_method != "random":
+    #         sequence_ids = get_sequence_ids(train_X, train_Y)    
+    #     # Perform the validation split
+    #     if validation_method == "sequence_aware":
+    #         x_train, x_valid, y_train, y_valid, sw_train, sw_valid = sequence_aware_validation_split(
+    #             train_X, train_Y, sw, sequence_ids, self.UNLABELED_VALUE, test_size
+    #         )
+    #     elif validation_method == "interleaved":
+    #         x_train, x_valid, y_train, y_valid, sw_train, sw_valid = interleaved_validation_split(
+    #             train_X, train_Y, sw, sequence_ids, self.UNLABELED_VALUE
+    #         )
+    #     elif validation_method == "balanced_class":
+    #         x_train, x_valid, y_train, y_valid, sw_train, sw_valid = balanced_class_validation_split(
+    #             train_X, train_Y, sw, sequence_ids, self.UNLABELED_VALUE, test_size
+    #         )
+    #     elif validation_method == "stratified":
+    #         x_train, x_valid, y_train, y_valid, sw_train, sw_valid = stratified_sequence_split(
+    #             train_X, train_Y, sw, sequence_ids, self.UNLABELED_VALUE, test_size
+    #         )
+    #     else:  # Default to random
+    #         x_train, x_valid, y_train, y_valid, sw_train, sw_valid = random_validation_split(
+    #             train_X, train_Y, sw, test_size, self.config.analysis.random_seed
+    #         )
+    
+    #     y_train_clipped = np.where(y_train == self.UNLABELED_VALUE, 0, y_train)
+    #     y_valid_clipped = np.where(y_valid == self.UNLABELED_VALUE, 0, y_valid)
+
+    #     history = model.fit(
+    #         x_train,
+    #         y_train_clipped,
+    #         validation_data=(x_valid, y_valid_clipped, sw_valid),
+    #         sample_weight=sw_train,
+    #         epochs=n_epochs,
+    #         batch_size=self.batch_size,
+    #         callbacks=[
+    #             EarlyStopping(
+    #                 monitor='val_loss',
+    #                 patience=self.patience,
+    #                 restore_best_weights=True,
+    #                 min_delta=self.min_delta     # More sensitive to improvements
+    #             ),
+    #             # ReduceLROnPlateau(
+    #             #     monitor='val_loss',
+    #             #     factor=0.05,
+    #             #     patience=10,
+    #             #     min_lr=0.00001
+    #             # ),
+    #         ],
+    #         verbose=0
+    #     )
+
+
+    #     test_Y_clipped = np.where(test_Y == self.UNLABELED_VALUE, 0, test_Y)
+
+    #     progress_callback(90, "Generating predictions")
+    #     pred_y = model.predict(test_X, verbose=0)
+        
+    #     if ops_mode: 
+    #         pred_y_classes = np.argmax(pred_y, axis=1)  # Use axis=1 since we flattened
+    #     else:
+    #         pred_y_classes = np.argmax(pred_y, axis=2)
+        
+
+    #     progress_callback(95, "Calculating performance metrics")
+    #     valid_indices = test_Y > self.UNLABELED_VALUE
+    #     self.last_accuracy = np.mean(pred_y_classes[valid_indices] == test_Y[valid_indices])
+        
+    #     # Calculate F1 score (better metric for imbalanced classes)
+    #     if np.any(valid_indices):
+    #         try:
+    #             self.last_f1_score = f1_score(
+    #                 test_Y[valid_indices], 
+    #                 pred_y_classes[valid_indices],
+    #                 average='micro'
+    #             )
+    #         except Exception as e:
+    #             print(f"Error calculating F1 score: {e}")
+    #             self.last_f1_score = 0
+                
+    #     # Store class accuracies
+    #     self.last_class_accuracies = {}
+    #     for class_idx in np.unique(test_Y):
+    #         if class_idx == self.UNLABELED_VALUE:
+    #             continue
+    #         class_mask = (test_Y == class_idx)
+    #         if np.sum(class_mask) > 0:
+    #             class_acc = np.mean(pred_y_classes[class_mask] == class_idx)
+    #             class_name = self.inv_activity_map.get(class_idx, f"Unknown ({class_idx})")
+    #             self.last_class_accuracies[class_name] = float(class_acc)
+        
+    #     return model, history, pred_y_classes
+
+
+
+
+
     def _make_LSTM(self, train_X, train_Y, test_X, test_Y, progress_callback=None):
         """Build and train LSTM model with improved handling of imbalanced data
         
@@ -1583,13 +1359,14 @@ class LSTM_Model:
         Returns:
         --------
         model, history, pred_final
-        """
+        """        
         if progress_callback is None:
             progress_callback = lambda percent, message: None
         
         progress_callback(73, "Building and compiling LSTM model")
         
-        ops = len(train_Y.shape) == 1
+        # Determine if we're in OPS mode (one prediction per sequence) or OPO mode (one prediction per observation)
+        ops_mode = len(train_Y.shape) == 1
             
         n_epochs = self.config.analysis.lstm.epochs
 
@@ -1598,122 +1375,228 @@ class LSTM_Model:
 
         lr_schedule = ExponentialDecay(
             self.initial_lr,
-            decay_steps=self.decay_steps, #2000
-            decay_rate=self.decay_steps # 1.5
+            decay_steps=self.decay_steps,
+            decay_rate=self.decay_steps
         )
 
-        optimizer = Adam(
-            learning_rate=lr_schedule,
-            clipnorm=self.clipnorm,  # Clip gradients to prevent explosions
-            # clipvalue=0.5
-        )
-
-
+        optimizer = Adam(learning_rate=lr_schedule, clipnorm=self.clipnorm)
+        
         model.compile(
             optimizer=optimizer,
-            # loss=SparseCategoricalCrossentropy(),
             loss='sparse_categorical_crossentropy',
-            # loss=weighted_categorical_focal_loss(gamma=2.0),
-            metrics=['accuracy'],
-            # metrics=[metrics.F1Score(name="f1", average="macro"), "accuracy"],
-            # metrics=[metrics.F1Score(name="f1", average="micro")],
-            
-            # metrics=[masked_sparse_categorical_accuracy],
+            metrics=['accuracy']  # Include both metrics for comparison
         )
-        
-        # model.summary()
 
-        flat_labels = train_Y[train_Y != -1].ravel()
+        # model.compile(
+        #     optimizer=optimizer,
+        #     loss=MaskedSparseCategoricalCrossentropy(unlabeled_value=self.UNLABELED_VALUE),
+        #     metrics=[MaskedAccuracy(unlabeled_value=self.UNLABELED_VALUE)]
+        # )
+
+
+        # Calculate class weights from the labeled data
+        if ops_mode:
+            flat_labels = train_Y[train_Y != self.UNLABELED_VALUE]
+        else:
+            flat_labels = train_Y[train_Y != self.UNLABELED_VALUE].flatten()
 
         present = np.unique(flat_labels)
-
         class_counts = np.bincount(flat_labels.astype(int))[present]
         total = np.sum(class_counts)
 
         class_weights = total / (class_counts * len(present))
         class_weights = class_weights / np.min(class_weights)  # Normalize
-        ###
-
-        # Training class weights
+        
+        # Create weight array and mapping
         cw_dict_present = dict(zip(present, class_weights))
         cw_arr = np.ones(self.nclasses, dtype='float32')
 
         for cls, w in cw_dict_present.items():
             cw_arr[cls] = w
-        mask = (train_Y != -1).astype('float32')  # shape (N, T)
-        train_Y_clipped = np.where(train_Y == -1, 0, train_Y)  # replace unlabeled with class 0
+        
+        # Create mask for labeled data and placeholder for unlabeled
+        mask = (train_Y != self.UNLABELED_VALUE).astype('float32')
 
-        sw = (mask * cw_arr[train_Y_clipped])# / (mask.sum(axis=1, keepdims=True) +1e-8)
+        # Compute sample weights - 0 weight for unlabeled data
+        if ops_mode:
+            sw = mask * np.vectorize(lambda x: cw_arr[x] if x != self.UNLABELED_VALUE else 0)(train_Y)
+        else:
+            # For 2D array, we need a different approach
+            sw = np.zeros_like(train_Y, dtype=float)
+            for i in range(len(train_Y)):
+                for j in range(len(train_Y[i])):
+                    if train_Y[i, j] != self.UNLABELED_VALUE:
+                        sw[i, j] = cw_arr[train_Y[i, j]]
+        
 
-        # Make validation and class weights
+        # # Print diagnostic information
+        # n_total_labels = np.sum(train_Y != self.UNLABELED_VALUE)
+        # print(f"Total labeled examples: {n_total_labels}")
+        
+        # for i in range(self.nclasses):
+        #     n_class = np.sum(train_Y == i)
+        #     if n_total_labels > 0:
+        #         pct = (n_class / n_total_labels) * 100
+        #     else:
+        #         pct = 0
+        #     print(f"Class {i} ({self.inv_activity_map.get(i, 'Unknown')}): {n_class} examples ({pct:.2f}%)")
+        
 
-        val_split = 0.3
-    
+        validation_method = getattr(self.config.analysis.lstm, "validation_method", "random")
+        test_size = getattr(self.config.analysis.lstm, "validation_size", 0.3)
+        
+        progress_callback(75, f"Performing {validation_method} validation split")
+        
+        # Create sequence IDs if needed for sequence-aware methods
+        if validation_method != "random":
+            sequence_ids = get_sequence_ids(train_X, train_Y)
+        
+        # Perform the validation split with original labels (including UNLABELED_VALUE)
+        if validation_method == "sequence_aware":
+            x_train, x_valid, y_train, y_valid, sw_train, sw_valid = sequence_aware_validation_split(
+                train_X, train_Y, sw, sequence_ids, self.UNLABELED_VALUE, test_size
+            )
+        elif validation_method == "interleaved":
+            x_train, x_valid, y_train, y_valid, sw_train, sw_valid = interleaved_validation_split(
+                train_X, train_Y, sw, sequence_ids, self.UNLABELED_VALUE
+            )
+        elif validation_method == "balanced_class":
+            x_train, x_valid, y_train, y_valid, sw_train, sw_valid = balanced_class_validation_split(
+                train_X, train_Y, sw, sequence_ids, self.UNLABELED_VALUE, test_size
+            )
+        elif validation_method == "stratified":
+            x_train, x_valid, y_train, y_valid, sw_train, sw_valid = stratified_sequence_split(
+                train_X, train_Y, sw, sequence_ids, self.UNLABELED_VALUE, test_size
+            )
+        else:  # Default to random
+            x_train, x_valid, y_train, y_valid, sw_train, sw_valid = random_validation_split(
+                train_X, train_Y, sw, test_size, self.config.analysis.random_seed
+            )
+        
+        # Now convert the unlabeled values to 0 for model training
+        y_train_clipped = np.where(y_train == self.UNLABELED_VALUE, 0, y_train)
+        y_valid_clipped = np.where(y_valid == self.UNLABELED_VALUE, 0, y_valid)
+        
+
+        labeled_metrics_callback = LabeledDataMetricsCallback(
+            validation_data=(x_valid, y_valid),  # Pass original validation data with unlabeled values
+            unlabeled_value=self.UNLABELED_VALUE
+        )
+
+        # Train the model
+        progress_callback(80, "Training LSTM model")
         history = model.fit(
-            train_X,
-            train_Y_clipped,
-            # validation_data=(val_X,val_Y,val_sw),
-            validation_split=val_split,
-            sample_weight=sw,
-
-            # class_weight=class_weight_dict if ops else None,
-            # # sample_weight=valid_idx,
-            # sample_weight = None if ops else sw,
+            x_train,
+            y_train_clipped,  # Use clipped version for training
+            validation_data=(x_valid, y_valid_clipped, sw_valid),  # Use clipped version for validation
+            sample_weight=sw_train,
             epochs=n_epochs,
             batch_size=self.batch_size,
             callbacks=[
                 EarlyStopping(
-                    monitor='val_loss',
+                    monitor='val_accuracy',  # Use our custom metric for early stopping
                     patience=self.patience,
                     restore_best_weights=True,
-                    min_delta=self.min_delta     # More sensitive to improvements
+                    min_delta=self.min_delta,
+                    mode='max'
                 ),
-                # ReduceLROnPlateau(
-                #     monitor='val_loss',
-                #     factor=0.05,
-                #     patience=10,
-                #     min_lr=0.00001
-                # ),
+                labeled_metrics_callback
             ],
             verbose=0
         )
 
+        # For prediction, we also need to clip the unlabeled values in test data
+        test_Y_clipped = np.where(test_Y == self.UNLABELED_VALUE, 0, test_Y)
+        
+        # Generate predictions
+        progress_callback(90, "Generating predictions")
         pred_y = model.predict(test_X, verbose=0)
         
-        if ops: 
+        if ops_mode: 
             pred_y_classes = np.argmax(pred_y, axis=1)  # Use axis=1 since we flattened
         else:
             pred_y_classes = np.argmax(pred_y, axis=2)
         
-
-        # Gridsearch Code
-        # Calculate metrics for later use in hyperparameter search
-        valid_indices = test_Y > -1
-        self.last_accuracy = np.mean(pred_y_classes[valid_indices] == test_Y[valid_indices])
+        # Calculate metrics for evaluation using the original test_Y with unlabeled values
+        # progress_callback(95, "Calculating performance metrics")
+        # valid_indices = test_Y != self.UNLABELED_VALUE
+        # self.last_accuracy = np.mean(pred_y_classes[valid_indices] == test_Y[valid_indices])
         
-        # Calculate F1 score (better metric for imbalanced classes)
-        if np.any(valid_indices):
-            try:
-                self.last_f1_score = f1_score(
-                    test_Y[valid_indices], 
-                    pred_y_classes[valid_indices],
-                    average='macro'
-                )
-            except:
-                self.last_f1_score = 0
+        # # Calculate F1 score
+        # if np.any(valid_indices):
+        #     try:
+        #         self.last_f1_score = f1_score(
+        #             test_Y[valid_indices], 
+        #             pred_y_classes[valid_indices],
+        #             average='micro',
+        #             labels=sorted([v for k,v in self.activity_map.items() if k is not np.nan])
+        #         )
+        #     except Exception as e:
+        #         print(f"Error calculating F1 score: {e}")
+        #         self.last_f1_score = 0
                 
-        # Store class accuracies
-        self.last_class_accuracies = {}
-        for class_idx in np.unique(test_Y):
-            if class_idx == -1:
-                continue
-            class_mask = (test_Y == class_idx)
-            if np.sum(class_mask) > 0:
-                class_acc = np.mean(pred_y_classes[class_mask] == class_idx)
-                class_name = self.inv_activity_map.get(class_idx, f"Unknown ({class_idx})")
-                self.last_class_accuracies[class_name] = float(class_acc)
+        # # Store class accuracies
+        # self.last_class_accuracies = {}
+        # for class_idx in np.unique(test_Y):
+        #     if class_idx == self.UNLABELED_VALUE:
+        #         continue
+        #     class_mask = (test_Y == class_idx)
+        #     if np.sum(class_mask) > 0:
+        #         class_acc = np.mean(pred_y_classes[class_mask] == class_idx)
+        #         class_name = self.inv_activity_map.get(class_idx, f"Unknown ({class_idx})")
+        #         self.last_class_accuracies[class_name] = float(class_acc)
         
+
+
+        # Merge the custom callback history with the model history
+        history_dict = history.history.copy()
+        for key, value in labeled_metrics_callback.history.items():
+            history_dict[key] = value
+
+
+        progress_callback(100, "LSTM model training complete")
         return model, history, pred_y_classes
+
+
+
+
+
+    # def _plot_single_history(self, history):
+    #     """Plot training history for a single model"""
+    #     plt.figure(figsize=(12, 4))
+        
+    #     # Plot Loss
+    #     plt.subplot(1, 2, 1)
+    #     plt.plot(history.history['loss'], 'b-', label='Training Loss')
+    #     if 'val_loss' in history.history:
+    #         plt.plot(history.history['val_loss'], 'r-', label='Validation Loss')
+    #     plt.title('Loss')
+    #     plt.xlabel('Epoch')
+    #     plt.ylabel('Loss')
+    #     plt.legend()
+        
+    #     # Plot Accuracy
+    #     plt.subplot(1, 2, 2)
+    #     plt.plot(history.history['accuracy'], 'b-', label='Training Accuracy')
+    #     if 'val_accuracy' in history.history:
+    #         plt.plot(history.history['val_accuracy'], 'r-', label='Validation Accuracy')
+    #     plt.title('Accuracy')
+    #     plt.xlabel('Epoch')
+    #     plt.ylabel('Accuracy')
+    #     plt.legend()
+        
+
+    #     plt.savefig(self.model_path / "lstm_global_history.png", dpi=300)
+    #     plt.close()
+        
+    #     # Print final metrics
+    #     print("\nTraining Summary:")
+    #     print(f"Final Training Loss: {history.history['loss'][-1]:.4f}")
+    #     print(f"Final Training Accuracy: {history.history['accuracy'][-1]:.4f}")
+    #     if 'val_loss' in history.history:
+    #         print(f"Final Validation Loss: {history.history['val_loss'][-1]:.4f}")
+    #         print(f"Final Validation Accuracy: {history.history['val_accuracy'][-1]:.4f}")
+
 
 
 
@@ -1732,24 +1615,34 @@ class LSTM_Model:
         plt.ylabel('Loss')
         plt.legend()
         
-        # Plot Accuracy
+        # Plot Accuracy - prefer labeled_accuracy if available
         plt.subplot(1, 2, 2)
-        plt.plot(history.history['accuracy'], 'b-', label='Training Accuracy')
+        if 'labeled_accuracy' in history.history:
+            plt.plot(history.history['accuracy'], 'b--', alpha=0.5, label='Raw Training Accuracy')
+            plt.plot(history.history['labeled_accuracy'], 'b-', label='Labeled Data Accuracy')
+        else:
+            plt.plot(history.history['accuracy'], 'b-', label='Training Accuracy')
+            
         if 'val_accuracy' in history.history:
             plt.plot(history.history['val_accuracy'], 'r-', label='Validation Accuracy')
+            
         plt.title('Accuracy')
         plt.xlabel('Epoch')
         plt.ylabel('Accuracy')
         plt.legend()
         
-
         plt.savefig(self.model_path / "lstm_global_history.png", dpi=300)
         plt.close()
         
         # Print final metrics
         print("\nTraining Summary:")
         print(f"Final Training Loss: {history.history['loss'][-1]:.4f}")
-        print(f"Final Training Accuracy: {history.history['accuracy'][-1]:.4f}")
+        
+        if 'labeled_accuracy' in history.history:
+            print(f"Final Training Accuracy (labeled data only): {history.history['labeled_accuracy'][-1]:.4f}")
+        else:
+            print(f"Final Training Accuracy: {history.history['accuracy'][-1]:.4f}")
+            
         if 'val_loss' in history.history:
             print(f"Final Validation Loss: {history.history['val_loss'][-1]:.4f}")
             print(f"Final Validation Accuracy: {history.history['val_accuracy'][-1]:.4f}")
@@ -1776,7 +1669,7 @@ class LSTM_Model:
             self.last_f1_score = f1_score(
                 valid_actual, 
                 valid_pred,
-                average='macro',
+                average='micro',
                 labels=sorted([v for k,v in self.activity_map.items() if k is not np.nan])
             )
         except Exception as e:
@@ -1865,20 +1758,134 @@ class LSTM_Model:
                     f.write(f"{class_name}: {class_acc:.4f} (n={np.sum(class_mask)})\n")
 
 
-    def _plot_training_histories(self, histories):
-        """Plot training histories across all folds"""
-        plt.figure(figsize=(12, 4))
+    # def _plot_training_histories(self, histories):
+    #     """Plot training histories across all folds"""
+    #     plt.figure(figsize=(12, 4))
                 
-        metric_name = 'accuracy'
-        val_metric_name = 'val_' + metric_name
+    #     # Use consistent metric names based on what's available in the history
+    #     metric_name = 'masked_accuracy'
+    #     val_metric_name = 'val_masked_accuracy'
+        
+    #     # Check if we need to fall back to regular accuracy metrics
+    #     if not all(metric_name in h.history for h in histories):
+    #         metric_name = 'accuracy'
+    #         val_metric_name = 'val_accuracy'
 
+    #     # Find max length of histories
+    #     max_epochs = max(len(h.history['loss']) for h in histories)
+        
+    #     # Initialize arrays for mean and std calculations
+    #     losses = np.zeros((len(histories), max_epochs))
+    #     accuracies = np.zeros((len(histories), max_epochs))
+    #     val_losses = np.zeros((len(histories), max_epochs))
+    #     val_accuracies = np.zeros((len(histories), max_epochs))
+        
+    #     # Fill arrays with padding
+    #     for i, h in enumerate(histories):
+    #         # Pad or truncate loss
+    #         curr_len = len(h.history['loss'])
+    #         losses[i, :curr_len] = h.history['loss']
+    #         losses[i, curr_len:] = h.history['loss'][-1]  # Pad with last value
+            
+    #         # Pad or truncate val_loss if it exists
+    #         if 'val_loss' in h.history:
+    #             val_curr_len = len(h.history['val_loss'])
+    #             val_losses[i, :val_curr_len] = h.history['val_loss']
+    #             val_losses[i, val_curr_len:] = h.history['val_loss'][-1]
+            
+    #         # Pad or truncate accuracy metrics
+    #         curr = h.history[metric_name]
+    #         accuracies[i, :len(curr)] = curr
+    #         accuracies[i, len(curr):] = curr[-1]
+            
+    #         # Pad or truncate validation accuracy if it exists
+    #         if val_metric_name in h.history:
+    #             val_curr = h.history[val_metric_name]
+    #             val_accuracies[i, :len(val_curr)] = val_curr
+    #             val_accuracies[i, len(val_curr):] = val_curr[-1]
+        
+    #     # Plot Loss
+    #     plt.subplot(1, 2, 1)
+    #     epochs = range(1, max_epochs + 1)
+        
+    #     # Plot individual histories
+    #     for i in range(len(histories)):
+    #         plt.plot(epochs[:len(histories[i].history['loss'])], 
+    #                 histories[i].history['loss'], 
+    #                 'b-', alpha=0.1)
+        
+    #     # Plot mean and std
+    #     mean_loss = np.mean(losses, axis=0)
+    #     std_loss = np.std(losses, axis=0)
+    #     plt.plot(epochs, mean_loss, 'b-', label='Mean Train Loss')
+    #     plt.fill_between(epochs, mean_loss-std_loss, mean_loss+std_loss, 
+    #                     color='b', alpha=0.2, label='±1 std')
+        
+    #     # Plot validation loss if available
+    #     if 'val_loss' in histories[0].history:
+    #         mean_val_loss = np.mean(val_losses, axis=0)
+    #         plt.plot(epochs, mean_val_loss, 'r-', label='Mean Val Loss')
+        
+    #     plt.title('Training Loss')
+    #     plt.xlabel('Epoch')
+    #     plt.ylabel('Loss')
+    #     plt.legend()
+        
+    #     # Plot Accuracy
+    #     plt.subplot(1, 2, 2)
+        
+    #     # Plot individual histories
+    #     for i in range(len(histories)):
+    #         plt.plot(epochs[:len(histories[i].history[metric_name])], 
+    #                 histories[i].history[metric_name], 
+    #                 'b-', alpha=0.1)
+        
+    #     # Plot mean and std
+    #     mean_acc = np.mean(accuracies, axis=0)
+    #     std_acc = np.std(accuracies, axis=0)
+    #     plt.plot(epochs, mean_acc, 'b-', label=f'Mean {metric_name.replace("_", " ").title()}')
+    #     plt.fill_between(epochs, mean_acc-std_acc, mean_acc+std_acc, 
+    #                     color='b', alpha=0.2, label='±1 std')
+        
+    #     # Plot validation accuracy if available
+    #     if val_metric_name in histories[0].history:
+    #         mean_val_acc = np.mean(val_accuracies, axis=0)
+    #         plt.plot(epochs, mean_val_acc, 'r-', label=f'Mean {val_metric_name.replace("_", " ").title()}')
+        
+    #     plt.title('Training Accuracy')
+    #     plt.xlabel('Epoch')
+    #     plt.ylabel('Accuracy')
+    #     plt.legend()
+        
+    #     plt.tight_layout()
+    #     plt.savefig(self.cv_path / "lstm_training_history.png", dpi=300)
+    #     plt.close()
+
+
+
+
+    def _plot_training_histories(self, histories):
+        """Plot training histories across all folds with support for custom labeled data metrics"""
+        plt.figure(figsize=(12, 4))
+        
+        # Check which metrics are available in the histories
+        sample_history = histories[0].history
+        has_labeled_metrics = 'labeled_accuracy' in sample_history
+        
         # Find max length of histories
         max_epochs = max(len(h.history['loss']) for h in histories)
         
         # Initialize arrays for mean and std calculations
         losses = np.zeros((len(histories), max_epochs))
+        val_losses = np.zeros((len(histories), max_epochs)) if 'val_loss' in sample_history else None
+        
+        # Initialize accuracy arrays
         accuracies = np.zeros((len(histories), max_epochs))
-        val_accuracies = np.zeros((len(histories), max_epochs))
+        val_accuracies = np.zeros((len(histories), max_epochs)) if 'val_accuracy' in sample_history else None
+        
+        # Initialize labeled accuracy arrays if available
+        if has_labeled_metrics:
+            labeled_accuracies = np.zeros((len(histories), max_epochs))
         
         # Fill arrays with padding
         for i, h in enumerate(histories):
@@ -1887,11 +1894,32 @@ class LSTM_Model:
             losses[i, :curr_len] = h.history['loss']
             losses[i, curr_len:] = h.history['loss'][-1]  # Pad with last value
             
-            curr = h.history[metric_name]
-            accuracies[i, :len(curr)] = curr
-            accuracies[i, len(curr):] = curr[-1]
-            val_accuracies[i, :len(h.history[val_metric_name])] = h.history[val_metric_name]
-            val_accuracies[i, len(h.history[val_metric_name]):] = h.history[val_metric_name][-1]
+            # Pad or truncate val_loss if it exists
+            if 'val_loss' in sample_history and val_losses is not None:
+                val_curr_len = min(len(h.history['val_loss']), max_epochs)
+                val_losses[i, :val_curr_len] = h.history['val_loss'][:val_curr_len]
+                if val_curr_len < max_epochs:
+                    val_losses[i, val_curr_len:] = h.history['val_loss'][-1]
+            
+            # Pad or truncate accuracy metrics
+            curr_len = min(len(h.history['accuracy']), max_epochs)
+            accuracies[i, :curr_len] = h.history['accuracy'][:curr_len]
+            if curr_len < max_epochs:
+                accuracies[i, curr_len:] = h.history['accuracy'][-1]
+            
+            # Pad or truncate validation accuracy if it exists
+            if 'val_accuracy' in sample_history and val_accuracies is not None:
+                val_curr_len = min(len(h.history['val_accuracy']), max_epochs)
+                val_accuracies[i, :val_curr_len] = h.history['val_accuracy'][:val_curr_len]
+                if val_curr_len < max_epochs:
+                    val_accuracies[i, val_curr_len:] = h.history['val_accuracy'][-1]
+            
+            # Pad or truncate labeled accuracy if it exists
+            if has_labeled_metrics:
+                labeled_curr_len = min(len(h.history['labeled_accuracy']), max_epochs)
+                labeled_accuracies[i, :labeled_curr_len] = h.history['labeled_accuracy'][:labeled_curr_len]
+                if labeled_curr_len < max_epochs:
+                    labeled_accuracies[i, labeled_curr_len:] = h.history['labeled_accuracy'][-1]
         
         # Plot Loss
         plt.subplot(1, 2, 1)
@@ -1899,16 +1927,23 @@ class LSTM_Model:
         
         # Plot individual histories
         for i in range(len(histories)):
-            plt.plot(epochs[:len(histories[i].history['loss'])], 
-                    histories[i].history['loss'], 
+            curr_len = min(len(histories[i].history['loss']), max_epochs)
+            plt.plot(epochs[:curr_len], 
+                    histories[i].history['loss'][:curr_len], 
                     'b-', alpha=0.1)
         
         # Plot mean and std
         mean_loss = np.mean(losses, axis=0)
         std_loss = np.std(losses, axis=0)
-        plt.plot(epochs, mean_loss, 'r-', label='Mean Loss')
+        plt.plot(epochs, mean_loss, 'b-', label='Mean Train Loss')
         plt.fill_between(epochs, mean_loss-std_loss, mean_loss+std_loss, 
-                        color='r', alpha=0.2, label='±1 std')
+                        color='b', alpha=0.2, label='±1 std')
+        
+        # Plot validation loss if available
+        if val_losses is not None:
+            mean_val_loss = np.mean(val_losses, axis=0)
+            plt.plot(epochs, mean_val_loss, 'r-', label='Mean Val Loss')
+        
         plt.title('Training Loss')
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
@@ -1917,78 +1952,161 @@ class LSTM_Model:
         # Plot Accuracy
         plt.subplot(1, 2, 2)
         
-        # Plot individual histories
+        # Plot regular accuracy metrics
+        # Plot individual history lines
         for i in range(len(histories)):
-            plt.plot(epochs[:len(histories[i].history[metric_name])], 
-                    histories[i].history[metric_name], 
-                    'b-', alpha=0.1)
+            curr_len = min(len(histories[i].history['accuracy']), max_epochs)
+            plt.plot(epochs[:curr_len], 
+                    histories[i].history['accuracy'][:curr_len], 
+                    'b-', alpha=0.1 if has_labeled_metrics else 0.3)
         
-        # Plot mean and std
+        # Plot mean and std for regular accuracy
         mean_acc = np.mean(accuracies, axis=0)
         std_acc = np.std(accuracies, axis=0)
-        mean_val_acc = np.mean(val_accuracies, axis=0)
-
-        plt.plot(epochs, mean_acc, 'r-', label='Mean Accuracy')
-        plt.plot(epochs, mean_val_acc, 'g-', label='Mean Val_Accuracy')
-        plt.fill_between(epochs, mean_acc-std_acc, mean_acc+std_acc, 
-                        color='r', alpha=0.2, label='±1 std')
+        
+        if has_labeled_metrics:
+            # Plot regular accuracy with lower emphasis
+            plt.plot(epochs, mean_acc, 'b--', alpha=0.5, label='Mean Raw Accuracy')
+            
+            # Plot labeled accuracy with higher emphasis
+            for i in range(len(histories)):
+                curr_len = min(len(histories[i].history.get('labeled_accuracy', [])), max_epochs)
+                if curr_len > 0:
+                    plt.plot(epochs[:curr_len], 
+                            histories[i].history['labeled_accuracy'][:curr_len], 
+                            'g-', alpha=0.2)
+            
+            # Plot mean and std for labeled accuracy
+            mean_labeled_acc = np.mean(labeled_accuracies, axis=0)
+            std_labeled_acc = np.std(labeled_accuracies, axis=0)
+            plt.plot(epochs, mean_labeled_acc, 'g-', label='Mean Labeled Accuracy')
+            plt.fill_between(epochs, 
+                            mean_labeled_acc-std_labeled_acc, 
+                            mean_labeled_acc+std_labeled_acc, 
+                            color='g', alpha=0.2, label='±1 std')
+        else:
+            # Plot regular accuracy with full emphasis
+            plt.plot(epochs, mean_acc, 'b-', label='Mean Accuracy')
+            plt.fill_between(epochs, mean_acc-std_acc, mean_acc+std_acc, 
+                            color='b', alpha=0.2, label='±1 std')
+        
+        # Plot validation accuracy if available
+        if val_accuracies is not None:
+            mean_val_acc = np.mean(val_accuracies, axis=0)
+            plt.plot(epochs, mean_val_acc, 'r-', label='Mean Val Accuracy')
+        
         plt.title('Training Accuracy')
         plt.xlabel('Epoch')
         plt.ylabel('Accuracy')
         plt.legend()
         
-
+        plt.tight_layout()
         plt.savefig(self.cv_path / "lstm_training_history.png", dpi=300)
         plt.close()
 
 
-    def test_isolated_nan_interpolation(self):
-        # import pandas as pd
-        # import numpy as np
+
+    # def _plot_training_histories(self, histories):
+    #     """Plot training histories across all folds"""
+    #     plt.figure(figsize=(12, 4))
         
-        # Create test cases
-        test_cases = [
-            # Case 1: Isolated NaN in the middle
-            [1.0, 2.0, np.nan, 4.0],
-            
-            # Case 2: Two consecutive NaNs
-            [1.0, np.nan, np.nan, 4.0],
-            
-            # Case 3: NaN at the beginning
-            [np.nan, 2.0, 3.0, 4.0],
-            
-            # Case 4: NaN at the end
-            [1.0, 2.0, 3.0, np.nan],
-            
-            # Case 5: Mixed pattern
-            [1.0, np.nan, 3.0, np.nan, np.nan, 6.0],
-            
-            # Case 6: No NaNs
-            [1.0, 2.0, 3.0, 4.0]
-        ]
+    #     # Check which metrics are available in the histories
+    #     available_metrics = set(histories[0].history.keys())
         
-        print("Test cases for isolated NaN interpolation:")
-        for i, test_data in enumerate(test_cases):
-            # Create DataFrame with a single column
-            df = pd.DataFrame({'col': test_data})
-            print(f"\nTest case {i+1}:")
-            print(f"Original: {df['col'].tolist()}")
-            
-            # Apply standard interpolation
-            df_standard = df.copy()
-            df_standard['col'] = df_standard['col'].interpolate(method='linear')
-            print(f"Standard interpolation: {df_standard['col'].tolist()}")
-            
-            # Apply our custom approach
-            df_custom = df.copy()
-            series = df_custom['col']
-            mask = series.isna() & series.shift(1).notna() & series.shift(-1).notna()
-            if mask.any():
-                temp = series.copy()
-                temp[~mask] = temp[~mask].fillna(method='ffill')
-                temp = temp.interpolate(method='linear')
-                series[mask] = temp[mask]
-                df_custom['col'] = series
-            print(f"Custom interpolation: {df_custom['col'].tolist()}")
+    #     # Determine which accuracy metric to use (masked_accuracy or regular accuracy)
+    #     if 'masked_accuracy' in available_metrics:
+    #         metric_name = 'masked_accuracy'
+    #         val_metric_name = 'val_masked_accuracy' if 'val_masked_accuracy' in available_metrics else None
+    #     else:
+    #         metric_name = 'accuracy'
+    #         val_metric_name = 'val_accuracy' if 'val_accuracy' in available_metrics else None
         
-        return "Tests completed"
+    #     # Find max length of histories
+    #     max_epochs = max(len(h.history['loss']) for h in histories)
+        
+    #     # Initialize arrays for mean and std calculations
+    #     losses = np.zeros((len(histories), max_epochs))
+    #     accuracies = np.zeros((len(histories), max_epochs))
+    #     val_losses = np.zeros((len(histories), max_epochs)) if 'val_loss' in available_metrics else None
+    #     val_accuracies = np.zeros((len(histories), max_epochs)) if val_metric_name else None
+        
+    #     # Fill arrays with padding
+    #     for i, h in enumerate(histories):
+    #         # Pad or truncate loss
+    #         curr_len = len(h.history['loss'])
+    #         losses[i, :curr_len] = h.history['loss']
+    #         losses[i, curr_len:] = h.history['loss'][-1]  # Pad with last value
+            
+    #         # Pad or truncate val_loss if it exists
+    #         if 'val_loss' in available_metrics and val_losses is not None:
+    #             val_curr_len = len(h.history['val_loss'])
+    #             val_losses[i, :val_curr_len] = h.history['val_loss']
+    #             val_losses[i, val_curr_len:] = h.history['val_loss'][-1]
+            
+    #         # Pad or truncate accuracy metrics
+    #         curr_len = len(h.history[metric_name])
+    #         accuracies[i, :curr_len] = h.history[metric_name]
+    #         accuracies[i, curr_len:] = h.history[metric_name][-1]
+            
+    #         # Pad or truncate validation accuracy if it exists
+    #         if val_metric_name and val_accuracies is not None:
+    #             val_curr_len = len(h.history[val_metric_name])
+    #             val_accuracies[i, :val_curr_len] = h.history[val_metric_name]
+    #             val_accuracies[i, val_curr_len:] = h.history[val_metric_name][-1]
+        
+    #     # Plot Loss
+    #     plt.subplot(1, 2, 1)
+    #     epochs = range(1, max_epochs + 1)
+        
+    #     # Plot individual histories
+    #     for i in range(len(histories)):
+    #         plt.plot(epochs[:len(histories[i].history['loss'])], 
+    #                 histories[i].history['loss'], 
+    #                 'b-', alpha=0.1)
+        
+    #     # Plot mean and std
+    #     mean_loss = np.mean(losses, axis=0)
+    #     std_loss = np.std(losses, axis=0)
+    #     plt.plot(epochs, mean_loss, 'b-', label='Mean Train Loss')
+    #     plt.fill_between(epochs, mean_loss-std_loss, mean_loss+std_loss, 
+    #                     color='b', alpha=0.2, label='±1 std')
+        
+    #     # Plot validation loss if available
+    #     if 'val_loss' in available_metrics and val_losses is not None:
+    #         mean_val_loss = np.mean(val_losses, axis=0)
+    #         plt.plot(epochs, mean_val_loss, 'r-', label='Mean Val Loss')
+        
+    #     plt.title('Training Loss')
+    #     plt.xlabel('Epoch')
+    #     plt.ylabel('Loss')
+    #     plt.legend()
+        
+    #     # Plot Accuracy
+    #     plt.subplot(1, 2, 2)
+        
+    #     # Plot individual histories
+    #     for i in range(len(histories)):
+    #         plt.plot(epochs[:len(histories[i].history[metric_name])], 
+    #                 histories[i].history[metric_name], 
+    #                 'b-', alpha=0.1)
+        
+    #     # Plot mean and std
+    #     mean_acc = np.mean(accuracies, axis=0)
+    #     std_acc = np.std(accuracies, axis=0)
+    #     plt.plot(epochs, mean_acc, 'b-', label=f'Mean {metric_name.replace("_", " ").title()}')
+    #     plt.fill_between(epochs, mean_acc-std_acc, mean_acc+std_acc, 
+    #                     color='b', alpha=0.2, label='±1 std')
+        
+    #     # Plot validation accuracy if available
+    #     if val_metric_name and val_accuracies is not None:
+    #         mean_val_acc = np.mean(val_accuracies, axis=0)
+    #         plt.plot(epochs, mean_val_acc, 'r-', label=f'Mean {val_metric_name.replace("_", " ").title()}')
+        
+    #     plt.title('Training Accuracy')
+    #     plt.xlabel('Epoch')
+    #     plt.ylabel('Accuracy')
+    #     plt.legend()
+        
+    #     plt.tight_layout()
+    #     plt.savefig(self.cv_path / "lstm_training_history.png", dpi=300)
+    #     plt.close()

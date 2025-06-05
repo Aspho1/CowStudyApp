@@ -200,10 +200,21 @@ analysis:
     ops: true
 
 
+    # random,
+    # sequence_aware,
+    # interleaved,
+    # balanced_class,
+    # stratified,
+
+    # validation_method: stratified
+    validation_method: balanced_class
+    validation_size: 0.3
+
+
     ################ Warning these two will SIGNIFICANTLY increase runtime to find parameters 
     # BAYESIAN Optimization
     bayes_opt: true                # Whether to use Bayesian optimization 
-    bayes_opt_n_calls: 40          # Number of evaluations to perform
+    bayes_opt_n_calls: 10          # Number of evaluations to perform
     bayes_opt_resume: true         # Whether to resume from previous optimization
     bayes_opt_fast_eval: true      # Use faster evaluation during optimization
 
@@ -252,15 +263,16 @@ analysis:
     # Traveling accuracy: 0.8696 (n=46)
 
     ################### OPO BO Paper parameters
-    max_length: 288
-    batch_size: 5
-    initial_lr: 0.0007918
-    decay_steps: 3704
-    decay_rate: 0.1
-    clipnorm: 1.2775850
-    patience: 37
-    min_delta: 0.0001
-    reg_val: 0.0000038
+    # max_length: 288
+    # batch_size: 5
+    # initial_lr: 0.0007918
+    # decay_steps: 3704
+    # decay_rate: 0.1
+    # clipnorm: 1.2775850
+    # patience: 37
+    # min_delta: 0.0001
+    # reg_val: 0.0000038
+
     # max_length: 271
     # batch_size: 2
     # initial_lr: 0.0001000
@@ -282,6 +294,27 @@ analysis:
     # patience: 57
     # min_delta: 0.0000017
     # reg_val: 0.0000139
+
+
+    max_length: 46
+    batch_size: 4
+    initial_lr: 0.003163803718904318
+    decay_steps: 3743
+    decay_rate: 0.1767921783287132
+    clipnorm: 0.26516296448723364
+    patience: 46
+    min_delta: 9.184261472141041e-06
+    reg_val: 5.0526881807188965e-05
+
+    # max_length: 20
+    # batch_size: 5
+    # initial_lr: 1e-4
+    # decay_steps: 5000
+    # decay_rate: 0.1
+    # clipnorm: 0.5
+    # patience: 60
+    # min_delta: 1e-6
+    # reg_val: 1e-6
 
 
 visuals:
