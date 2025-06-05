@@ -197,7 +197,7 @@ analysis:
   lstm:
     enabled: true
     
-    ops: true
+    ops: false
 
 
     # random,
@@ -214,7 +214,7 @@ analysis:
     ################ Warning these two will SIGNIFICANTLY increase runtime to find parameters 
     # BAYESIAN Optimization
     bayes_opt: true                # Whether to use Bayesian optimization 
-    bayes_opt_n_calls: 10          # Number of evaluations to perform
+    bayes_opt_n_calls: 100          # Number of evaluations to perform
     bayes_opt_resume: true         # Whether to resume from previous optimization
     bayes_opt_fast_eval: true      # Use faster evaluation during optimization
 

@@ -3,6 +3,7 @@ import numpy as np
 from scipy import stats
 import matplotlib.pyplot as plt
 
+
 # Function to test multiple distributions and print results
 def test_distributions(data, distributions):
     results = []
@@ -23,6 +24,7 @@ def test_distributions(data, distributions):
 
     # Convert to DataFrame for nice display
     return pd.DataFrame(results).sort_values('KS Statistic')
+
 
 # Visual check - Create QQ plots for the best-fitting distributions
 def create_qq_plots(data, results, title_prefix, n_best=3):
@@ -54,6 +56,7 @@ def create_qq_plots(data, results, title_prefix, n_best=3):
     plt.savefig(f"{title_prefix.replace(' ', '_')}_qq_plots.png")
     plt.show()
 
+
 # Create histograms with fitted distributions
 def plot_histogram_with_fits(data, results, title_prefix, n_best=3):
     plt.figure(figsize=(15, 5))
@@ -82,6 +85,7 @@ def plot_histogram_with_fits(data, results, title_prefix, n_best=3):
     plt.tight_layout()
     plt.savefig(f"{title_prefix.replace(' ', '_')}_histogram_fits.png")
     plt.show()
+
 
 # Create visualization of ECDF vs fitted CDFs
 def plot_ecdf_with_fits(data, results, title_prefix, n_best=3):
