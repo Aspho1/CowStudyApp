@@ -571,53 +571,53 @@ class BehaviorAnalyzer:
 
             print("-"*80)
 
-            # Print detailed R environment information
-            with conversion.localconverter(default_converter):
-                r_version = robjects.r('R.version.string')
-                print(f"R version: {r_version[0]}")
-                
-                # Get library paths actually being used by R
-                print("R library paths:")
-                lib_paths = robjects.r('.libPaths()')
-                for i, path in enumerate(lib_paths):
-                    print(f"  [{i}] {path}")
-                
-                # Check for required packages
-                required_packages = ['lme4', 'Matrix', 'lmerTest']
-                missing_packages = []
-                
-                for pkg in required_packages:
-                    if not isinstalled(pkg):
-                        print(f"Package {pkg} is not installed")
-                        missing_packages.append(pkg)
-                    else:
-                        pkg_version = robjects.r(f'packageVersion("{pkg}")')
-                        print(f"Package {pkg} version: {pkg_version[0]}")
-                
-                # Install missing packages if needed
-                if missing_packages:
-                    print(f"Installing missing packages: {', '.join(missing_packages)}")
-                    utils = importr('utils')
-                    for pkg in missing_packages:
-                        print(f"Installing {pkg}...")
-                        utils.install_packages(pkg, repos="https://cloud.r-project.org")
-                        print(f"{pkg} installed")
-                        
-                # Load required packages to ensure they work
-                print("Loading required packages...")
-                matrix = importr('Matrix')
-                lme4 = importr('lme4')
-                print("Required packages loaded successfully")
-                        
+#             # Print detailed R environment information
+#             with conversion.localconverter(default_converter):
+#                 r_version = robjects.r('R.version.string')
+#                 print(f"R version: {r_version[0]}")
+#
+#                 # Get library paths actually being used by R
+#                 print("R library paths:")
+#                 lib_paths = robjects.r('.libPaths()')
+#                 for i, path in enumerate(lib_paths):
+#                     print(f"  [{i}] {path}")
+#
+#                 # Check for required packages
+#                 required_packages = ['lme4', 'Matrix', 'lmerTest']
+#                 missing_packages = []
+#
+#                 for pkg in required_packages:
+#                     if not isinstalled(pkg):
+#                         print(f"Package {pkg} is not installed")
+#                         missing_packages.append(pkg)
+#                     else:
+#                         pkg_version = robjects.r(f'packageVersion("{pkg}")')
+#                         print(f"Package {pkg} version: {pkg_version[0]}")
+#
+#                 # Install missing packages if needed
+#                 if missing_packages:
+#                     print(f"Installing missing packages: {', '.join(missing_packages)}")
+#                     utils = importr('utils')
+#                     for pkg in missing_packages:
+#                         print(f"Installing {pkg}...")
+#                         utils.install_packages(pkg, repos="https://cloud.r-project.org")
+#                         print(f"{pkg} installed")
+#
+#                 # Load required packages to ensure they work
+#                 print("Loading required packages...")
+#                 matrix = importr('Matrix')
+#                 lme4 = importr('lme4')
+#                 print("Required packages loaded successfully")
+#
                 # Configure R performance settings
-                cores = max(1, multiprocessing.cpu_count() - 4)
-                robjects.r(f'options(mc.cores = {cores})')
-                
-                if 'OMP_NUM_THREADS' not in os.environ:
-                    os.environ['OMP_NUM_THREADS'] = str(min(12, cores))
-                    
-                print("R performance optimizations applied")
-                return True
+            cores = max(1, multiprocessing.cpu_count() - 4)
+            robjects.r(f'options(mc.cores = {cores})')
+
+            if 'OMP_NUM_THREADS' not in os.environ:
+                os.environ['OMP_NUM_THREADS'] = str(min(12, cores))
+
+            print("R performance optimizations applied")
+            return True
             
         except Exception as e:
             print(f"Warning: R setup failed: {str(e)}")
