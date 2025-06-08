@@ -1,9 +1,10 @@
-from skopt import gp_minimize
-from skopt.space import Real, Integer #, Categorical
-# from skopt.utils import use_named_args
-from skopt.plots import plot_convergence, plot_objective
-from skopt import dump, load
 import os
+
+from skopt import gp_minimize
+from skopt.space import Real, Integer, Categorical
+# from skopt.utils import use_named_args
+from skopt.plots import plot_convergence, plot_objective, plot_gaussian_process
+from skopt import dump, load
 
 import itertools
 import json
@@ -23,6 +24,7 @@ from matplotlib import pyplot as plt
 
 
 from cowstudyapp.config import ConfigManager
+from cowstudyapp.analysis.RNN.utils import compute_seed
 
 class BayesianOptSearch:
     """Bayesian optimization for hyperparameter tuning using Gaussian Processes"""
@@ -38,7 +40,7 @@ class BayesianOptSearch:
 
         ops = 'ops' if self.config.analysis.lstm.ops else 'opo'
 
-        self.output_dir = self.config.analysis.cv_results / 'lstm' / ops / 'v4'
+        self.output_dir = self.config.analysis.cv_results / 'lstm' / ops / 'v6'
         # self.output_dir = Path(self.output_dir)
         self.output_dir.mkdir(parents=True,exist_ok=True)
         
@@ -47,14 +49,19 @@ class BayesianOptSearch:
         # Define the search space
         self.space = [
             Integer(10, 288, name='max_length'),
-            Integer(2, 32, name='batch_size'),
-            Real(1e-4, 1e-2, "log-uniform", name='initial_lr'),
-            Integer(100, 5000, name='decay_steps'),
-            Real(0.1, 0.95, name='decay_rate'),
-            Real(0.1, 2.0, name='clipnorm'),
-            Integer(20, 60, name='patience'),
-            Real(1e-6, 1e-4, "log-uniform", name='min_delta'),
-            Real(1e-6, 1e-4, "log-uniform", name='reg_val'),
+            Integer(4, 32, name='batch_size'),
+            Real(1e-5, 1, "log-uniform", name='initial_lr'),
+            Integer(100, 3000, name='decay_steps'),
+            Real(0.01, 0.95, name='decay_rate'),
+            Real(0.1, 1.5, name='clipnorm'),
+
+            Categorical([16, 32, 64], name='lstm_size'),
+            Categorical([16, 32, 64], name='dense_size'),
+
+
+            # Integer(15, 15, name='patience'),
+            # Real(1e-3, 1e-3, "log-uniform", name='min_delta'),
+            # Real(1e-3, 1e-3, "log-uniform", name='reg_val'),
             # Optional: Categorical parameters
             # Categorical(['adam', 'rmsprop'], name='optimizer'),
             # Categorical(['relu', 'tanh'], name='activation'),
@@ -67,9 +74,11 @@ class BayesianOptSearch:
             "decay_steps",
             "decay_rate",
             "clipnorm",
-            "patience",
-            "min_delta",
-            "reg_val"
+            'lstm_size',
+            'dense_size'
+            # "patience",
+            # "min_delta",
+            # "reg_val",
         ]
         
         # Number of calls to make to the objective function
@@ -85,6 +94,16 @@ class BayesianOptSearch:
     def run_search(self, lstm_model):
         """Run Bayesian optimization search"""
         self.lstm_model = lstm_model
+
+        if self.lstm_model.config.analysis.mode != "LOOCV":
+            raise ValueError("MUST use LOOCV when performing BO.")
+
+        # acq_func="EI"
+        # acq_func="LCB"
+        acq_func="PI"
+
+        # noise =
+
         # Instead of trying to use a decorator, use a simple function
         def objective(x):
             # Convert the parameter vector to a dictionary
@@ -107,6 +126,7 @@ class BayesianOptSearch:
                 random_state=self.config.analysis.random_seed,
                 n_random_starts=0,  # No random starts since we're using previous results
                 verbose=True,
+                acq_func=acq_func,
                 callback=self._on_step
             )
 
@@ -118,6 +138,7 @@ class BayesianOptSearch:
                 n_calls=self.n_calls,
                 random_state=self.config.analysis.random_seed,
                 verbose=True,
+                acq_func=acq_func,
                 callback=self._on_step
             )
         
@@ -151,14 +172,14 @@ class BayesianOptSearch:
         # Convert any NumPy types to native Python types for JSON serialization
 
 
-
-        param_hash = hash(frozenset(params.items())) & 0xFFFFFFFF
-        derived_seed = (self.random_seed + param_hash) & 0xFFFFFFFF
-
-        # Set seeds for this evaluation
-        set_seed(derived_seed)
-        np.random.seed(derived_seed)
-        random.seed(derived_seed)
+        # param_hash = hash(frozenset(params.items())) & 0xFFFFFFFF
+        # derived_seed = (self.random_seed + param_hash) & 0xFFFFFFFF
+        # derived_seed = compute_seed(self.random_seed, params)
+        #
+        # # Set seeds for this evaluation
+        # set_seed(derived_seed)
+        # np.random.seed(derived_seed)
+        # random.seed(derived_seed)
 
 
         printable_params = {}
@@ -176,9 +197,9 @@ class BayesianOptSearch:
         # Set the parameters on the model (using original values)
         self._set_params(params)
 
-        set_seed(self.config.analysis.random_seed)
-        np.random.seed(self.config.analysis.random_seed)
-        random.seed(self.config.analysis.random_seed)
+        # set_seed(self.config.analysis.random_seed)
+        # np.random.seed(self.config.analysis.random_seed)
+        # random.seed(self.config.analysis.random_seed)
         
         # Run a small LOOCV with current parameters
         start_time = time.time()
@@ -259,11 +280,11 @@ class BayesianOptSearch:
         # Assign parameters to the model
         for param_name, param_value in params.items():
             setattr(self.lstm_model, param_name, param_value)
-            
-            # Special case for max_length which also needs to update sequence_length
-            if param_name == 'max_length':
-                self.lstm_model.sequence_length = param_value
-    
+#
+#             # Special case for max_length which also needs to update sequence_length
+#             if param_name == 'max_length':
+#                 self.lstm_model.sequence_length = param_value
+#
 
 
     def _save_optimization_plots(self, result):
@@ -281,6 +302,12 @@ class BayesianOptSearch:
         plt.tight_layout()
         plt.savefig(self.output_dir / "bayes_opt_parameters.png", dpi=300)
         plt.close()
+
+        #
+        # plot_gaussian_process(result) #, dimensions=range(len(self.space))
+        # plt.tight_layout()
+        # plt.savefig(self.output_dir / "bayes_opt_gp_res.png", dpi=300)
+        # plt.close()
 
 class HyperparamSearch:
     """Hyperparameter search for LSTM models"""
@@ -337,7 +364,7 @@ class HyperparamSearch:
             # Run LOOCV with current parameters
             start_time = time.time()
             if self.config.analysis.mode == "LOOCV":
-                models, histories = lstm_model.do_loocv(sequences=sequences, df=df, n=6)  # Use fewer splits for speed
+                models, histories = lstm_model.do_loocv(sequences=sequences, df=df, n=6)
             else:  # PRODUCT mode
                 models, histories = lstm_model.dont_do_loocv(sequences=sequences, df=df)
                 

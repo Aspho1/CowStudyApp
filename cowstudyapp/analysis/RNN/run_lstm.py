@@ -1,4 +1,24 @@
 # from datetime import datetime
+import os
+
+from cowstudyapp.analysis.RNN.utils import (
+    random_validation_split,
+    sequence_aware_validation_split,
+    interleaved_validation_split,
+    balanced_class_validation_split,
+    stratified_sequence_split,
+    get_sequence_ids,
+    manual_chunking,
+    MaskedAccuracy,
+    MaskedSparseCategoricalCrossentropy,
+    LabeledDataMetricsCallback,
+    silence_tensorflow,
+    compute_seed
+
+)
+
+silence_tensorflow()
+
 import itertools
 import json
 from pathlib import Path
@@ -13,8 +33,9 @@ import numpy as np
 
 from sklearn.model_selection import train_test_split 
 from sklearn.preprocessing import StandardScaler
-
 import tensorflow as tf
+import logging
+
 
 # from sklearn.model_selection import GroupKFold
 from tensorflow.keras.models import Sequential  #, Model
@@ -26,19 +47,6 @@ from tensorflow.random import set_seed
 from tensorflow.keras.regularizers import L2
 from tensorflow.keras.optimizers import Adam
 
-from cowstudyapp.analysis.RNN.utils import (
-    random_validation_split,
-    sequence_aware_validation_split,
-    interleaved_validation_split,
-    balanced_class_validation_split,
-    stratified_sequence_split,
-    get_sequence_ids,
-    manual_chunking,
-    MaskedAccuracy,
-    MaskedSparseCategoricalCrossentropy,
-    LabeledDataMetricsCallback
-
-)
 
 from cowstudyapp.analysis.RNN.hyper_parameter_tuning import (
     BayesianOptSearch,
@@ -67,14 +75,8 @@ from cowstudyapp.utils import from_posix_col
 
 from sklearn.metrics import confusion_matrix, f1_score, accuracy_score
 import multiprocessing as mp
-# from functools import partial
 
-# from skopt import gp_minimize
-# from skopt.space import Real, Integer #, Categorical
-# # from skopt.utils import use_named_args
-# from skopt.plots import plot_convergence, plot_objective
-# from skopt import dump, load
-# import os
+
 
 class LSTM_Model:
 
@@ -95,7 +97,8 @@ class LSTM_Model:
 
         self.inv_activity_map = {self.activity_map[k]: k for k in self.activity_map.keys()}
 
-        self.nfeatures = len(self.config.analysis.lstm.features)
+        self.features = self.config.analysis.lstm.features
+        self.nfeatures = len(self.features)
         self.nclasses = len(self.config.analysis.lstm.states)
 
         self.dropout_rate = 0.1
@@ -111,7 +114,7 @@ class LSTM_Model:
         for p in [self.cv_path, self.pred_path, self.model_path]:
             p.mkdir(parents=True, exist_ok=True)
 
-        self.sequence_length: int = lstm_cfg.max_length
+        self.max_length: int = lstm_cfg.max_length
         self.max_time_gap = lstm_cfg.max_time_gap
         self.epochs = lstm_cfg.epochs
         self.cows_per_cv_fold = lstm_cfg.cows_per_cv_fold
@@ -125,8 +128,8 @@ class LSTM_Model:
         self.min_delta = lstm_cfg.min_delta
         self.reg_val = lstm_cfg.reg_val
 
-
-
+        self.lstm_size = 32
+        self.dense_size = 32
 
         set_seed(self.config.analysis.random_seed)
         np.random.seed(self.config.analysis.random_seed)
@@ -134,7 +137,7 @@ class LSTM_Model:
         self.masking_val = -9999
 
         # self.layers = [
-        #     Input((self.sequence_length, self.nfeatures)),
+        #     Input((self.max_length, self.nfeatures)),
         #     Masking(mask_value=self.masking_val),      
         #     ]
 
@@ -167,36 +170,16 @@ class LSTM_Model:
             # Set the best parameters
             for key, value in best_params.items():
                 setattr(self, key, value)
-                if key == 'max_length':
-                    self.sequence_length = value
 
-            # # Rebuild model architecture with optimized parameters
-            # self.layers = [
-            #     Input((self.sequence_length, self.nfeatures)),
-            #     Masking(mask_value=self.masking_val),
-            # ]
-            # if self.config.analysis.lstm.ops:
-            #     self._build_ops_architecture()
-            # else:
-            #     self._build_opo_architecture()
+
+
+
 
         self.build_model() # progress_callback
 
         sequences = self.build_sequences(transformed) #, progress_callback
 
-        # # Build sequences based on configuration
-        # if self.config.analysis.lstm.ops:
-        #     progress_callback(20, "Building sequences for one-per-sample (OPS) analysis")
-        #     sequences = self._build_sequences_ops(transformed, progress_callback)
-        #     progress_callback(40, "Building OPS model architecture")
-        #     self._build_ops_architecture()
-        # else:
-        #     progress_callback(20, "Building sequences for one-per-observation (OPO) analysis")
-        #     sequences = self._build_sequences_opo(transformed, progress_callback)
-        #     progress_callback(40, "Building OPO model architecture")
-        #     self._build_opo_architecture()
 
-        # print("run3")
         # Check if we're doing hyperparameter search
         # if self.config.analysis.lstm.hyperparams_search:
         #     search = HyperparamSearch(self.config)
@@ -209,7 +192,7 @@ class LSTM_Model:
         #     for key, value in best_params.items():
         #         setattr(self, key, value)
         #         if key == 'max_length':
-        #             self.sequence_length = value
+        #             self.max_length = value
 
 
         # Do either LOOCV or product
@@ -227,10 +210,29 @@ class LSTM_Model:
         else:
             raise ValueError(f"Unknown config mode {self.config.analysis.mode}.")
 
+
+    def _set_seed(self):
+        params = {}
+        for p in ['max_length', 'batch_size', 'initial_lr',
+                  'decay_steps', 'decay_rate', 'clipnorm',
+                  'lstm_size', 'dense_size', 'patience',
+                  'min_delta', 'reg_val']:
+
+            params[p] = getattr(self,p)
+
+        derived_seed = compute_seed(self.config.analysis.random_seed, params)
+
+        set_seed(derived_seed)
+        np.random.seed(derived_seed)
+        random.seed(derived_seed)
+
+
     def build_model(self,progress_callback=None):
 
+        self._set_seed()
+
         self.layers = [
-            Input((self.sequence_length, self.nfeatures)),
+            Input((self.max_length, self.nfeatures)),
             Masking(mask_value=self.masking_val),
         ]
 
@@ -255,14 +257,14 @@ class LSTM_Model:
     def _build_ops_architecture(self):
         """Build model architecture for one-per-observation"""
         self.layers.extend([
-            LSTM(32, 
+            LSTM(self.lstm_size,
                 return_sequences=False,
                 recurrent_dropout=self.dropout_rate,
                 dropout=self.dropout_rate,
                 kernel_regularizer=L2(self.reg_val),
                 recurrent_regularizer=L2(self.reg_val)
                 ),
-            Dense(32, activation='relu'),
+            Dense(self.dense_size, activation='relu'),
             Dropout(self.dropout_rate),  
             Dense(self.nclasses, activation='softmax')
         ])
@@ -271,30 +273,24 @@ class LSTM_Model:
     def _build_opo_architecture(self):
         """Build model architecture for one-per-sequence"""
         self.layers.extend([
-            LSTM(64, 
+            LSTM(self.lstm_size,
                 return_sequences=True,
                 recurrent_dropout=self.dropout_rate,
                 dropout=self.dropout_rate,
                 kernel_regularizer=L2(self.reg_val),
                 recurrent_regularizer=L2(self.reg_val)
                 ),
-            LSTM(32, 
-                return_sequences=True,
-                recurrent_dropout=self.dropout_rate,
-                dropout=self.dropout_rate,
-                kernel_regularizer=L2(self.reg_val),
-                recurrent_regularizer=L2(self.reg_val)
-                ),
-            Dense(32, activation='relu'),  # This will be applied to each timestep
+
+            Dense(self.dense_size, activation='relu'),
             Dropout(self.dropout_rate),
-            Dense(self.nclasses, activation='softmax')  # This will be applied to each timestep
+            Dense(self.nclasses, activation='softmax')
         ])
 
 
     def _get_target_dataset(self, add_step_and_angle=True):
         df = pd.read_csv(self.config.analysis.target_dataset)
 
-        print(df.activity.unique())
+        # print(df.activity.unique())
         step_size = self.config.analysis.gps_sample_interval//60
         dfs = []
         
@@ -400,9 +396,9 @@ class LSTM_Model:
         if progress_callback is None:
             progress_callback = lambda percent, message: None
         
-        max_length = self.sequence_length
-        features = self.config.analysis.lstm.features
-        num_features = len(features)
+        max_length = self.max_length
+
+        num_features = len(self.features)
         
         # Sample interval calculations
         step_size = self.config.analysis.gps_sample_interval // 60  # Sample interval in minutes
@@ -452,7 +448,7 @@ class LSTM_Model:
         all_labels = np.full((total_sequences, max_length), self.UNLABELED_VALUE, dtype=np.int32)
         
         # Pre-fill NaN values in the feature columns
-        df[features] = df[features].fillna(self.masking_val)
+        df[self.features] = df[self.features].fillna(self.masking_val)
         
         # Process the data
         sequence_idx = 0
@@ -485,7 +481,7 @@ class LSTM_Model:
                                     f"Device {device_id}: day {day_count}/{total_days}")
                     
                     # Extract features and labels
-                    day_features = day_data[features].values
+                    day_features = day_data[self.features].values
                     day_activities = day_data['activity'].map(lambda x: self.activity_map.get(x, self.UNLABELED_VALUE)).values
                     
                     day_len = len(day_features)
@@ -514,7 +510,7 @@ class LSTM_Model:
                 expected_sequences = device_sequences[device_id]
                 
                 # Extract all features and activities at once
-                device_features = device_data[features].values
+                device_features = device_data[self.features].values
                 device_activities = device_data['activity'].map(lambda x: self.activity_map.get(x, self.UNLABELED_VALUE)).values
                 
                 # Process in chunks
@@ -578,11 +574,11 @@ class LSTM_Model:
         
         # Pre-process feature data
         # Fill NaN values in features
-        df[self.config.analysis.lstm.features] = df[self.config.analysis.lstm.features].fillna(self.masking_val)
+        df[self.features] = df[self.features].fillna(self.masking_val)
         
         # Pre-allocate arrays for results - one row per observation
         cow_date_keys = np.zeros((total_rows, 2), dtype=np.int32)
-        all_sequences = np.zeros((total_rows, self.sequence_length, len(self.config.analysis.lstm.features)), 
+        all_sequences = np.zeros((total_rows, self.max_length, len(self.features)),
                                 dtype=np.float32)
         all_labels = np.zeros(total_rows, dtype=np.int32)
         
@@ -602,7 +598,7 @@ class LSTM_Model:
             device_progress_interval = max(1, data_len // 20)  # Update 20 times per device
             
             # Feature matrix for this device
-            feature_matrix = data[self.config.analysis.lstm.features].values
+            feature_matrix = data[self.features].values
             
             # Activity labels
             activities = data['activity'].map(lambda x: self.activity_map.get(x, self.UNLABELED_VALUE)).values
@@ -611,7 +607,7 @@ class LSTM_Model:
             posix_times = data['posix_time'].values
             
             # Initialize empty sequence with masking values
-            current_sequence = np.full((self.sequence_length, len(self.config.analysis.lstm.features)), 
+            current_sequence = np.full((self.max_length, len(self.features)),
                                     self.masking_val, dtype=np.float32)
             current_sequence_len = 0
             
@@ -630,9 +626,9 @@ class LSTM_Model:
                     current_sequence_len = 0
                 
                 # Add current observation to sequence using a circular buffer approach
-                if current_sequence_len < self.sequence_length:
+                if current_sequence_len < self.max_length:
                     # Sequence not full yet, add at the end
-                    current_sequence[self.sequence_length - current_sequence_len - 1] = feature_matrix[i]
+                    current_sequence[self.max_length - current_sequence_len - 1] = feature_matrix[i]
                     current_sequence_len += 1
                 else:
                     # Sequence full, shift everything up and add new at the end
@@ -740,7 +736,7 @@ class LSTM_Model:
         progress_callback(85, "Generating predictions for the full dataset")
 
         # Process predictions in batches to avoid memory issues
-        batch_size_pred = 1024  # Adjust based on your system's memory
+        batch_size_pred = 4096  # Adjust based on your system's memory
         n_batches = (len(X_full) + batch_size_pred - 1) // batch_size_pred
         
         if n_batches > 1:
@@ -1025,7 +1021,7 @@ class LSTM_Model:
         test_chunks = manual_chunking(unique_cows, n)
 
         # Determine number of processes
-        n_jobs = (mp.cpu_count()-2) if n_jobs == -1 else n_jobs
+        n_jobs = (mp.cpu_count()-1) if n_jobs == -1 else n_jobs
         n_jobs = min(n_jobs, len(test_chunks))  # Can't use more processes than chunks
 
 
@@ -1411,8 +1407,8 @@ class LSTM_Model:
         cw_dict_present = dict(zip(present, class_weights))
         cw_arr = np.ones(self.nclasses, dtype='float32')
 
-        for cls, w in cw_dict_present.items():
-            cw_arr[cls] = w
+        # for cls, w in cw_dict_present.items():
+        #     cw_arr[cls] = w
         
         # Create mask for labeled data and placeholder for unlabeled
         mask = (train_Y != self.UNLABELED_VALUE).astype('float32')

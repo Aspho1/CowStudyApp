@@ -34,7 +34,7 @@ The package is organized into three main components:
 2. Analysis - Apply HMM or LSTM models to classify activities (`run_analysis.py`)
 3. Visualization - Generate plots and visual analysis (`make_visuals.py`)
    
-All main modules are located in the `src/cowstudyapp` directory.
+All main modules are located in the `cowstudyapp` directory.
 
 
 ## Usage
@@ -48,9 +48,9 @@ Place the GPS, Accelerometer, and Label data into their respective directories (
 The config can be set in two ways: 
 1. Pass in a `config_path` argument to the call
 ```bash
-python -m src/cowstudyapp/build_processed_data.py config_path config/RB_22_config.yaml
+python -m cowstudyapp/build_processed_data.py config_path config/RB_22_config.yaml
 ```
-2. Make sure the correct config is selected in `src/build_processed_data.py`, then run the script with no arguments.
+2. Make sure the correct config is selected in `build_processed_data.py`, then run the script with no arguments.
 
 ```python
 def main(config_path=None, progress_callback=None):
@@ -95,7 +95,7 @@ def main(config_path=None, progress_callback=None):
 
 #### Comparing datasets
 
-Additionally, there is a script to compare two processed datasets `src/compare_descriptive_stats.py`. 
+Additionally, there is a script to compare two processed datasets `compare_descriptive_stats.py`.
 
 for instance, to compare RB_19 and RB_22:
 ```python
@@ -112,15 +112,15 @@ if __name__ == "__main__":
 
 ### Running analysis
 
-Make sure the YAML config file (specifically the `analysis` section of it) is set up as desired. At a minimum, make sure the `mode`, `target_dataset`, and optionally `training_info_path` are correct. See the [Config section](##cfg-heading-id) below for more information on the config. The file `src/run_analysis.py` can be called in the same ways as `src/cowstudyapp/build_processed_data.py`. This will create outputs in `data/cv_results`, `data/models`, and or `data/predictions` depending on the config settings. 
+Make sure the YAML config file (specifically the `analysis` section of it) is set up as desired. At a minimum, make sure the `mode`, `target_dataset`, and optionally `training_info_path` are correct. See the [Config section](##cfg-heading-id) below for more information on the config. The file `cowstudyapp/run_analysis.py` can be called in the same ways as `cowstudyapp/build_processed_data.py`. This will create outputs in `data/cv_results`, `data/models`, and or `data/predictions` depending on the config settings.
 ```bash
-python -m src/cowstudyapp/run_analysis.py config_path config/RB_22_config.yaml
+python -m cowstudyapp/run_analysis.py config_path config/RB_22_config.yaml
 ```
 ### Creating visuals
 
-Visualizations can be turned on and off in the `visuals` section of the config. Point the `visuals.predictions_path` to a `predictions.csv` output from analysis code and run `src/make_visuals.py` to create visualizations.
+Visualizations can be turned on and off in the `visuals` section of the config. Point the `visuals.predictions_path` to a `predictions.csv` output from analysis code and run `make_visuals.py` to create visualizations.
 ```bash
-python -m src/cowstudyapp/make_visuals.py config_path config/RB_22_config.yaml
+python -m cowstudyapp/make_visuals.py config_path config/RB_22_config.yaml
 ```
 
 ## Development
@@ -140,7 +140,7 @@ black .
 isort .
 
 # Type checking
-mypy src/cowstudyapp
+mypy cowstudyapp
 
 # Linting
 flake8 .
@@ -167,7 +167,7 @@ common:
 
 #### Processing Data
 
-The `io`, `validation`, `features`, and `labels` sections of the config directly relate to `src/cowstudyapp/build_processed_data.py`. These next sections will explain how the user can interact with the related sections of the config. 
+The `io`, `validation`, `features`, and `labels` sections of the config directly relate to `cowstudyapp/build_processed_data.py`. These next sections will explain how the user can interact with the related sections of the config.
 
 ##### IO
 

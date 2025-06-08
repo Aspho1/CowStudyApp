@@ -15,9 +15,9 @@ from pathlib import Path
 import pandas as pd
 import seaborn as sns
 
-mode = 'ops'
+mode = 'opo'
 # Path to your optimization results file - you can edit this directly
-pkl_path = f"data/cv_results/RB_22/LSTM/{mode}/v3/bayes_opt_results.pkl"
+pkl_path = f"data/cv_results/RB_22/LSTM/{mode}/v6/bayes_opt_results.pkl"
 
 # Load the optimization results
 result = load(pkl_path)
@@ -42,9 +42,14 @@ lbls = [
     "decay_steps",
     "decay_rate",
     "clipnorm ",
-    "patience",
-    "min_delta ",
-    "reg_val"
+    "lstm_size",
+    "dense_size"
+
+
+
+    # "patience",
+    # "min_delta ",
+    # "reg_val"
 ]
 
 lens = [len(i) for i in lbls]

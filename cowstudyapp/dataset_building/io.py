@@ -8,18 +8,18 @@ from typing import Any, Dict, Optional, Tuple
 import logging
 import pytz
 
-from ..utils import (
+from cowstudyapp.utils import (
     add_posix_column,
     round_timestamps,
     process_time_column,
     from_posix,
-)  # Add this import
-from .features import GPSFeatures, FeatureComputation  # apply_feature_extraction
+)
 
-from .labels import LabelAggregation
+from cowstudyapp.dataset_building.features import GPSFeatures, FeatureComputation
+from cowstudyapp.dataset_building.labels import LabelAggregation
+from cowstudyapp.dataset_building.validation import DataValidator
+
 from cowstudyapp.config import ConfigManager
-from .validation import DataValidator
-
 
 class DataLoader:
 

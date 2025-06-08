@@ -111,7 +111,7 @@ labels:
     - "Mineral"
 
 analysis:
-  mode: "LOOCV"     # Do LOOCV on the target dataset. 
+  mode: "LOOCV"     # Do LOOCV on the target dataset.
   # mode: "PRODUCT"   # predict activity labels for a full dataset
   target_dataset: "data/processed/RB_22/all_cows_labeled.csv"  # Required The dataset to make predictions on
   # training_info_path: "data/analysis_results/hmm/FinalModels/RB_22_Paper_Model/trained_model.rds" # No CV, no filter cows, no covariate.
@@ -213,8 +213,8 @@ analysis:
 
     ################ Warning these two will SIGNIFICANTLY increase runtime to find parameters 
     # BAYESIAN Optimization
-    bayes_opt: true                # Whether to use Bayesian optimization 
-    bayes_opt_n_calls: 10          # Number of evaluations to perform
+    bayes_opt: true                # Whether to use Bayesian optimization
+    bayes_opt_n_calls: 100          # Number of evaluations to perform
     bayes_opt_resume: true         # Whether to resume from previous optimization
     bayes_opt_fast_eval: true      # Use faster evaluation during optimization
 
@@ -282,6 +282,17 @@ analysis:
     # patience: 60
     # min_delta: 0.0001000
     # reg_val: 0.0000125
+    # "max_length": 10
+    # "batch_size": 12
+    # "initial_lr": 0.01
+    # "decay_steps": 3598
+    # "decay_rate": 0.95
+    # "clipnorm": 0.9883585222190786
+    # "patience": 51
+    # "min_delta": 4.991684621625977e-06
+    # "reg_val": 3.999565917650851e-06
+
+
 
 
     ################### OPS BO Paper parameters
@@ -296,25 +307,9 @@ analysis:
     # reg_val: 0.0000139
 
 
-    max_length: 46
-    batch_size: 4
-    initial_lr: 0.003163803718904318
-    decay_steps: 3743
-    decay_rate: 0.1767921783287132
-    clipnorm: 0.26516296448723364
-    patience: 46
-    min_delta: 9.184261472141041e-06
-    reg_val: 5.0526881807188965e-05
-
-    # max_length: 20
-    # batch_size: 5
-    # initial_lr: 1e-4
-    # decay_steps: 5000
-    # decay_rate: 0.1
-    # clipnorm: 0.5
-    # patience: 60
-    # min_delta: 1e-6
-    # reg_val: 1e-6
+    patience: 15
+    min_delta: 0.001
+    reg_val: 0.001 #0.0000010
 
 
 visuals:
@@ -333,7 +328,7 @@ visuals:
   visuals_root_path: "data/visuals/LSTM/ops/"
 
   radar:
-    run: false
+    run: true
     extension: 'RadarPlots01/'
     show_night: true
 
@@ -347,7 +342,7 @@ visuals:
     export_excel: false  # Whether to export results to Excel
 
 
-    sample_size: 0.7
+    sample_size: 1
 
     terms:
     - hod
@@ -368,10 +363,10 @@ visuals:
     run: false
 
   convolution_surface:
-    run: false
+    run: true
 
   moon_phases:
-    run: false
+    run: true
     extension: 'moon_phases_plots/'
 
   domain:
@@ -387,7 +382,7 @@ visuals:
     # extension: 'cow_info_plots/'
 
   heatmap:
-    run: false
+    run: true
     # extension: 'heatmap/'
 
     filter_weigh_days: true
