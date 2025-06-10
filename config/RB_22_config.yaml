@@ -117,17 +117,7 @@ analysis:
   # training_info_path: "data/analysis_results/hmm/FinalModels/RB_22_Paper_Model/trained_model.rds" # No CV, no filter cows, no covariate.
 
 
-  r_executable: "C:/Program Files/R/R-4.4.1/bin/Rscript.exe"
-  # r_executable: "C:/Program Files/R/R-4.4.3/bin/Rscript.exe"
-  # r_executable: "C:/Program Files/R/R-4.3.0/bin/Rscript.exe"
-
-  
-  
-  
-  
-  ########## TEMP ONLY FOR BAYSES OPT I NEED SLEEP
-  # output_dir: "data/analysis_results"
-
+  r_executable: "C:/Program Files/R/R-4.4.3/bin/Rscript.exe"
 
 
   cv_results: "data/cv_results/RB_22"
@@ -197,7 +187,7 @@ analysis:
   lstm:
     enabled: true
     
-    ops: true
+    ops: false
 
 
     # random,
@@ -213,8 +203,8 @@ analysis:
 
     ################ Warning these two will SIGNIFICANTLY increase runtime to find parameters 
     # BAYESIAN Optimization
-    bayes_opt: true                # Whether to use Bayesian optimization
-    bayes_opt_n_calls: 100          # Number of evaluations to perform
+    bayes_opt: false                # Whether to use Bayesian optimization
+    bayes_opt_n_calls: 50          # Number of evaluations to perform
     bayes_opt_resume: true         # Whether to resume from previous optimization
     bayes_opt_fast_eval: true      # Use faster evaluation during optimization
 
@@ -252,59 +242,40 @@ analysis:
     epochs: 1000
     cows_per_cv_fold: 1
 
-    # max_length: 36
-    # batch_size: 32
-
-    # OPO cv=2
-    # ===== OVERALL RESULTS =====
-    # Total accuracy: 0.8170
-    # Grazing accuracy: 0.7291 (n=203)
-    # Resting accuracy: 0.8836 (n=232)
-    # Traveling accuracy: 0.8696 (n=46)
-
     ################### OPO BO Paper parameters
-    # max_length: 288
-    # batch_size: 5
-    # initial_lr: 0.0007918
-    # decay_steps: 3704
-    # decay_rate: 0.1
-    # clipnorm: 1.2775850
-    # patience: 37
-    # min_delta: 0.0001
-    # reg_val: 0.0000038
+    max_length: 122
+    batch_size: 32
+    initial_lr: 0.011718033546672266
+    decay_steps: 1667
+    decay_rate: 0.13881146613297657
+    clipnorm: 1.5
+    lstm_size: 16
+    dense_size: 64
+    # ===== OVERALL RESULTS =====
+    # Total accuracy: 0.9418
+    # Grazing accuracy: 0.9901 (n=203)
+    # Resting accuracy: 0.9095 (n=232)
+    # Traveling accuracy: 0.8913 (n=46)
 
-    # max_length: 271
-    # batch_size: 2
-    # initial_lr: 0.0001000
-    # decay_steps: 3188
-    # decay_rate: 0.7066770
-    # clipnorm: 1.0862404
-    # patience: 60
-    # min_delta: 0.0001000
-    # reg_val: 0.0000125
-    # "max_length": 10
-    # "batch_size": 12
-    # "initial_lr": 0.01
-    # "decay_steps": 3598
-    # "decay_rate": 0.95
-    # "clipnorm": 0.9883585222190786
-    # "patience": 51
-    # "min_delta": 4.991684621625977e-06
-    # "reg_val": 3.999565917650851e-06
+
 
 
 
 
     ################### OPS BO Paper parameters
-    # max_length: 184
-    # batch_size: 32
-    # initial_lr: 0.0079165
-    # decay_steps: 4255
-    # decay_rate: 0.2829337
-    # clipnorm: 0.4411081
-    # patience: 57
-    # min_delta: 0.0000017
-    # reg_val: 0.0000139
+    max_length: 249
+    batch_size: 29
+    initial_lr: 0.026919380886896802
+    decay_steps: 1836
+    decay_rate: 0.1967454052505094
+    clipnorm: 1.3541014490322514
+    lstm_size: 16
+    dense_size: 8
+    # ===== OVERALL RESULTS =====
+    # Total accuracy: 0.9584
+    # Grazing accuracy: 0.9655 (n=203)
+    # Resting accuracy: 0.9569 (n=232)
+    # Traveling accuracy: 0.9348 (n=46)
 
 
     patience: 15

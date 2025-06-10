@@ -140,7 +140,7 @@ def generate_plots(config, predictions_dataset, target_dataset, progress_callbac
         from cowstudyapp.visuals.show_radar_plots import RadarPlotOfCow
         radar = RadarPlotOfCow(config=config)
         radar.make_cow_gallery_images(df=predictions_dataset.copy())
-        # radar.make_radar_TWO_cows(df=predictions_dataset.copy(), show=True)
+        radar.make_radar_TWO_cows(df=predictions_dataset.copy(), show=False)
         vis_index += 1
 
     #############################################################################
