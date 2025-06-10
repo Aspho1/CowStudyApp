@@ -124,23 +124,18 @@ class LSTM_Model:
         self.decay_steps = lstm_cfg.decay_steps
         self.decay_rate = lstm_cfg.decay_rate
         self.clipnorm = lstm_cfg.clipnorm
+        self.lstm_size = lstm_cfg.lstm_size
+        self.dense_size = lstm_cfg.dense_size
+
         self.patience = lstm_cfg.patience
         self.min_delta = lstm_cfg.min_delta
         self.reg_val = lstm_cfg.reg_val
 
-        self.lstm_size = 32
-        self.dense_size = 32
-
-        set_seed(self.config.analysis.random_seed)
-        np.random.seed(self.config.analysis.random_seed)
-        random.seed(self.config.analysis.random_seed)
+        self.seed = None
+        # set_seed(self.config.analysis.random_seed)
+        # np.random.seed(self.config.analysis.random_seed)
+        # random.seed(self.config.analysis.random_seed)
         self.masking_val = -9999
-
-        # self.layers = [
-        #     Input((self.max_length, self.nfeatures)),
-        #     Masking(mask_value=self.masking_val),      
-        #     ]
-
 
 
     def run_LSTM(self, progress_callback=None):
@@ -148,6 +143,12 @@ class LSTM_Model:
         if progress_callback is None:
             progress_callback = lambda percent, message: print(f"{percent}%: {message}")
         progress_callback(7, "Preparing dataset for LSTM analysis")
+
+        tf.config.experimental.enable_op_determinism()
+        os.environ['TF_DETERMINISTIC_OPS'] = '1'
+        os.environ['TF_CUDNN_DETERMINISTIC'] = '1'
+
+
         untransformed = self._get_target_dataset(add_step_and_angle=True)
 
         # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
@@ -159,8 +160,6 @@ class LSTM_Model:
         transformed = untransformed[required_cols].copy()
         transformed = self._normalize_features(transformed, self.config.analysis.lstm.features)
         # df = df[required_cols].copy()
-
-
 
         # Check if we're doing Bayesian optimization
         if self.config.analysis.lstm.bayes_opt:
@@ -211,7 +210,7 @@ class LSTM_Model:
             raise ValueError(f"Unknown config mode {self.config.analysis.mode}.")
 
 
-    def _set_seed(self):
+    def _calculate_seed(self):
         params = {}
         for p in ['max_length', 'batch_size', 'initial_lr',
                   'decay_steps', 'decay_rate', 'clipnorm',
@@ -220,16 +219,23 @@ class LSTM_Model:
 
             params[p] = getattr(self,p)
 
-        derived_seed = compute_seed(self.config.analysis.random_seed, params)
+        return compute_seed(self.config.analysis.random_seed, params)
 
-        set_seed(derived_seed)
-        np.random.seed(derived_seed)
-        random.seed(derived_seed)
+    def _set_seed(self,seed):
+        set_seed(seed)
+        np.random.seed(seed)
+        random.seed(seed)
+
+        os.environ['PYTHONHASHSEED'] = str(seed)
+
+        self.seed = seed
+
 
 
     def build_model(self,progress_callback=None):
+        seed = self._calculate_seed()
 
-        self._set_seed()
+        self._set_seed(seed)
 
         self.layers = [
             Input((self.max_length, self.nfeatures)),
@@ -677,18 +683,23 @@ class LSTM_Model:
         
         # Split data for training/testing
         progress_callback(65, "Splitting data into training and test sets")
-        train_X, test_X, train_Y, test_Y = train_test_split(
-            X, Y, random_state=self.config.analysis.random_seed, test_size=.3, shuffle=True
-        )
-        
+        # train_X, test_X, train_Y, test_Y = train_test_split(
+        #     X, Y, random_state=self.config.analysis.random_seed, test_size=.3, shuffle=True
+        # )
+
         # Print label statistics
-        train_label_count = np.sum(train_Y != self.UNLABELED_VALUE)
-        test_label_count = np.sum(test_Y != self.UNLABELED_VALUE)
-        progress_callback(67, f"Training set: {len(train_X)} sequences with {train_label_count} labeled timesteps")
-        progress_callback(68, f"Test set: {len(test_X)} sequences with {test_label_count} labeled timesteps")
+        # train_label_count = np.sum(train_Y != self.UNLABELED_VALUE)
+        # test_label_count = np.sum(test_Y != self.UNLABELED_VALUE)
+        # progress_callback(67, f"Training set: {len(train_X)} sequences with {train_label_count} labeled timesteps")
+        # progress_callback(68, f"Test set: {len(test_X)} sequences with {test_label_count} labeled timesteps")
         
         model = None
         history = None
+        # Training Summary:
+        # Final Training Loss: 0.0882
+        # Final Training Accuracy: 0.5787
+        # Final Validation Loss: 0.1463
+        # Final Validation Accuracy: 0.5815
 
         # Check if we should load a model from a path
         if self.config.analysis.training_info_path and str(self.config.analysis.training_info_path).endswith(".keras"):
@@ -708,7 +719,7 @@ class LSTM_Model:
                 progress_callback(72, f"Error loading model: {str(e)}")
                 progress_callback(73, "Falling back to training a new model")
                 print(traceback.format_exc())
-                model, history, _ = self._make_LSTM(train_X, train_Y, test_X, test_Y, progress_callback)
+                model, history = self._make_LSTM(X, Y, test_X, test_Y, progress_callback)
                 # Save the global model
                 model_path = self.model_path / "global_lstm_model.keras"
                 model.save(model_path)
@@ -720,7 +731,7 @@ class LSTM_Model:
 
         else:
             progress_callback(70, "Training new model")
-            model, history, _ = self._make_LSTM(train_X, train_Y, test_X, test_Y, progress_callback)
+            model, history = self._make_LSTM(X, Y, progress_callback)
             # Save the global model
             model_path = self.model_path / "global_lstm_model.keras"
             model.save(model_path)
@@ -728,8 +739,8 @@ class LSTM_Model:
             # Plot training history
             if history:
                 self._plot_single_history(history)
-        
-        del train_X, train_Y, test_X, test_Y
+
+        del X, Y
         gc.collect()
 
         # Generate predictions for the full dataset
@@ -1023,23 +1034,20 @@ class LSTM_Model:
         # Determine number of processes
         n_jobs = (mp.cpu_count()-1) if n_jobs == -1 else n_jobs
         n_jobs = min(n_jobs, len(test_chunks))  # Can't use more processes than chunks
-
-
-        ################################# PLEASE STOP CRASHING ##############################
-        # n_jobs = 1 ##########################################################################
+        n_jobs=1
         
         # Instead of using a Pool directly, we'll use the starmap approach with pre-built arguments
         print(f"Running LOOCV with {n_jobs} parallel processes")
         progress_callback(45, f"Running LOOCV with {n_jobs} parallel processes")
         # Create argument list for each fold
         fold_args = []
-        for test_chunk in test_chunks:
+        for i, test_chunk in enumerate(test_chunks):
             test_mask = np.isin(groups, test_chunk)
             train_mask = ~test_mask
             test_X, test_Y = X[test_mask], Y[test_mask]
             train_X, train_Y = X[train_mask], Y[train_mask]
             progress_callback(45, f"Initializing fold with held out device_ids: {test_chunk}")
-            fold_args.append((test_chunk, train_X, train_Y, test_X, test_Y))
+            fold_args.append((test_chunk, train_X, train_Y, test_X, test_Y, self.seed + i * 10000))
         
         # Process folds in parallel
         if n_jobs > 1:
@@ -1078,15 +1086,26 @@ class LSTM_Model:
         # Save and display overall results
         if not compute_metrics_only and all_histories:
             self._summarize_results(all_predictions, all_actual, all_histories)
-        
-        # Return empty lists where models and histories would be (can't pickle models easily)
+
         return [], []
 
-    # Add this method to your class to be used by multiprocessing
-    def _process_fold_mp(self, test_chunk, train_X, train_Y, test_X, test_Y):
+
+    def _process_fold_mp(self, test_chunk, train_X, train_Y, test_X, test_Y, seed):
         """
         Process a single fold in LOOCV - this method is designed to be called via multiprocessing
         """
+
+        # ===== OVERALL RESULTS =====
+        # Total accuracy: 0.8815
+        # Grazing accuracy: 0.8719 (n=203)
+        # Resting accuracy: 0.8922 (n=232)
+        # Traveling accuracy: 0.8696 (n=46)
+
+        self._set_seed(seed)
+        os.environ['TF_DETERMINISTIC_OPS'] = '1'
+        os.environ['PYTHONHASHSEED'] = str(seed)
+        tf.config.experimental.enable_op_determinism()
+
 
         # Full training
         model, history, pred_y_classes = self._make_LSTM(
@@ -1100,11 +1119,6 @@ class LSTM_Model:
         else:
             flat_actual = test_Y
             flat_pred = pred_y_classes
-
-        # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-        # for i in range(len(flat_pred)):
-        #     print(flat_pred[i], flat_actual[i])
-
         
         # Only evaluate on valid data points
         valid_indices = flat_actual != self.UNLABELED_VALUE
@@ -1153,199 +1167,7 @@ class LSTM_Model:
 
 
 
-    # def _make_LSTM(self, train_X, train_Y, test_X, test_Y, progress_callback=None):
-    #     """Build and train LSTM model with improved handling of imbalanced data
-        
-    #     Parameters:
-    #     -----------
-    #     train_X, train_Y: Training data
-    #     test_X, test_Y: Test data
-    #     Returns:
-    #     --------
-    #     model, history, pred_final
-    #     """
-    #     if progress_callback is None:
-    #         progress_callback = lambda percent, message: None
-        
-    #     progress_callback(73, "Building and compiling LSTM model")
-        
-    #     ops_mode = len(train_Y.shape) == 1
-            
-    #     n_epochs = self.config.analysis.lstm.epochs
-
-    #     model = Sequential(self.layers)
-    #     # learning rate schedule
-
-    #     lr_schedule = ExponentialDecay(
-    #         self.initial_lr,
-    #         decay_steps=self.decay_steps,
-    #         decay_rate=self.decay_steps
-    #     )
-
-    #     optimizer = Adam(learning_rate=lr_schedule, clipnorm=self.clipnorm)
-
-
-    #     model.compile(
-    #         optimizer=optimizer,
-    #         loss='sparse_categorical_crossentropy',
-    #         metrics=['accuracy']
-    #     )
-    #     # model.summary()
-        
-    #     if ops_mode:
-    #         flat_labels = train_Y[train_Y != self.UNLABELED_VALUE]
-    #     else:
-    #         flat_labels = train_Y[train_Y != self.UNLABELED_VALUE].flatten()
-
-
-    #     present = np.unique(flat_labels)
-    #     class_counts = np.bincount(flat_labels.astype(int))[present]
-    #     total = np.sum(class_counts)
-
-    #     class_weights = total / (class_counts * len(present))
-    #     class_weights = class_weights / np.min(class_weights)  # Normalize
-        
-    #     # Create weight array and mapping
-    #     cw_dict_present = dict(zip(present, class_weights))
-    #     cw_arr = np.ones(self.nclasses, dtype='float32')
-
-    #     for cls, w in cw_dict_present.items():
-    #         cw_arr[cls] = w
-        
-    #     # Create mask for labeled data and placeholder for unlabeled
-    #     mask = (train_Y != self.UNLABELED_VALUE).astype('float32')
-
-
-    #     if ops_mode:
-    #         sw = mask * np.vectorize(lambda x: cw_arr[x] if x != self.UNLABELED_VALUE else 0)(train_Y)
-    #     else:
-    #         # For 2D array, we need a different approach
-    #         sw = np.zeros_like(train_Y, dtype=float)
-    #         for i in range(len(train_Y)):
-    #             for j in range(len(train_Y[i])):
-    #                 if train_Y[i, j] != self.UNLABELED_VALUE:
-    #                     sw[i, j] = cw_arr[train_Y[i, j]]
-        
-
-    #     # train_Y_clipped = np.where(train_Y == self.UNLABELED_VALUE, 0, train_Y)  # Use class 0 as placeholder
-        
-    #     # Compute sample weights - 0 weight for unlabeled data
-    #     # sw = mask * cw_arr[train_Y_clipped]
-        
-    #     # Print diagnostic information
-    #     # n_total_labels = np.sum(train_Y != self.UNLABELED_VALUE)
-    #     # print(f"Total labeled examples: {n_total_labels}")
-        
-    #     # for i in range(self.nclasses):
-    #     #     n_class = np.sum(train_Y == i)
-    #     #     if n_total_labels > 0:
-    #     #         pct = (n_class / n_total_labels) * 100
-    #     #     else:
-    #     #         pct = 0
-    #     #     print(f"Class {i} ({self.inv_activity_map.get(i, 'Unknown')}): {n_class} examples ({pct:.2f}%)")
-        
-
-    #     validation_method = self.config.analysis.lstm.validation_method
-    #     test_size = self.config.analysis.lstm.validation_size
-        
-    #     # Create sequence IDs if needed for sequence-aware methods
-    #     if validation_method != "random":
-    #         sequence_ids = get_sequence_ids(train_X, train_Y)    
-    #     # Perform the validation split
-    #     if validation_method == "sequence_aware":
-    #         x_train, x_valid, y_train, y_valid, sw_train, sw_valid = sequence_aware_validation_split(
-    #             train_X, train_Y, sw, sequence_ids, self.UNLABELED_VALUE, test_size
-    #         )
-    #     elif validation_method == "interleaved":
-    #         x_train, x_valid, y_train, y_valid, sw_train, sw_valid = interleaved_validation_split(
-    #             train_X, train_Y, sw, sequence_ids, self.UNLABELED_VALUE
-    #         )
-    #     elif validation_method == "balanced_class":
-    #         x_train, x_valid, y_train, y_valid, sw_train, sw_valid = balanced_class_validation_split(
-    #             train_X, train_Y, sw, sequence_ids, self.UNLABELED_VALUE, test_size
-    #         )
-    #     elif validation_method == "stratified":
-    #         x_train, x_valid, y_train, y_valid, sw_train, sw_valid = stratified_sequence_split(
-    #             train_X, train_Y, sw, sequence_ids, self.UNLABELED_VALUE, test_size
-    #         )
-    #     else:  # Default to random
-    #         x_train, x_valid, y_train, y_valid, sw_train, sw_valid = random_validation_split(
-    #             train_X, train_Y, sw, test_size, self.config.analysis.random_seed
-    #         )
-    
-    #     y_train_clipped = np.where(y_train == self.UNLABELED_VALUE, 0, y_train)
-    #     y_valid_clipped = np.where(y_valid == self.UNLABELED_VALUE, 0, y_valid)
-
-    #     history = model.fit(
-    #         x_train,
-    #         y_train_clipped,
-    #         validation_data=(x_valid, y_valid_clipped, sw_valid),
-    #         sample_weight=sw_train,
-    #         epochs=n_epochs,
-    #         batch_size=self.batch_size,
-    #         callbacks=[
-    #             EarlyStopping(
-    #                 monitor='val_loss',
-    #                 patience=self.patience,
-    #                 restore_best_weights=True,
-    #                 min_delta=self.min_delta     # More sensitive to improvements
-    #             ),
-    #             # ReduceLROnPlateau(
-    #             #     monitor='val_loss',
-    #             #     factor=0.05,
-    #             #     patience=10,
-    #             #     min_lr=0.00001
-    #             # ),
-    #         ],
-    #         verbose=0
-    #     )
-
-
-    #     test_Y_clipped = np.where(test_Y == self.UNLABELED_VALUE, 0, test_Y)
-
-    #     progress_callback(90, "Generating predictions")
-    #     pred_y = model.predict(test_X, verbose=0)
-        
-    #     if ops_mode: 
-    #         pred_y_classes = np.argmax(pred_y, axis=1)  # Use axis=1 since we flattened
-    #     else:
-    #         pred_y_classes = np.argmax(pred_y, axis=2)
-        
-
-    #     progress_callback(95, "Calculating performance metrics")
-    #     valid_indices = test_Y > self.UNLABELED_VALUE
-    #     self.last_accuracy = np.mean(pred_y_classes[valid_indices] == test_Y[valid_indices])
-        
-    #     # Calculate F1 score (better metric for imbalanced classes)
-    #     if np.any(valid_indices):
-    #         try:
-    #             self.last_f1_score = f1_score(
-    #                 test_Y[valid_indices], 
-    #                 pred_y_classes[valid_indices],
-    #                 average='micro'
-    #             )
-    #         except Exception as e:
-    #             print(f"Error calculating F1 score: {e}")
-    #             self.last_f1_score = 0
-                
-    #     # Store class accuracies
-    #     self.last_class_accuracies = {}
-    #     for class_idx in np.unique(test_Y):
-    #         if class_idx == self.UNLABELED_VALUE:
-    #             continue
-    #         class_mask = (test_Y == class_idx)
-    #         if np.sum(class_mask) > 0:
-    #             class_acc = np.mean(pred_y_classes[class_mask] == class_idx)
-    #             class_name = self.inv_activity_map.get(class_idx, f"Unknown ({class_idx})")
-    #             self.last_class_accuracies[class_name] = float(class_acc)
-        
-    #     return model, history, pred_y_classes
-
-
-
-
-
-    def _make_LSTM(self, train_X, train_Y, test_X, test_Y, progress_callback=None):
+    def _make_LSTM(self, train_X, train_Y, test_X=None, test_Y=None, progress_callback=None):
         """Build and train LSTM model with improved handling of imbalanced data
         
         Parameters:
@@ -1355,7 +1177,9 @@ class LSTM_Model:
         Returns:
         --------
         model, history, pred_final
-        """        
+        """
+        os.environ["TF_DETERMINISTIC_OPS"] = "1"
+        os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # Optional: control GPU exposure
         if progress_callback is None:
             progress_callback = lambda percent, message: None
         
@@ -1363,53 +1187,28 @@ class LSTM_Model:
         
         # Determine if we're in OPS mode (one prediction per sequence) or OPO mode (one prediction per observation)
         ops_mode = len(train_Y.shape) == 1
-            
-        n_epochs = self.config.analysis.lstm.epochs
 
         model = Sequential(self.layers)
+        # print(model.summary())
         # learning rate schedule
 
         lr_schedule = ExponentialDecay(
             self.initial_lr,
             decay_steps=self.decay_steps,
-            decay_rate=self.decay_steps
+            decay_rate=self.decay_rate
         )
 
         optimizer = Adam(learning_rate=lr_schedule, clipnorm=self.clipnorm)
+        # print("DECAY RATE!:", self.decay_rate)
         
         model.compile(
             optimizer=optimizer,
             loss='sparse_categorical_crossentropy',
-            metrics=['accuracy']  # Include both metrics for comparison
+            metrics=['accuracy']
         )
 
-        # model.compile(
-        #     optimizer=optimizer,
-        #     loss=MaskedSparseCategoricalCrossentropy(unlabeled_value=self.UNLABELED_VALUE),
-        #     metrics=[MaskedAccuracy(unlabeled_value=self.UNLABELED_VALUE)]
-        # )
-
-
-        # Calculate class weights from the labeled data
-        if ops_mode:
-            flat_labels = train_Y[train_Y != self.UNLABELED_VALUE]
-        else:
-            flat_labels = train_Y[train_Y != self.UNLABELED_VALUE].flatten()
-
-        present = np.unique(flat_labels)
-        class_counts = np.bincount(flat_labels.astype(int))[present]
-        total = np.sum(class_counts)
-
-        class_weights = total / (class_counts * len(present))
-        class_weights = class_weights / np.min(class_weights)  # Normalize
-        
-        # Create weight array and mapping
-        cw_dict_present = dict(zip(present, class_weights))
         cw_arr = np.ones(self.nclasses, dtype='float32')
 
-        # for cls, w in cw_dict_present.items():
-        #     cw_arr[cls] = w
-        
         # Create mask for labeled data and placeholder for unlabeled
         mask = (train_Y != self.UNLABELED_VALUE).astype('float32')
 
@@ -1424,22 +1223,10 @@ class LSTM_Model:
                     if train_Y[i, j] != self.UNLABELED_VALUE:
                         sw[i, j] = cw_arr[train_Y[i, j]]
         
-
-        # # Print diagnostic information
-        # n_total_labels = np.sum(train_Y != self.UNLABELED_VALUE)
-        # print(f"Total labeled examples: {n_total_labels}")
-        
-        # for i in range(self.nclasses):
-        #     n_class = np.sum(train_Y == i)
-        #     if n_total_labels > 0:
-        #         pct = (n_class / n_total_labels) * 100
-        #     else:
-        #         pct = 0
-        #     print(f"Class {i} ({self.inv_activity_map.get(i, 'Unknown')}): {n_class} examples ({pct:.2f}%)")
         
 
-        validation_method = getattr(self.config.analysis.lstm, "validation_method", "random")
-        test_size = getattr(self.config.analysis.lstm, "validation_size", 0.3)
+        validation_method = self.config.analysis.lstm.validation_method
+        test_size = self.config.analysis.lstm.validation_size
         
         progress_callback(75, f"Performing {validation_method} validation split")
         
@@ -1466,7 +1253,7 @@ class LSTM_Model:
             )
         else:  # Default to random
             x_train, x_valid, y_train, y_valid, sw_train, sw_valid = random_validation_split(
-                train_X, train_Y, sw, test_size, self.config.analysis.random_seed
+                train_X, train_Y, sw, test_size, self.seed
             )
         
         # Now convert the unlabeled values to 0 for model training
@@ -1486,7 +1273,7 @@ class LSTM_Model:
             y_train_clipped,  # Use clipped version for training
             validation_data=(x_valid, y_valid_clipped, sw_valid),  # Use clipped version for validation
             sample_weight=sw_train,
-            epochs=n_epochs,
+            epochs=self.config.analysis.lstm.epochs,
             batch_size=self.batch_size,
             callbacks=[
                 EarlyStopping(
@@ -1498,100 +1285,33 @@ class LSTM_Model:
                 ),
                 labeled_metrics_callback
             ],
-            verbose=0
+            verbose=0,
+
         )
 
-        # For prediction, we also need to clip the unlabeled values in test data
-        test_Y_clipped = np.where(test_Y == self.UNLABELED_VALUE, 0, test_Y)
-        
-        # Generate predictions
-        progress_callback(90, "Generating predictions")
-        pred_y = model.predict(test_X, verbose=0)
-        
-        if ops_mode: 
-            pred_y_classes = np.argmax(pred_y, axis=1)  # Use axis=1 since we flattened
+
+        if (test_X is not None) and (test_Y is not None):
+
+            # Generate predictions
+            progress_callback(90, "Generating predictions")
+            pred_y = model.predict(test_X, verbose=0)
+
+            if ops_mode:
+                pred_y_classes = np.argmax(pred_y, axis=1)  # Use axis=1 since we flattened
+            else:
+                pred_y_classes = np.argmax(pred_y, axis=2)
+
+            # Merge the custom callback history with the model history
+            history_dict = history.history.copy()
+            for key, value in labeled_metrics_callback.history.items():
+                history_dict[key] = value
+
+
+            progress_callback(100, "LSTM model training complete")
+            return model, history, pred_y_classes
+
         else:
-            pred_y_classes = np.argmax(pred_y, axis=2)
-        
-        # Calculate metrics for evaluation using the original test_Y with unlabeled values
-        # progress_callback(95, "Calculating performance metrics")
-        # valid_indices = test_Y != self.UNLABELED_VALUE
-        # self.last_accuracy = np.mean(pred_y_classes[valid_indices] == test_Y[valid_indices])
-        
-        # # Calculate F1 score
-        # if np.any(valid_indices):
-        #     try:
-        #         self.last_f1_score = f1_score(
-        #             test_Y[valid_indices], 
-        #             pred_y_classes[valid_indices],
-        #             average='micro',
-        #             labels=sorted([v for k,v in self.activity_map.items() if k is not np.nan])
-        #         )
-        #     except Exception as e:
-        #         print(f"Error calculating F1 score: {e}")
-        #         self.last_f1_score = 0
-                
-        # # Store class accuracies
-        # self.last_class_accuracies = {}
-        # for class_idx in np.unique(test_Y):
-        #     if class_idx == self.UNLABELED_VALUE:
-        #         continue
-        #     class_mask = (test_Y == class_idx)
-        #     if np.sum(class_mask) > 0:
-        #         class_acc = np.mean(pred_y_classes[class_mask] == class_idx)
-        #         class_name = self.inv_activity_map.get(class_idx, f"Unknown ({class_idx})")
-        #         self.last_class_accuracies[class_name] = float(class_acc)
-        
-
-
-        # Merge the custom callback history with the model history
-        history_dict = history.history.copy()
-        for key, value in labeled_metrics_callback.history.items():
-            history_dict[key] = value
-
-
-        progress_callback(100, "LSTM model training complete")
-        return model, history, pred_y_classes
-
-
-
-
-
-    # def _plot_single_history(self, history):
-    #     """Plot training history for a single model"""
-    #     plt.figure(figsize=(12, 4))
-        
-    #     # Plot Loss
-    #     plt.subplot(1, 2, 1)
-    #     plt.plot(history.history['loss'], 'b-', label='Training Loss')
-    #     if 'val_loss' in history.history:
-    #         plt.plot(history.history['val_loss'], 'r-', label='Validation Loss')
-    #     plt.title('Loss')
-    #     plt.xlabel('Epoch')
-    #     plt.ylabel('Loss')
-    #     plt.legend()
-        
-    #     # Plot Accuracy
-    #     plt.subplot(1, 2, 2)
-    #     plt.plot(history.history['accuracy'], 'b-', label='Training Accuracy')
-    #     if 'val_accuracy' in history.history:
-    #         plt.plot(history.history['val_accuracy'], 'r-', label='Validation Accuracy')
-    #     plt.title('Accuracy')
-    #     plt.xlabel('Epoch')
-    #     plt.ylabel('Accuracy')
-    #     plt.legend()
-        
-
-    #     plt.savefig(self.model_path / "lstm_global_history.png", dpi=300)
-    #     plt.close()
-        
-    #     # Print final metrics
-    #     print("\nTraining Summary:")
-    #     print(f"Final Training Loss: {history.history['loss'][-1]:.4f}")
-    #     print(f"Final Training Accuracy: {history.history['accuracy'][-1]:.4f}")
-    #     if 'val_loss' in history.history:
-    #         print(f"Final Validation Loss: {history.history['val_loss'][-1]:.4f}")
-    #         print(f"Final Validation Accuracy: {history.history['val_accuracy'][-1]:.4f}")
+            return model, history
 
 
 
@@ -1747,117 +1467,18 @@ class LSTM_Model:
             for class_name, class_id in self.activity_map.items():
                 if class_id == self.UNLABELED_VALUE:
                     continue
-                    
+
                 class_mask = valid_actual == class_id
                 if np.sum(class_mask) > 0:
                     class_acc = np.mean(valid_pred[class_mask] == class_id)
                     f.write(f"{class_name}: {class_acc:.4f} (n={np.sum(class_mask)})\n")
 
 
-    # def _plot_training_histories(self, histories):
-    #     """Plot training histories across all folds"""
-    #     plt.figure(figsize=(12, 4))
-                
-    #     # Use consistent metric names based on what's available in the history
-    #     metric_name = 'masked_accuracy'
-    #     val_metric_name = 'val_masked_accuracy'
-        
-    #     # Check if we need to fall back to regular accuracy metrics
-    #     if not all(metric_name in h.history for h in histories):
-    #         metric_name = 'accuracy'
-    #         val_metric_name = 'val_accuracy'
-
-    #     # Find max length of histories
-    #     max_epochs = max(len(h.history['loss']) for h in histories)
-        
-    #     # Initialize arrays for mean and std calculations
-    #     losses = np.zeros((len(histories), max_epochs))
-    #     accuracies = np.zeros((len(histories), max_epochs))
-    #     val_losses = np.zeros((len(histories), max_epochs))
-    #     val_accuracies = np.zeros((len(histories), max_epochs))
-        
-    #     # Fill arrays with padding
-    #     for i, h in enumerate(histories):
-    #         # Pad or truncate loss
-    #         curr_len = len(h.history['loss'])
-    #         losses[i, :curr_len] = h.history['loss']
-    #         losses[i, curr_len:] = h.history['loss'][-1]  # Pad with last value
-            
-    #         # Pad or truncate val_loss if it exists
-    #         if 'val_loss' in h.history:
-    #             val_curr_len = len(h.history['val_loss'])
-    #             val_losses[i, :val_curr_len] = h.history['val_loss']
-    #             val_losses[i, val_curr_len:] = h.history['val_loss'][-1]
-            
-    #         # Pad or truncate accuracy metrics
-    #         curr = h.history[metric_name]
-    #         accuracies[i, :len(curr)] = curr
-    #         accuracies[i, len(curr):] = curr[-1]
-            
-    #         # Pad or truncate validation accuracy if it exists
-    #         if val_metric_name in h.history:
-    #             val_curr = h.history[val_metric_name]
-    #             val_accuracies[i, :len(val_curr)] = val_curr
-    #             val_accuracies[i, len(val_curr):] = val_curr[-1]
-        
-    #     # Plot Loss
-    #     plt.subplot(1, 2, 1)
-    #     epochs = range(1, max_epochs + 1)
-        
-    #     # Plot individual histories
-    #     for i in range(len(histories)):
-    #         plt.plot(epochs[:len(histories[i].history['loss'])], 
-    #                 histories[i].history['loss'], 
-    #                 'b-', alpha=0.1)
-        
-    #     # Plot mean and std
-    #     mean_loss = np.mean(losses, axis=0)
-    #     std_loss = np.std(losses, axis=0)
-    #     plt.plot(epochs, mean_loss, 'b-', label='Mean Train Loss')
-    #     plt.fill_between(epochs, mean_loss-std_loss, mean_loss+std_loss, 
-    #                     color='b', alpha=0.2, label='±1 std')
-        
-    #     # Plot validation loss if available
-    #     if 'val_loss' in histories[0].history:
-    #         mean_val_loss = np.mean(val_losses, axis=0)
-    #         plt.plot(epochs, mean_val_loss, 'r-', label='Mean Val Loss')
-        
-    #     plt.title('Training Loss')
-    #     plt.xlabel('Epoch')
-    #     plt.ylabel('Loss')
-    #     plt.legend()
-        
-    #     # Plot Accuracy
-    #     plt.subplot(1, 2, 2)
-        
-    #     # Plot individual histories
-    #     for i in range(len(histories)):
-    #         plt.plot(epochs[:len(histories[i].history[metric_name])], 
-    #                 histories[i].history[metric_name], 
-    #                 'b-', alpha=0.1)
-        
-    #     # Plot mean and std
-    #     mean_acc = np.mean(accuracies, axis=0)
-    #     std_acc = np.std(accuracies, axis=0)
-    #     plt.plot(epochs, mean_acc, 'b-', label=f'Mean {metric_name.replace("_", " ").title()}')
-    #     plt.fill_between(epochs, mean_acc-std_acc, mean_acc+std_acc, 
-    #                     color='b', alpha=0.2, label='±1 std')
-        
-    #     # Plot validation accuracy if available
-    #     if val_metric_name in histories[0].history:
-    #         mean_val_acc = np.mean(val_accuracies, axis=0)
-    #         plt.plot(epochs, mean_val_acc, 'r-', label=f'Mean {val_metric_name.replace("_", " ").title()}')
-        
-    #     plt.title('Training Accuracy')
-    #     plt.xlabel('Epoch')
-    #     plt.ylabel('Accuracy')
-    #     plt.legend()
-        
-    #     plt.tight_layout()
-    #     plt.savefig(self.cv_path / "lstm_training_history.png", dpi=300)
-    #     plt.close()
-
-
+        # Save detailed metrics to file
+        with open(self.cv_path / "lstm_cv_preds.csv", "w") as f:
+            f.write(f"Actual, Predicted\n")
+            for i in range(len(valid_pred)):
+                f.write(f"{valid_actual[i]}, {valid_pred[i]}\n")
 
 
     def _plot_training_histories(self, histories):
@@ -1999,110 +1620,3 @@ class LSTM_Model:
         plt.tight_layout()
         plt.savefig(self.cv_path / "lstm_training_history.png", dpi=300)
         plt.close()
-
-
-
-    # def _plot_training_histories(self, histories):
-    #     """Plot training histories across all folds"""
-    #     plt.figure(figsize=(12, 4))
-        
-    #     # Check which metrics are available in the histories
-    #     available_metrics = set(histories[0].history.keys())
-        
-    #     # Determine which accuracy metric to use (masked_accuracy or regular accuracy)
-    #     if 'masked_accuracy' in available_metrics:
-    #         metric_name = 'masked_accuracy'
-    #         val_metric_name = 'val_masked_accuracy' if 'val_masked_accuracy' in available_metrics else None
-    #     else:
-    #         metric_name = 'accuracy'
-    #         val_metric_name = 'val_accuracy' if 'val_accuracy' in available_metrics else None
-        
-    #     # Find max length of histories
-    #     max_epochs = max(len(h.history['loss']) for h in histories)
-        
-    #     # Initialize arrays for mean and std calculations
-    #     losses = np.zeros((len(histories), max_epochs))
-    #     accuracies = np.zeros((len(histories), max_epochs))
-    #     val_losses = np.zeros((len(histories), max_epochs)) if 'val_loss' in available_metrics else None
-    #     val_accuracies = np.zeros((len(histories), max_epochs)) if val_metric_name else None
-        
-    #     # Fill arrays with padding
-    #     for i, h in enumerate(histories):
-    #         # Pad or truncate loss
-    #         curr_len = len(h.history['loss'])
-    #         losses[i, :curr_len] = h.history['loss']
-    #         losses[i, curr_len:] = h.history['loss'][-1]  # Pad with last value
-            
-    #         # Pad or truncate val_loss if it exists
-    #         if 'val_loss' in available_metrics and val_losses is not None:
-    #             val_curr_len = len(h.history['val_loss'])
-    #             val_losses[i, :val_curr_len] = h.history['val_loss']
-    #             val_losses[i, val_curr_len:] = h.history['val_loss'][-1]
-            
-    #         # Pad or truncate accuracy metrics
-    #         curr_len = len(h.history[metric_name])
-    #         accuracies[i, :curr_len] = h.history[metric_name]
-    #         accuracies[i, curr_len:] = h.history[metric_name][-1]
-            
-    #         # Pad or truncate validation accuracy if it exists
-    #         if val_metric_name and val_accuracies is not None:
-    #             val_curr_len = len(h.history[val_metric_name])
-    #             val_accuracies[i, :val_curr_len] = h.history[val_metric_name]
-    #             val_accuracies[i, val_curr_len:] = h.history[val_metric_name][-1]
-        
-    #     # Plot Loss
-    #     plt.subplot(1, 2, 1)
-    #     epochs = range(1, max_epochs + 1)
-        
-    #     # Plot individual histories
-    #     for i in range(len(histories)):
-    #         plt.plot(epochs[:len(histories[i].history['loss'])], 
-    #                 histories[i].history['loss'], 
-    #                 'b-', alpha=0.1)
-        
-    #     # Plot mean and std
-    #     mean_loss = np.mean(losses, axis=0)
-    #     std_loss = np.std(losses, axis=0)
-    #     plt.plot(epochs, mean_loss, 'b-', label='Mean Train Loss')
-    #     plt.fill_between(epochs, mean_loss-std_loss, mean_loss+std_loss, 
-    #                     color='b', alpha=0.2, label='±1 std')
-        
-    #     # Plot validation loss if available
-    #     if 'val_loss' in available_metrics and val_losses is not None:
-    #         mean_val_loss = np.mean(val_losses, axis=0)
-    #         plt.plot(epochs, mean_val_loss, 'r-', label='Mean Val Loss')
-        
-    #     plt.title('Training Loss')
-    #     plt.xlabel('Epoch')
-    #     plt.ylabel('Loss')
-    #     plt.legend()
-        
-    #     # Plot Accuracy
-    #     plt.subplot(1, 2, 2)
-        
-    #     # Plot individual histories
-    #     for i in range(len(histories)):
-    #         plt.plot(epochs[:len(histories[i].history[metric_name])], 
-    #                 histories[i].history[metric_name], 
-    #                 'b-', alpha=0.1)
-        
-    #     # Plot mean and std
-    #     mean_acc = np.mean(accuracies, axis=0)
-    #     std_acc = np.std(accuracies, axis=0)
-    #     plt.plot(epochs, mean_acc, 'b-', label=f'Mean {metric_name.replace("_", " ").title()}')
-    #     plt.fill_between(epochs, mean_acc-std_acc, mean_acc+std_acc, 
-    #                     color='b', alpha=0.2, label='±1 std')
-        
-    #     # Plot validation accuracy if available
-    #     if val_metric_name and val_accuracies is not None:
-    #         mean_val_acc = np.mean(val_accuracies, axis=0)
-    #         plt.plot(epochs, mean_val_acc, 'r-', label=f'Mean {val_metric_name.replace("_", " ").title()}')
-        
-    #     plt.title('Training Accuracy')
-    #     plt.xlabel('Epoch')
-    #     plt.ylabel('Accuracy')
-    #     plt.legend()
-        
-    #     plt.tight_layout()
-    #     plt.savefig(self.cv_path / "lstm_training_history.png", dpi=300)
-    #     plt.close()

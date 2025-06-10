@@ -391,7 +391,8 @@ class LSTMConfig(CommonConfig):
     min_delta: float = 1e-4
     reg_val: float = 1e-5
 
-
+    lstm_size: int = 32
+    dense_size: int = 32
 
 
 
