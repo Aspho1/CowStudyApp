@@ -17,7 +17,7 @@ import seaborn as sns
 
 mode = 'opo'
 # Path to your optimization results file - you can edit this directly
-pkl_path = f"data/cv_results/RB_22/LSTM/{mode}/v6/bayes_opt_results.pkl"
+pkl_path = f"data/cv_results/RB_22/LSTM/{mode}/v2job/bayes_opt_results.pkl"
 
 # Load the optimization results
 result = load(pkl_path)
@@ -27,7 +27,8 @@ srt_idx = np.argsort(func_vals)
 
 print(f"Reading optimization results from: {pkl_path}")
 def fix_type(value, spacing):
-    if isinstance(value, (np.integer, np.int32, np.int64)):
+    # print(value, type(value))
+    if isinstance(value, (np.integer, np.int32, np.int64, int)):
         return f"{int(value):<{spacing}}"
     elif isinstance(value, (np.floating, np.float32, np.float64, float)):
         return f"{float(value):<{spacing}.{7}f}"
@@ -61,21 +62,10 @@ print(" | ".join([x for x in lbls]))
 for i in srt_idx[:10]:
     if i == (len(input_vals) - 1):
         continue
-    print(f"{i:<{lens[0]}} | {' | '.join([fix_type(x,lens[j+1]) for j, x in enumerate(input_vals[i+1])])} --> {-100*func_vals[i]:>0.2f}")
-
-
-# idx | max_length | batch_size | initial_lr | decay_steps | decay_rate | clipnorm  | patience | min_delta  | reg_val
-# 31  | 61         | 4          | 0.0010000  | 1664        | 0.5934775  | 1.0226245 | 45       | 0.0000100  | 0.0000372 --> 89.36
-# 21  | 60         | 32         | 0.0000100  | 10000       | 0.9500000  | 1.1279435 | 32       | 0.0000001  | 0.0000001 --> 89.27
-# 35  | 248        | 4          | 0.0010000  | 10000       | 0.4000000  | 0.6214111 | 21       | 0.0000012  | 0.0000001 --> 88.02
-# 26  | 250        | 21         | 0.0010000  | 9703        | 0.4368956  | 2.0000000 | 15       | 0.0000001  | 0.0000001 --> 85.97
-# 39  | 169        | 4          | 0.0010000  | 7781        | 0.9500000  | 1.3041670 | 50       | 0.0000100  | 0.0000003 --> 85.62
-# 33  | 142        | 13         | 0.0010000  | 10000       | 0.8320453  | 0.1000000 | 50       | 0.0000003  | 0.0000001 --> 85.49
-# 34  | 288        | 4          | 0.0010000  | 10000       | 0.9500000  | 2.0000000 | 10       | 0.0000100  | 0.0001000 --> 85.41
-# 15  | 253        | 23         | 0.0006767  | 500         | 0.4956445  | 1.7276658 | 17       | 0.0000001  | 0.0000342 --> 84.48
-# 23  | 80         | 28         | 0.0010000  | 10000       | 0.4000000  | 1.7029562 | 31       | 0.0000003  | 0.0000001 --> 83.92
-
-
+    try:
+        print(f"{i:<{lens[0]}} | {' | '.join([fix_type(x,lens[j+1]) for j, x in enumerate(input_vals[i])])} --> {-100*func_vals[i]:>0.2f}")
+    except:
+        print("Failure on i =",i)
 
 
 

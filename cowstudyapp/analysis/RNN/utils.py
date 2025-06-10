@@ -8,6 +8,9 @@ import tensorflow as tf
 import keras
 from tensorflow.keras.callbacks import Callback
 
+import hashlib
+import json
+
 import os
 import logging
 
@@ -27,10 +30,39 @@ def silence_tensorflow():
         pass
 
 
-def compute_seed(base_seed, params):
-    param_hash = hash(frozenset(params.items())) & 0xFFFFFFFF
-    return (base_seed + param_hash) & 0xFFFFFFFF
+# def compute_seed(base_seed, params):
+#
+#     print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+#
+#     tuples = tuple([(k,v) for k,v in sorted(params.items())])
+#     print(tuples)
+#
+#     param_hash = hash(tuples) & 0xFFFFFFFF
+#     ds = (base_seed + param_hash) & 0xFFFFFFFF
+#
+#     print("--->",ds)
+#     print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+#     return ds
 
+
+def compute_seed(base_seed, params):
+    serializable_params = {}
+
+    for k,v in params.items():
+        # print(k, v, type(v))
+        if isinstance(v, (np.integer, np.int32, np.int64)):
+            serializable_params[k] = int(v)
+        elif isinstance(v, (np.floating, np.float32, np.float64)):
+            serializable_params[k] = float(v)
+        else:
+            serializable_params[k] = v
+
+    sorted_items = sorted(serializable_params.items())
+    param_str = json.dumps(sorted_items, sort_keys=True)
+
+    param_hash = int(hashlib.md5(param_str.encode('utf-8')).hexdigest(), 16) & 0xFFFFFFFF
+    ds = (base_seed + param_hash) & 0xFFFFFFFF
+    return ds
 
 # Add this method before _make_LSTM
 class LabeledDataMetricsCallback(Callback):

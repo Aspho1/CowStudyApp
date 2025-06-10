@@ -40,7 +40,7 @@ class BayesianOptSearch:
 
         ops = 'ops' if self.config.analysis.lstm.ops else 'opo'
 
-        self.output_dir = self.config.analysis.cv_results / 'lstm' / ops / 'v6'
+        self.output_dir = self.config.analysis.cv_results / 'lstm' / ops / 'v2job'
         # self.output_dir = Path(self.output_dir)
         self.output_dir.mkdir(parents=True,exist_ok=True)
         
@@ -49,14 +49,14 @@ class BayesianOptSearch:
         # Define the search space
         self.space = [
             Integer(10, 288, name='max_length'),
-            Integer(4, 32, name='batch_size'),
-            Real(1e-5, 1, "log-uniform", name='initial_lr'),
-            Integer(100, 3000, name='decay_steps'),
-            Real(0.01, 0.95, name='decay_rate'),
-            Real(0.1, 1.5, name='clipnorm'),
+            Integer(4, 48, name='batch_size'),
+            Real(1e-4, 0.1, name='initial_lr'),
+            Integer(500, 3000, name='decay_steps'),
+            Real(0.001, 0.95, name='decay_rate'),
+            Real(0.1, 2.5, name='clipnorm'),
 
-            Categorical([16, 32, 64], name='lstm_size'),
-            Categorical([16, 32, 64], name='dense_size'),
+            Categorical([8, 16, 32, 64], name='lstm_size'),
+            Categorical([8, 16, 32, 64], name='dense_size'),
 
 
             # Integer(15, 15, name='patience'),
@@ -98,9 +98,9 @@ class BayesianOptSearch:
         if self.lstm_model.config.analysis.mode != "LOOCV":
             raise ValueError("MUST use LOOCV when performing BO.")
 
-        # acq_func="EI"
+        acq_func="EI"
         # acq_func="LCB"
-        acq_func="PI"
+        # acq_func="PI"
 
         # noise =
 
@@ -170,18 +170,6 @@ class BayesianOptSearch:
     def _objective(self, params):
         """Objective function to minimize (negative F1 score)"""
         # Convert any NumPy types to native Python types for JSON serialization
-
-
-        # param_hash = hash(frozenset(params.items())) & 0xFFFFFFFF
-        # derived_seed = (self.random_seed + param_hash) & 0xFFFFFFFF
-        # derived_seed = compute_seed(self.random_seed, params)
-        #
-        # # Set seeds for this evaluation
-        # set_seed(derived_seed)
-        # np.random.seed(derived_seed)
-        # random.seed(derived_seed)
-
-
         printable_params = {}
         for key, value in params.items():
             if isinstance(value, (np.integer, np.int32, np.int64)):
@@ -211,18 +199,13 @@ class BayesianOptSearch:
         # Use fewer CV splits for speed
         cows_per_fold = self.config.analysis.lstm.cows_per_cv_fold
         
-        if self.config.analysis.mode == "LOOCV":
-            _, _ = self.lstm_model.do_loocv(
-                sequences=self.sequences, 
-                df=self.df, 
-                n=cows_per_fold, 
-                compute_metrics_only=self.config.analysis.lstm.bayes_opt_fast_eval
-            )
-        else:  # PRODUCT mode
-            _, _ = self.lstm_model.dont_do_loocv(
-                sequences=self.sequences, 
-                df=self.df
-            )
+        _, _ = self.lstm_model.do_loocv(
+            sequences=self.sequences,
+            df=self.df,
+            n=cows_per_fold,
+            compute_metrics_only=self.config.analysis.lstm.bayes_opt_fast_eval
+        )
+
             
         elapsed_time = time.time() - start_time
         
@@ -277,15 +260,15 @@ class BayesianOptSearch:
 
     def _set_params(self, params):
         """Set hyperparameters on the LSTM model"""
-        # Assign parameters to the model
         for param_name, param_value in params.items():
-            setattr(self.lstm_model, param_name, param_value)
-#
-#             # Special case for max_length which also needs to update sequence_length
-#             if param_name == 'max_length':
-#                 self.lstm_model.sequence_length = param_value
-#
+            # Convert numpy integers and floats to Python native types
+            if isinstance(param_value, (np.integer, np.int32, np.int64)):
+                param_value = int(param_value)
+            elif isinstance(param_value, (np.floating, np.float32, np.float64)):
+                param_value = float(param_value)
 
+            # Set the parameter on the model
+            setattr(self.lstm_model, param_name, param_value)
 
     def _save_optimization_plots(self, result):
         """Save optimization visualization plots"""
