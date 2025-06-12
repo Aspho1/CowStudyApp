@@ -275,12 +275,20 @@ get_predictions_from_model <- function(model, output_dir, config) {
     tryCatch({
     timezone <- "America/Denver"  # Let's be explicit about timezone
     predictions <- viterbi(model)
+
+    # TESTING
+    state_probs <- stateProbs(model)
     states <- model$stateNames
     results_df <- model$data
     results_df$predicted_state <- states[predictions]
     results_df$factored_activity <- NULL
     buffer <- 1.5
-    
+
+    for (i in 1:length(states)) {
+        results_df[[paste0("prob_", states[i])]] <- state_probs[,i]
+    }
+
+
     if(config$day_only){
         # Convert to Mountain time consistently
         utc_times <- as.POSIXct(results_df$posix_time, origin="1970-01-01", tz="UTC")

@@ -3,6 +3,7 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import math
 
 # from matplotlib.dates import WeekdayLocator
 # import matplotlib.patches as mpatches
@@ -18,11 +19,6 @@ from statsmodels.stats.multicomp import pairwise_tukeyhsd
 
 from cowstudyapp.utils import from_posix_col
 from cowstudyapp.config import ConfigManager
-
-
-
-
-
 
 
 def plot_tukey_results(tukey_results, title, y_values):
@@ -109,16 +105,6 @@ def plot_tukey_results(tukey_results, title, y_values):
     plt.show()
 
 
-
-
-
-
-
-
-
-
-
-
 def analyze_cows(df):
     print("=== Analysis by Cow ===")
     print("H1: At least one cow's mean grazing time is different")
@@ -138,7 +124,6 @@ def analyze_cows(df):
 
     
     plot_tukey_results(tukey, "Comparisons Between Cows", df.set_index('ID')['grazing_percentage'])
-
 
 
 def analyze_days(df):
@@ -221,70 +206,303 @@ class HeatMapMaker:
 
         return grazing_pct
         
-
-
-
-
+    
     def make_graph(self, grazing_pct:pd.DataFrame):
-
-
-        # print(grazing_pct.describe())
+        # pivot data for heatmap
         heatmap_data = grazing_pct.pivot(
             index='ID',
             columns='day',
             values='grazing_percentage'
         )
-        print(np.mean(heatmap_data))
-
-
-        heatmap_data = heatmap_data.sort_index(ascending=True)
-        fig, ax = plt.subplots(layout='constrained', figsize=self.figure_size)
         
-        # sns.heatmap(heatmap_data, annot=True, fmt=".0f", cmap="coolwarm", cbar=False, ax=ax, center=100/3)
+        # Calculate average percentage per day (across all cows)
+        day_averages = heatmap_data.mean(axis=0)
+        
+        # Calculate average percentage per cow (across all days)
+        cow_averages = heatmap_data.mean(axis=1)
+        
+        # Calculate the overall mean grazing percentage
+        overall_mean = np.mean(heatmap_data)
+        print(f"Overall average grazing percentage: {overall_mean:.2f}%")
+        
+        # Calculate deviations from the overall mean
+        day_deviations = day_averages - overall_mean
+        cow_deviations = (cow_averages - overall_mean)[::-1]
+        
+        heatmap_data = heatmap_data.sort_index(ascending=True)
+        
+        # Create figure with 2x2 grid
+        fig, axs = plt.subplots(2, 2, figsize=(self.figure_size[0]*1.2, self.figure_size[1]*1.5),
+                            gridspec_kw={'width_ratios': [4, 1], 'height_ratios': [1, 4]})
+        
+        # 1,1: Day deviations from mean (top-left)
+        ax_day_dev = axs[0, 0]
+        
+        # Create zero line (overall mean)
+        ax_day_dev.axhline(y=0, color='gray', linestyle='-', alpha=0.7, linewidth=1)
+        
+        # Create x range for days
+        x_positions = np.arange(len(day_averages)) + 0.5
+        
+        # Use bars for deviations
+        pos_mask = day_deviations >= 0
+        neg_mask = day_deviations < 0
+        
+        # Handle positive deviations
+        if any(pos_mask):
+            ax_day_dev.bar(x_positions[pos_mask], day_deviations[pos_mask],
+                        color='#d95f02', alpha=0.6, edgecolor=None, width=1.0)
+        
+        # Handle negative deviations
+        if any(neg_mask):
+            ax_day_dev.bar(x_positions[neg_mask], day_deviations[neg_mask],
+                        color='#1f78b4', alpha=0.6, edgecolor=None, width=1.0)
+        
+        # Set axis limits
+        ax_day_dev.set_xlim(0, len(day_averages))
+        
+        # Round to nearest 5% for y-axis limits
+        dev_max = max(5, 5 * math.ceil(max(abs(day_deviations)) / 5))
+        ax_day_dev.set_ylim(-dev_max, dev_max)
+        
+        # Set ticks every 5%
+        y_ticks = np.arange(-dev_max, dev_max + 5, 5)
+        ax_day_dev.set_yticks(y_ticks)
+        ax_day_dev.set_yticklabels([f'{x:+.1f}%' for x in y_ticks])  # + sign for positive values
+        
+        # Add a label showing the overall mean
+        ax_day_dev.text(0.5, 0.97, f'Mean: {overall_mean:.1f}%', transform=ax_day_dev.transAxes,
+                    fontsize=10, verticalalignment='top', horizontalalignment='center',
+                    bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+        
+        # No title for publication figure
+        # ax_day_dev.set_title('Daily Deviation from Mean Grazing %', fontsize=12)
+        ax_day_dev.set_ylabel('Deviation')
+        ax_day_dev.set_xticks([])  # Hide x-ticks as they're shown in the heatmap
+        ax_day_dev.grid(True, axis='y', linestyle='--', alpha=0.3)
+        ax_day_dev.spines['top'].set_visible(False)
+        ax_day_dev.spines['right'].set_visible(False)
+        
+        # 2,1: Main heatmap (bottom-left)
+        ax_heatmap = axs[1, 0]
         c = 100/3
-        # vmin, vmax = (1/3)*c, (5/3)*c  # Narrower range around 33
-        # vmin, vmax = 0, 100  # Narrower range around 33
         cmap = sns.diverging_palette(250, 30, l=60, s=80, center="light", as_cmap=True)
         heatmap = sns.heatmap(
-            heatmap_data, 
-            annot=False, 
-            fmt=".0f", 
+            heatmap_data,
+            annot=False,
+            fmt=".0f",
             cmap=cmap,
-            # cmap="RdYlBu_r",
-            # cmap="coolwarm",
             center=c,
-            # vmin=vmin,
-            # vmax=vmax,
-            cbar=True,  # Add colorbar to show the scale
-            ax=ax
+            cbar=False,  # We'll create a separate colorbar
+            ax=ax_heatmap
         )
         
-        cbar = heatmap.collections[0].colorbar
-        cbar.set_ticklabels([f'{x:.0f}%' for x in cbar.get_ticks()])
+        # Minimal axis labels for the heatmap
+        # For publication, we can simplify by removing or reducing these
+        # x_tick_positions = np.arange(len(heatmap_data.columns))[::4] + 0.5  # Show fewer labels (every 4th)
+        # x_tick_labels = [d.strftime('%m-%d') for d in heatmap_data.columns[::4]]
+        # ax_heatmap.set_xticks(x_tick_positions)
+        # ax_heatmap.set_xticklabels(x_tick_labels, rotation=45, ha='right', fontsize=9)
         
-        ax.tick_params(axis='y', labelsize=12)
-        # ax.set_xticks([x + 0.5 for x in range(len(heatmap_data.columns))])
-        # date_labels = [d.strftime('%m-%d') for d in heatmap_data.columns]
-        # # ax.set_xticklabels(date_labels, rotation=45, ha='right', fontsize=10)
-        # ax.set_xticklabels(date_labels, rotation=45, ha='right', fontsize=10)
+        # Simplified y-axis (cow IDs) - consider removing or using smaller font
+        # ax_heatmap.set_yticks(np.arange(len(heatmap_data.index)) + 0.5)
+        # ax_heatmap.set_yticklabels(heatmap_data.index, fontsize=7)
+                
+        ax_heatmap.set_xticks([])  # For x-axis
+        ax_heatmap.set_yticks([])  # For y-axis
 
-
-
-        x_tick_positions = np.arange(len(heatmap_data.columns))[::2] + 0.5
-        x_tick_labels = [d.strftime('%m-%d') for d in heatmap_data.columns[::2]]
-        # Set the positions and labels
-        ax.set_xticks(x_tick_positions)
-        ax.set_xticklabels(x_tick_labels, rotation=45, ha='right', fontsize=10)
-
-        ax.set_yticks([])
-
-        ax.set_yticklabels([])
-        ax.set_xlabel("Date", fontsize=14)
-        ax.set_ylabel("Cow ID", fontsize=14)
-        plt.savefig(os.path.join(self.config.visuals.visuals_root_path, 'heatmap_of_grazing.png'), dpi=300)
-        # plt.show()
-        print("Saved?")
+        ax_heatmap.set_xlabel("Date", fontsize=11)
+        ax_heatmap.set_ylabel("Cow ID", fontsize=11)
+        
+        # 1,2: Colorbar (top-right)
+        ax_colorbar = axs[0, 1]
+        # Create a ScalarMappable with the same colormap as the heatmap
+        sm = plt.cm.ScalarMappable(cmap=cmap)
+        sm.set_array([])
+        
+        # Define colorbar range similar to the heatmap
+        vmin = min(heatmap_data.min().min(), c - (c - heatmap_data.min().min()))
+        vmax = max(heatmap_data.max().max(), c + (heatmap_data.max().max() - c))
+        sm.set_clim(vmin, vmax)
+        
+        # Add colorbar to the specified axes
+        cbar = plt.colorbar(sm, cax=ax_colorbar)
+        cbar.set_label('Grazing %')
+        
+        # 2,2: Cow deviations from mean (bottom-right)
+        ax_cow_dev = axs[1, 1]
+        
+        # Create zero line (overall mean)
+        ax_cow_dev.axvline(x=0, color='gray', linestyle='-', alpha=0.7, linewidth=1)
+        
+        # Create horizontal positions for each cow (align with heatmap y-positions)
+        y_positions = np.arange(len(cow_averages)) + 0.5
+        
+        # Create horizontal bars for cow deviations
+        pos_mask = cow_deviations >= 0
+        neg_mask = cow_deviations < 0
+        
+        # Handle positive deviations
+        if any(pos_mask):
+            ax_cow_dev.barh(y_positions[pos_mask], cow_deviations[pos_mask],
+                        height=0.8, color='#d95f02', alpha=0.6, edgecolor=None)
+        
+        # Handle negative deviations
+        if any(neg_mask):
+            ax_cow_dev.barh(y_positions[neg_mask], cow_deviations[neg_mask],
+                        height=0.8, color='#1f78b4', alpha=0.6, edgecolor=None)
+        
+        # Set y-axis limits to match heatmap
+        ax_cow_dev.set_ylim(0, len(cow_averages))
+        ax_cow_dev.set_yticks([])  # Hide y-ticks as they're shown in the heatmap
+        
+        # Round to nearest 5% for x-axis limits
+        dev_max = max(5, 5 * math.ceil(max(abs(cow_deviations)) / 5))
+        ax_cow_dev.set_xlim(-dev_max, dev_max)
+        
+        # Set ticks every 5%
+        x_ticks = np.arange(-dev_max, dev_max + 5, 5)
+        ax_cow_dev.set_xticks(x_ticks)
+        ax_cow_dev.set_xticklabels([f'{x:+.0f}%' for x in x_ticks], fontsize=8)  # + sign for positive values
+        
+        ax_cow_dev.set_xlabel('Deviation', fontsize=9)
+        # No title for bottom right in publication
+        # ax_cow_dev.set_title('Cow Deviation', fontsize=10)
+        ax_cow_dev.grid(True, axis='x', linestyle='--', alpha=0.3)
+        ax_cow_dev.spines['top'].set_visible(False)
+        ax_cow_dev.spines['right'].set_visible(False)
+        
+        # Adjust layout
+        plt.tight_layout()
+        
+        plt.savefig(os.path.join(self.config.visuals.visuals_root_path, 'heatmap_of_grazing.png'), dpi=300, bbox_inches='tight')
         plt.close()
+
+
+    # Day wise aggregations
+    # def make_graph(self, grazing_pct:pd.DataFrame):
+    #     # pivot data for heatmap
+    #     heatmap_data = grazing_pct.pivot(
+    #         index='ID',
+    #         columns='day',
+    #         values='grazing_percentage'
+    #     )
+        
+    #     # Calculate average percentage per day (across all cows)
+    #     day_averages = heatmap_data.mean(axis=0)
+        
+    #     # Print overall average 
+    #     print(f"Overall average grazing percentage: {np.mean(heatmap_data):.2f}%")
+        
+    #     heatmap_data = heatmap_data.sort_index(ascending=True)
+        
+    #     # Create figure with additional space for the average plot
+    #     fig, (ax_avg, ax) = plt.subplots(2, 1, 
+    #                                     figsize=(self.figure_size[0], self.figure_size[1]*1.2),
+    #                                     gridspec_kw={'height_ratios': [1, 4]},
+    #                                     layout='constrained')
+        
+    #     # Plot the daily averages on top subplot
+    #     ax_avg.plot(np.arange(len(day_averages)), day_averages, 'o-', color='#d95f02', linewidth=1.5)
+    #     ax_avg.set_xlim(0, len(day_averages)-1)
+    #     ax_avg.set_ylim(0, max(day_averages) * 1.1)
+    #     ax_avg.set_title('Average % of Day Spent Grazing', fontsize=12)
+    #     ax_avg.set_ylabel('Percentage')
+    #     ax_avg.set_xticks([])  # Hide x-ticks as they're shown in the heatmap
+    #     ax_avg.grid(True, linestyle='--', alpha=0.7)
+        
+    #     # Create the heatmap on the bottom subplot
+    #     c = 100/3
+    #     cmap = sns.diverging_palette(250, 30, l=60, s=80, center="light", as_cmap=True)
+    #     heatmap = sns.heatmap(
+    #         heatmap_data,
+    #         annot=False,
+    #         fmt=".0f",
+    #         cmap=cmap,
+    #         center=c,
+    #         cbar=True,
+    #         ax=ax
+    #     )
+        
+    #     cbar = heatmap.collections[0].colorbar
+    #     cbar.set_ticklabels([f'{x:.0f}%' for x in cbar.get_ticks()])
+    #     ax.tick_params(axis='y', labelsize=12)
+        
+    #     x_tick_positions = np.arange(len(heatmap_data.columns))[::2] + 0.5
+    #     x_tick_labels = [d.strftime('%m-%d') for d in heatmap_data.columns[::2]]
+        
+    #     # Set the positions and labels
+    #     ax.set_xticks(x_tick_positions)
+    #     ax.set_xticklabels(x_tick_labels, rotation=45, ha='right', fontsize=10)
+    #     ax.set_yticks([])
+    #     ax.set_yticklabels([])
+    #     ax.set_xlabel("Date", fontsize=14)
+    #     ax.set_ylabel("Cow ID", fontsize=14)
+        
+    #     plt.savefig(os.path.join(self.config.visuals.visuals_root_path, 'heatmap_of_grazing.png'), dpi=300)
+    #     plt.close()
+
+
+
+    # Used for paper. No annotations or title. 
+    # def make_graph(self, grazing_pct:pd.DataFrame):
+
+
+    #     # print(grazing_pct.describe())
+    #     heatmap_data = grazing_pct.pivot(
+    #         index='ID',
+    #         columns='day',
+    #         values='grazing_percentage'
+    #     )
+    #     print(f"Overall average grazing percentage: {np.mean(heatmap_data):.2f}%")
+
+    #     heatmap_data = heatmap_data.sort_index(ascending=True)
+    #     fig, ax = plt.subplots(layout='constrained', figsize=self.figure_size)
+        
+    #     # sns.heatmap(heatmap_data, annot=True, fmt=".0f", cmap="coolwarm", cbar=False, ax=ax, center=100/3)
+    #     c = 100/3
+    #     # vmin, vmax = (1/3)*c, (5/3)*c  # Narrower range around 33
+    #     # vmin, vmax = 0, 100  # Narrower range around 33
+    #     cmap = sns.diverging_palette(250, 30, l=60, s=80, center="light", as_cmap=True)
+    #     heatmap = sns.heatmap(
+    #         heatmap_data, 
+    #         annot=False, 
+    #         fmt=".0f", 
+    #         cmap=cmap,
+    #         # cmap="RdYlBu_r",
+    #         # cmap="coolwarm",
+    #         center=c,
+    #         # vmin=vmin,
+    #         # vmax=vmax,
+    #         cbar=True,  # Add colorbar to show the scale
+    #         ax=ax
+    #     )
+        
+    #     cbar = heatmap.collections[0].colorbar
+    #     cbar.set_ticklabels([f'{x:.0f}%' for x in cbar.get_ticks()])
+        
+    #     ax.tick_params(axis='y', labelsize=12)
+    #     # ax.set_xticks([x + 0.5 for x in range(len(heatmap_data.columns))])
+    #     # date_labels = [d.strftime('%m-%d') for d in heatmap_data.columns]
+    #     # # ax.set_xticklabels(date_labels, rotation=45, ha='right', fontsize=10)
+    #     # ax.set_xticklabels(date_labels, rotation=45, ha='right', fontsize=10)
+
+
+
+    #     x_tick_positions = np.arange(len(heatmap_data.columns))[::2] + 0.5
+    #     x_tick_labels = [d.strftime('%m-%d') for d in heatmap_data.columns[::2]]
+    #     # Set the positions and labels
+    #     ax.set_xticks(x_tick_positions)
+    #     ax.set_xticklabels(x_tick_labels, rotation=45, ha='right', fontsize=10)
+
+    #     ax.set_yticks([])
+
+    #     ax.set_yticklabels([])
+    #     ax.set_xlabel("Date", fontsize=14)
+    #     ax.set_ylabel("Cow ID", fontsize=14)
+    #     plt.savefig(os.path.join(self.config.visuals.visuals_root_path, 'heatmap_of_grazing.png'), dpi=300)
+    #     # plt.show()
+    #     plt.close()
 
 
 

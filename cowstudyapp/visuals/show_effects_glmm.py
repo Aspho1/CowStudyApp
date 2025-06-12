@@ -1456,41 +1456,36 @@ class BehaviorAnalyzer:
             # Calculate orthogonal polynomial values for this time point
             time_polys = np.polynomial.legendre.legval(scaled_time, np.eye(max_degree + 1))
             
+
+            
             # Add main time polynomial terms
             for degree in range(1, max_degree + 1):
                 suffix = '' if degree == 1 else ('_sq' if degree == 2 else ('_cub' if degree == 3 else '_qrt'))
                 term = f'time_z{suffix}'
-                if term in model_result.index:
+                if term in model_result.index and model_result.loc[term, 'P-val'] < 0.1:
                     logit += model_result.loc[term, 'Estimate'] * time_polys[degree]
-            
-            # Add the by variable (temperature, etc.) main effect
-            if f'{by}_z' in model_result.index:
-                logit += model_result.loc[f'{by}_z', 'Estimate'] * b_z
+
+                if f'{by}_z{suffix}' in model_result.index and model_result.loc[f'{by}_z{suffix}', 'P-val'] < 0.1:
+                    logit += model_result.loc[f'{by}_z{suffix}', 'Estimate'] * (b_z ** degree)    
+
+            for by_degree in range(1, max_degree + 1):
+                by_suffix = '' if by_degree == 1 else ('_sq' if by_degree == 2 else ('_cub' if by_degree == 3 else '_qrt'))
                 
-            # Add quadratic term for by variable if it exists
-            if f'{by}_z_sq' in model_result.index:
-                logit += model_result.loc[f'{by}_z_sq', 'Estimate'] * (b_z ** 2)
-            
-            # Add interaction terms between by variable and orthogonal time polynomials
-            for degree in range(1, max_degree + 1):
-                suffix = '' if degree == 1 else ('_sq' if degree == 2 else ('_cub' if degree == 3 else '_qrt'))
-                interaction_term = f'{by}_z:time_z{suffix}'
-                rev_interaction_term = f'time_z{suffix}:{by}_z'
-                
-                # Check both possible orderings of the interaction term
-                if interaction_term in model_result.index:
-                    logit += model_result.loc[interaction_term, 'Estimate'] * b_z * time_polys[degree]
-                elif rev_interaction_term in model_result.index:
-                    logit += model_result.loc[rev_interaction_term, 'Estimate'] * b_z * time_polys[degree]
-                
-                # Also check for interactions with squared by variable
-                sq_interaction = f'{by}_z_sq:time_z{suffix}'
-                rev_sq_interaction = f'time_z{suffix}:{by}_z_sq'
-                
-                if sq_interaction in model_result.index:
-                    logit += model_result.loc[sq_interaction, 'Estimate'] * (b_z ** 2) * time_polys[degree]
-                elif rev_sq_interaction in model_result.index:
-                    logit += model_result.loc[rev_sq_interaction, 'Estimate'] * (b_z ** 2) * time_polys[degree]
+                for time_degree in range(1, max_degree + 1):
+                    time_suffix = '' if time_degree == 1 else ('_sq' if time_degree == 2 else ('_cub' if time_degree == 3 else '_qrt'))
+                    
+                    # Try both orderings of the interaction term
+                    interaction_terms = [
+                        f'{by}_z{by_suffix}:time_z{time_suffix}',
+                        f'time_z{time_suffix}:{by}_z{by_suffix}'
+                    ]
+                    
+                    # Check if either interaction term exists and is significant
+                    for interaction_term in interaction_terms:
+                        if interaction_term in model_result.index and model_result.loc[interaction_term, 'P-val'] < 0.1:
+                            logit += model_result.loc[interaction_term, 'Estimate'] * (b_z ** by_degree) * time_polys[time_degree]
+                            break
+        
         else:
             # Use regular polynomial terms
             coef_patterns = {
@@ -1509,7 +1504,7 @@ class BehaviorAnalyzer:
             
             # Apply each coefficient if it exists in the model
             for coef_name, coef_value in coef_patterns.items():
-                if coef_name in model_result.index:
+                if coef_name in model_result.index and model_result.loc[coef_name, 'P-val'] < 0.1:
                     logit += model_result.loc[coef_name, 'Estimate'] * coef_value
 
         return logit
