@@ -1,6 +1,19 @@
-Overall accuracy: 0.8669
+Parameter values
+max_length: 122
+batch_size: 32
+initial_lr: 0.011718033546672266
+decay_steps: 1667
+decay_rate: 0.13881146613297657
+clipnorm: 1.5
+lstm_size: 16
+dense_size: 64
+patience: 15
+min_delta: 0.001
+reg_val: 0.001
+
+Overall accuracy: 0.9563
 
 Class-wise accuracy:
-Grazing: 0.8719 (n=203)
-Resting: 0.8664 (n=232)
-Traveling: 0.8478 (n=46)
+Grazing: 0.9754 (n=203)
+Resting: 0.9483 (n=232)
+Traveling: 0.9130 (n=46)

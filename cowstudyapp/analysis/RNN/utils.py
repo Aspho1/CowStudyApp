@@ -7,6 +7,7 @@ import random
 import tensorflow as tf
 import keras
 from tensorflow.keras.callbacks import Callback
+from tensorflow.keras.metrics import Metric
 
 import hashlib
 import json
@@ -29,22 +30,6 @@ def silence_tensorflow():
     except ModuleNotFoundError:
         pass
 
-
-# def compute_seed(base_seed, params):
-#
-#     print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-#
-#     tuples = tuple([(k,v) for k,v in sorted(params.items())])
-#     print(tuples)
-#
-#     param_hash = hash(tuples) & 0xFFFFFFFF
-#     ds = (base_seed + param_hash) & 0xFFFFFFFF
-#
-#     print("--->",ds)
-#     print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-#     return ds
-
-
 def compute_seed(base_seed, params):
     serializable_params = {}
 
@@ -64,51 +49,84 @@ def compute_seed(base_seed, params):
     ds = (base_seed + param_hash) & 0xFFFFFFFF
     return ds
 
-# Add this method before _make_LSTM
+
 class LabeledDataMetricsCallback(Callback):
     """Custom callback to track metrics only on labeled data"""
-    
-    def __init__(self, validation_data, unlabeled_value):
+
+    def __init__(self, validation_data, train_data=None, unlabeled_value=-1):
         super().__init__()
         self.val_data = validation_data  # (x_val, y_val)
+        self.train_data = train_data  # (x_train, y_train) or None
         self.unlabeled_value = unlabeled_value
-        self.history = {'labeled_accuracy': [], 'labeled_loss': []}
-        
+        self.history = {'labeled_accuracy': [], 'val_labeled_accuracy': []}
+
     def on_epoch_end(self, epoch, logs=None):
+        # Calculate validation accuracy on labeled data only
         x_val, y_val = self.val_data
-        # Get predictions on validation data
-        y_pred = self.model.predict(x_val, verbose=0)
-        
+        y_pred_val = self.model.predict(x_val, verbose=0)
+
         # For OPO mode (sequence of predictions)
         if len(y_val.shape) > 1:
-            # Find valid indices (labeled data points)
-            valid_mask = y_val != self.unlabeled_value
-            
-            # Get predicted classes
-            pred_classes = np.argmax(y_pred, axis=2)
-            
-            # Calculate accuracy only on labeled data points
-            if np.any(valid_mask):
-                labeled_acc = np.mean(pred_classes[valid_mask] == y_val[valid_mask])
-                self.history['labeled_accuracy'].append(labeled_acc)
+            # Process validation data
+            valid_mask_val = y_val != self.unlabeled_value
+            pred_classes_val = np.argmax(y_pred_val, axis=2)
+
+            if np.any(valid_mask_val):
+                val_labeled_acc = np.mean(pred_classes_val[valid_mask_val] == y_val[valid_mask_val])
+                self.history['val_labeled_accuracy'].append(val_labeled_acc)
             else:
-                self.history['labeled_accuracy'].append(0.0)
-                
+                self.history['val_labeled_accuracy'].append(0.0)
+
+            # Process training data if available
+            if self.train_data is not None:
+                x_train, y_train = self.train_data
+                y_pred_train = self.model.predict(x_train, verbose=0)
+                valid_mask_train = y_train != self.unlabeled_value
+                pred_classes_train = np.argmax(y_pred_train, axis=2)
+
+                if np.any(valid_mask_train):
+                    train_labeled_acc = np.mean(pred_classes_train[valid_mask_train] == y_train[valid_mask_train])
+                    self.history['labeled_accuracy'].append(train_labeled_acc)
+                else:
+                    self.history['labeled_accuracy'].append(0.0)
+            else:
+                # If we don't have training data, just calculate labeled accuracy from logs
+                if 'accuracy' in logs:
+                    self.history['labeled_accuracy'].append(logs['accuracy'])
+                else:
+                    self.history['labeled_accuracy'].append(0.0)
+
         # For OPS mode (single prediction per sequence)
         else:
-            # Find valid indices (labeled data points)
-            valid_mask = y_val != self.unlabeled_value
-            
-            # Get predicted classes
-            pred_classes = np.argmax(y_pred, axis=1)
-            
-            # Calculate accuracy only on labeled data points
-            if np.any(valid_mask):
-                labeled_acc = np.mean(pred_classes[valid_mask] == y_val[valid_mask])
-                self.history['labeled_accuracy'].append(labeled_acc)
+            # Process validation data
+            valid_mask_val = y_val != self.unlabeled_value
+            pred_classes_val = np.argmax(y_pred_val, axis=1)
+
+            if np.any(valid_mask_val):
+                val_labeled_acc = np.mean(pred_classes_val[valid_mask_val] == y_val[valid_mask_val])
+                self.history['val_labeled_accuracy'].append(val_labeled_acc)
             else:
-                self.history['labeled_accuracy'].append(0.0)
-                
+                self.history['val_labeled_accuracy'].append(0.0)
+
+            # Process training data if available
+            if self.train_data is not None:
+                x_train, y_train = self.train_data
+                y_pred_train = self.model.predict(x_train, verbose=0)
+                valid_mask_train = y_train != self.unlabeled_value
+                pred_classes_train = np.argmax(y_pred_train, axis=1)
+
+                if np.any(valid_mask_train):
+                    train_labeled_acc = np.mean(pred_classes_train[valid_mask_train] == y_train[valid_mask_train])
+                    self.history['labeled_accuracy'].append(train_labeled_acc)
+                else:
+                    self.history['labeled_accuracy'].append(0.0)
+            else:
+                # If we don't have training data, just calculate labeled accuracy from logs
+                if 'accuracy' in logs:
+                    self.history['labeled_accuracy'].append(logs['accuracy'])
+                else:
+                    self.history['labeled_accuracy'].append(0.0)
+
         # Add the current epoch metrics to our history
         if logs:
             for key, value in logs.items():
@@ -119,73 +137,54 @@ class LabeledDataMetricsCallback(Callback):
 
 @keras.saving.register_keras_serializable()
 class MaskedAccuracy(tf.keras.metrics.Metric):
-    def __init__(self, name='masked_accuracy', unlabeled_value=-1, **kwargs):
+    def __init__(self, unlabeled_value, name='masked_accuracy', **kwargs):
         super(MaskedAccuracy, self).__init__(name=name, **kwargs)
-        self.total = self.add_weight(name='total', initializer='zeros')
-        self.count = self.add_weight(name='count', initializer='zeros')
         self.unlabeled_value = unlabeled_value
-        
+        self.correct = self.add_weight(name="correct", initializer="zeros")
+        self.count = self.add_weight(name="count", initializer="zeros")
+
     def update_state(self, y_true, y_pred, sample_weight=None):
-        # Create mask for labeled data
-        # This handles both the case with sample weights and the case with unlabeled values
-        if sample_weight is not None:
-            # If sample weight is provided, use it as primary mask
-            weight_mask = tf.cast(sample_weight > 0, tf.bool)
-        else:
-            # If no sample weight, use all ones
-            weight_mask = tf.ones_like(y_true, dtype=tf.bool)
-        
-        # Also check for unlabeled values in y_true
-        value_mask = tf.not_equal(y_true, self.unlabeled_value)
-        
-        # Combine both masks - an example is valid if it has weight > 0 AND is not unlabeled
-        mask = tf.logical_and(weight_mask, value_mask)
-        
-        # Get predicted classes
-        y_pred_classes = tf.argmax(y_pred, axis=-1)
-        y_pred_classes = tf.cast(y_pred_classes, y_true.dtype)
-        
-        # Calculate correct predictions only on labeled data
-        correct = tf.cast(tf.equal(y_true, y_pred_classes), tf.float32) * tf.cast(mask, tf.float32)
-        
-        # Update running totals
-        self.total.assign_add(tf.reduce_sum(tf.cast(mask, tf.float32)))
-        self.count.assign_add(tf.reduce_sum(correct))
-        
+        # y_pred: (batch, seq, n_classes)
+        # y_true: (batch, seq)
+        y_pred_classes = tf.argmax(y_pred, axis=-1, output_type=y_true.dtype)
+
+        mask = tf.not_equal(y_true, self.unlabeled_value)
+
+        y_true_masked = tf.boolean_mask(y_true, mask)
+        y_pred_masked = tf.boolean_mask(y_pred_classes, mask)
+
+        matches = tf.cast(tf.equal(y_true_masked, y_pred_masked), tf.float32)
+        self.correct.assign_add(tf.reduce_sum(matches))
+        self.count.assign_add(tf.cast(tf.size(matches), tf.float32))
+
     def result(self):
-        return self.count / (self.total + tf.keras.backend.epsilon())
-        
+        return self.correct / (self.count + tf.keras.backend.epsilon())
+
     def reset_state(self):
-        self.total.assign(0)
+        self.correct.assign(0)
         self.count.assign(0)
 
-@keras.saving.register_keras_serializable()
 class MaskedSparseCategoricalCrossentropy(tf.keras.losses.Loss):
     def __init__(self, unlabeled_value=-1, name='masked_sparse_categorical_crossentropy', **kwargs):
-        super(MaskedSparseCategoricalCrossentropy, self).__init__(name=name, **kwargs)
+        super().__init__(name=name, **kwargs)
         self.unlabeled_value = unlabeled_value
         self.loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(
-            reduction=tf.keras.losses.Reduction.NONE)
-    
+            from_logits=False,  # Set to True if logits are used
+            reduction=tf.keras.losses.Reduction.NONE
+        )
+
     def call(self, y_true, y_pred, sample_weight=None):
-        # Create mask for labeled data
         mask = tf.not_equal(y_true, self.unlabeled_value)
-        mask_float = tf.cast(mask, dtype=tf.float32)
-        
-        # If sample weight is provided, combine it with our mask
+        y_true_masked = tf.boolean_mask(y_true, mask)
+        y_pred_masked = tf.boolean_mask(y_pred, mask)
+
+        losses = self.loss_fn(y_true_masked, y_pred_masked)
+
         if sample_weight is not None:
-            mask_float = mask_float * sample_weight
-            
-        # Calculate loss only on labeled data
-        per_example_loss = self.loss_fn(y_true, y_pred)
-        masked_loss = per_example_loss * mask_float
-        
-        # Return average loss over valid points
-        sum_loss = tf.reduce_sum(masked_loss)
-        sum_mask = tf.reduce_sum(mask_float)
-        
-        # Avoid division by zero
-        return sum_loss / (sum_mask + tf.keras.backend.epsilon())
+            weight_mask = tf.boolean_mask(sample_weight, mask)
+            losses = losses * tf.cast(weight_mask, dtype=losses.dtype)
+
+        return tf.reduce_mean(losses)
 
 
 
@@ -357,104 +356,6 @@ def interleaved_validation_split(
     # print(f"Actual validation split: {actual_split:.2f} (target: {1/interleave_factor:.2f})")
     
     return x_train, x_valid, y_train, y_valid, sw_train, sw_valid
-
-# def stratified_sequence_split(
-#     train_X: np.ndarray, 
-#     train_Y: np.ndarray, 
-#     sample_weights: np.ndarray, 
-#     sequence_ids: np.ndarray,
-#     unlabeled_value: int = -1,
-#     test_size: float = 0.33
-# ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-#     """
-#     Performs stratified validation split at the sequence level,
-#     ensuring similar class distributions in train and validation sets.
-#     """
-#     from collections import Counter
-    
-#     # Get overall label distribution (excluding unlabeled)
-#     ops_mode = len(train_Y.shape) == 1
-    
-#     if ops_mode:
-#         all_labels = train_Y[train_Y != unlabeled_value]
-#     else:
-#         all_labels = train_Y[train_Y != unlabeled_value].flatten()
-    
-#     overall_distribution = Counter(all_labels)
-#     total_labels = len(all_labels)
-    
-#     # Calculate target distribution for validation set
-#     target_val_dist = {cls: count * test_size for cls, count in overall_distribution.items()}
-    
-#     # Get class distribution per sequence
-#     sequence_class_dist = count_class_distribution(train_Y, sequence_ids, unlabeled_value)
-    
-#     # Greedy algorithm to create validation split with distribution similar to overall
-#     current_val_dist = Counter()
-#     val_seqs = []
-    
-#     # Sort sequences by total label count (descending)
-#     seq_counts = [(seq_id, sum(dist.values())) for seq_id, dist in sequence_class_dist.items() if dist]
-#     seq_counts.sort(key=lambda x: x[1], reverse=True)
-    
-#     for seq_id, _ in seq_counts:
-#         # Check if adding this sequence would improve distribution
-#         candidate_dist = current_val_dist + Counter(sequence_class_dist[seq_id])
-        
-#         # Check if we're still under target for any class
-#         under_target = False
-#         for cls, target in target_val_dist.items():
-#             if candidate_dist[cls] <= target:
-#                 under_target = True
-#                 break
-        
-#         # Add to validation if it keeps us under target for any class
-#         if under_target:
-#             current_val_dist = candidate_dist
-#             val_seqs.append(seq_id)
-            
-#             # Check if we've reached or exceeded our target for all classes
-#             all_reached = True
-#             for cls, target in target_val_dist.items():
-#                 if current_val_dist[cls] < target * 0.9:  # Allow 10% under-representation
-#                     all_reached = False
-#                     break
-            
-#             if all_reached:
-#                 break
-    
-#     # Remaining sequences go to training
-#     train_seqs = [seq_id for seq_id in np.unique(sequence_ids) if seq_id not in val_seqs]
-    
-#     # Split the data using the sequences
-#     x_train = train_X[train_seqs]
-#     y_train = train_Y[train_seqs]
-#     sw_train = sample_weights[train_seqs]
-    
-#     x_valid = train_X[val_seqs]
-#     y_valid = train_Y[val_seqs]
-#     sw_valid = sample_weights[val_seqs]
-    
-#     # Calculate actual distribution for logging
-#     ops_mode = len(y_train.shape) == 1
-    
-#     if ops_mode:
-#         train_dist = Counter(y_train[y_train != unlabeled_value])
-#         val_dist = Counter(y_valid[y_valid != unlabeled_value])
-#     else:
-#         train_dist = Counter(y_train[y_train != unlabeled_value].flatten())
-#         val_dist = Counter(y_valid[y_valid != unlabeled_value].flatten())
-    
-#     train_total = sum(train_dist.values())
-#     val_total = sum(val_dist.values())
-#     actual_split = val_total / (train_total + val_total) if (train_total + val_total) > 0 else 0
-    
-#     print(f"Stratified split - Training: {train_total} labels, Validation: {val_total} labels")
-#     print(f"Actual validation split: {actual_split:.2f} (target: {test_size:.2f})")
-#     print(f"Training distribution: {dict(train_dist)}")
-#     print(f"Validation distribution: {dict(val_dist)}")
-    
-#     return x_train, x_valid, y_train, y_valid, sw_train, sw_valid
 
 
 def stratified_sequence_split(
@@ -657,9 +558,6 @@ def stratified_sequence_split(
     return x_train, x_valid, y_train, y_valid, sw_train, sw_valid
 
 
-
-
-
 def balanced_class_validation_split(
     train_X: np.ndarray, 
     train_Y: np.ndarray, 
@@ -815,18 +713,18 @@ def balanced_class_validation_split(
     
     # print(f"Class-balanced split - Training: {train_labeled_count} labeled samples, Validation: {val_labeled_count} labeled samples")
     # print(f"Actual validation split: {actual_split:.2f} (target: {test_size:.2f})")
-    
+
     # Print class distribution as percentages
-    # if train_labeled_count > 0:
-    #     train_pct = {cls: count/train_labeled_count*100 for cls, count in train_class_counts.items()}
-    # else:
-    #     train_pct = {cls: 0 for cls in train_class_counts}
-        
-    # if val_labeled_count > 0:
-    #     val_pct = {cls: count/val_labeled_count*100 for cls, count in val_class_counts.items()}
-    # else:
-    #     val_pct = {cls: 0 for cls in val_class_counts}
-    
+    if train_labeled_count > 0:
+        train_pct = {cls: count/train_labeled_count*100 for cls, count in train_class_counts.items()}
+    else:
+        train_pct = {cls: 0 for cls in train_class_counts}
+
+    if val_labeled_count > 0:
+        val_pct = {cls: count/val_labeled_count*100 for cls, count in val_class_counts.items()}
+    else:
+        val_pct = {cls: 0 for cls in val_class_counts}
+
     # print("Training class distribution (counts):", train_class_counts)
     # print("Training class distribution (%):", {cls: f"{pct:.1f}%" for cls, pct in train_pct.items()})
     # print("Validation class distribution (counts):", val_class_counts)

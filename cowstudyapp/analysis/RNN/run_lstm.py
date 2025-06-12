@@ -73,7 +73,7 @@ import seaborn as sns
 from cowstudyapp.config import ConfigManager
 from cowstudyapp.utils import from_posix_col
 
-from sklearn.metrics import confusion_matrix, f1_score, accuracy_score
+from sklearn.metrics import confusion_matrix, f1_score, accuracy_score, classification_report
 import multiprocessing as mp
 
 
@@ -210,7 +210,8 @@ class LSTM_Model:
             raise ValueError(f"Unknown config mode {self.config.analysis.mode}.")
 
 
-    def _calculate_seed(self):
+
+    def _get_params(self):
         params = {}
         for p in ['max_length', 'batch_size', 'initial_lr',
                   'decay_steps', 'decay_rate', 'clipnorm',
@@ -218,8 +219,10 @@ class LSTM_Model:
                   'min_delta', 'reg_val']:
 
             params[p] = getattr(self,p)
+        return params
 
-        return compute_seed(self.config.analysis.random_seed, params)
+    def _calculate_seed(self):
+        return compute_seed(self.config.analysis.random_seed, self._get_params())
 
     def _set_seed(self,seed):
         set_seed(seed)
@@ -747,7 +750,7 @@ class LSTM_Model:
         progress_callback(85, "Generating predictions for the full dataset")
 
         # Process predictions in batches to avoid memory issues
-        batch_size_pred = 4096  # Adjust based on your system's memory
+        batch_size_pred = 16384  # Adjust based on your system's memory
         n_batches = (len(X_full) + batch_size_pred - 1) // batch_size_pred
         
         if n_batches > 1:
@@ -1185,8 +1188,6 @@ class LSTM_Model:
         
         progress_callback(73, "Building and compiling LSTM model")
         
-        # Determine if we're in OPS mode (one prediction per sequence) or OPO mode (one prediction per observation)
-        ops_mode = len(train_Y.shape) == 1
 
         model = Sequential(self.layers)
         # print(model.summary())
@@ -1203,26 +1204,11 @@ class LSTM_Model:
         
         model.compile(
             optimizer=optimizer,
-            loss='sparse_categorical_crossentropy',
-            metrics=['accuracy']
+            loss=MaskedSparseCategoricalCrossentropy(unlabeled_value=self.UNLABELED_VALUE),
+            metrics=[MaskedAccuracy(unlabeled_value=self.UNLABELED_VALUE)]
         )
 
-        cw_arr = np.ones(self.nclasses, dtype='float32')
-
-        # Create mask for labeled data and placeholder for unlabeled
-        mask = (train_Y != self.UNLABELED_VALUE).astype('float32')
-
-        # Compute sample weights - 0 weight for unlabeled data
-        if ops_mode:
-            sw = mask * np.vectorize(lambda x: cw_arr[x] if x != self.UNLABELED_VALUE else 0)(train_Y)
-        else:
-            # For 2D array, we need a different approach
-            sw = np.zeros_like(train_Y, dtype=float)
-            for i in range(len(train_Y)):
-                for j in range(len(train_Y[i])):
-                    if train_Y[i, j] != self.UNLABELED_VALUE:
-                        sw[i, j] = cw_arr[train_Y[i, j]]
-        
+        sw = np.where(train_Y != self.UNLABELED_VALUE, 1.0, 0.0)
         
 
         validation_method = self.config.analysis.lstm.validation_method
@@ -1256,64 +1242,49 @@ class LSTM_Model:
                 train_X, train_Y, sw, test_size, self.seed
             )
         
-        # Now convert the unlabeled values to 0 for model training
-        y_train_clipped = np.where(y_train == self.UNLABELED_VALUE, 0, y_train)
-        y_valid_clipped = np.where(y_valid == self.UNLABELED_VALUE, 0, y_valid)
+        # # Now convert the unlabeled values to 0 for model training
+        # y_train_clipped = np.where(y_train == self.UNLABELED_VALUE, 0, y_train)
+        # y_valid_clipped = np.where(y_valid == self.UNLABELED_VALUE, 0, y_valid)
         
 
-        labeled_metrics_callback = LabeledDataMetricsCallback(
-            validation_data=(x_valid, y_valid),  # Pass original validation data with unlabeled values
-            unlabeled_value=self.UNLABELED_VALUE
-        )
+        # labeled_metrics_callback = LabeledDataMetricsCallback(
+        #     validation_data=(x_valid, y_valid),
+        #     unlabeled_value=self.UNLABELED_VALUE
+        # )
 
         # Train the model
         progress_callback(80, "Training LSTM model")
         history = model.fit(
             x_train,
-            y_train_clipped,  # Use clipped version for training
-            validation_data=(x_valid, y_valid_clipped, sw_valid),  # Use clipped version for validation
-            sample_weight=sw_train,
+            y_train,  # Use clipped version for training
+            validation_data=(x_valid, y_valid),  # Use clipped version for validation
+            # sample_weight=sw_train,
             epochs=self.config.analysis.lstm.epochs,
             batch_size=self.batch_size,
             callbacks=[
                 EarlyStopping(
-                    monitor='val_accuracy',  # Use our custom metric for early stopping
+                    monitor='val_masked_accuracy',
                     patience=self.patience,
                     restore_best_weights=True,
                     min_delta=self.min_delta,
                     mode='max'
                 ),
-                labeled_metrics_callback
             ],
             verbose=0,
-
         )
-
 
         if (test_X is not None) and (test_Y is not None):
 
             # Generate predictions
             progress_callback(90, "Generating predictions")
             pred_y = model.predict(test_X, verbose=0)
-
-            if ops_mode:
-                pred_y_classes = np.argmax(pred_y, axis=1)  # Use axis=1 since we flattened
-            else:
-                pred_y_classes = np.argmax(pred_y, axis=2)
-
-            # Merge the custom callback history with the model history
-            history_dict = history.history.copy()
-            for key, value in labeled_metrics_callback.history.items():
-                history_dict[key] = value
-
-
+            pred_y_classes = np.argmax(pred_y, axis=-1)  # Use axis=1 since we flattened
             progress_callback(100, "LSTM model training complete")
+            # return model, history, pred_y_classes
             return model, history, pred_y_classes
 
         else:
             return model, history
-
-
 
 
 
@@ -1333,14 +1304,8 @@ class LSTM_Model:
         
         # Plot Accuracy - prefer labeled_accuracy if available
         plt.subplot(1, 2, 2)
-        if 'labeled_accuracy' in history.history:
-            plt.plot(history.history['accuracy'], 'b--', alpha=0.5, label='Raw Training Accuracy')
-            plt.plot(history.history['labeled_accuracy'], 'b-', label='Labeled Data Accuracy')
-        else:
-            plt.plot(history.history['accuracy'], 'b-', label='Training Accuracy')
-            
-        if 'val_accuracy' in history.history:
-            plt.plot(history.history['val_accuracy'], 'r-', label='Validation Accuracy')
+        plt.plot(history.history['masked_accuracy'], 'b-', alpha=0.5, label='Training Accuracy')
+        plt.plot(history.history['val_masked_accuracy'], 'r-', label='Validation Accuracy')
             
         plt.title('Accuracy')
         plt.xlabel('Epoch')
@@ -1354,15 +1319,12 @@ class LSTM_Model:
         print("\nTraining Summary:")
         print(f"Final Training Loss: {history.history['loss'][-1]:.4f}")
         
-        if 'labeled_accuracy' in history.history:
-            print(f"Final Training Accuracy (labeled data only): {history.history['labeled_accuracy'][-1]:.4f}")
-        else:
-            print(f"Final Training Accuracy: {history.history['accuracy'][-1]:.4f}")
-            
-        if 'val_loss' in history.history:
-            print(f"Final Validation Loss: {history.history['val_loss'][-1]:.4f}")
-            print(f"Final Validation Accuracy: {history.history['val_accuracy'][-1]:.4f}")
 
+        print(f"Final Loss: {history.history['loss'][-1]:.4f}")
+        print(f"Final Training Accuracy (labeled data only): {history.history['masked_accuracy'][-1]:.4f}")
+
+        print(f"Final Validation Loss: {history.history['val_loss'][-1]:.4f}")
+        print(f"Final Validation Accuracy: {history.history['val_masked_accuracy'][-1]:.4f}")
 
 
     # Add a method to calculate overall metrics
@@ -1431,38 +1393,46 @@ class LSTM_Model:
                 print(f"{class_name} accuracy: {class_acc:.4f} (n={np.sum(class_mask)})")
         
         # Save confusion matrix
-        try:
-            cm = confusion_matrix(
-                valid_actual, 
-                valid_pred,
-                labels=sorted([v for k,v in self.activity_map.items() if k is not np.nan])
-            )
+        # try:
+
+        cm = confusion_matrix(
+            valid_actual,
+            valid_pred,
+            labels=sorted([v for k,v in self.activity_map.items() if k is not np.nan])
+        )
+
+        print(classification_report(valid_actual, valid_pred,labels=self.config.analysis.lstm.states, digits=3,zero_division=1))
+
+        plt.figure(figsize=(10, 8))
+        sns.heatmap(
+            cm,
+            annot=True,
+            fmt='d',
+            xticklabels=[self.inv_activity_map[i] for i in sorted([v for k,v in self.activity_map.items() if k is not np.nan])],
+            yticklabels=[self.inv_activity_map[i] for i in sorted([v for k,v in self.activity_map.items() if k is not np.nan])]
+        )
+        plt.title('Confusion Matrix')
+        plt.ylabel('True Label')
+        plt.xlabel('Predicted Label')
+
+        # Save the figure
+        plt.savefig(self.cv_path / "lstm_confusion_matrix.png", dpi=300)
+        plt.close()
+
+        # Plot training history
+        self._plot_training_histories(all_histories)
             
-            plt.figure(figsize=(10, 8))
-            sns.heatmap(
-                cm, 
-                annot=True, 
-                fmt='d',
-                xticklabels=[self.inv_activity_map[i] for i in sorted([v for k,v in self.activity_map.items() if k is not np.nan])],
-                yticklabels=[self.inv_activity_map[i] for i in sorted([v for k,v in self.activity_map.items() if k is not np.nan])]
-            )
-            plt.title('Confusion Matrix')
-            plt.ylabel('True Label')
-            plt.xlabel('Predicted Label')
-            
-            # Save the figure
-            plt.savefig(self.cv_path / "lstm_confusion_matrix.png", dpi=300)
-            plt.close()
-            
-            # Plot training history
-            self._plot_training_histories(all_histories)
-            
-        except Exception as e:
-            print(f"Error generating visualization: {e}")
+        # except Exception as e:
+        #     print(f"Error generating visualization: {e}")
         
         # Save detailed metrics to file
         with open(self.cv_path / "lstm_results.txt", "w") as f:
-            f.write(f"Overall accuracy: {accuracy:.4f}\n\n")
+
+            f.write(f"Parameter values\n")
+            for param, param_val in self._get_params().items():
+                f.write(f"{param}: {param_val}\n")
+
+            f.write(f"\nOverall accuracy: {accuracy:.4f}\n\n")
             f.write("Class-wise accuracy:\n")
             for class_name, class_id in self.activity_map.items():
                 if class_id == self.UNLABELED_VALUE:
@@ -1476,147 +1446,113 @@ class LSTM_Model:
 
         # Save detailed metrics to file
         with open(self.cv_path / "lstm_cv_preds.csv", "w") as f:
-            f.write(f"Actual, Predicted\n")
+            f.write(f"Actual,Predicted\n")
             for i in range(len(valid_pred)):
                 f.write(f"{valid_actual[i]}, {valid_pred[i]}\n")
 
 
+
+
     def _plot_training_histories(self, histories):
-        """Plot training histories across all folds with support for custom labeled data metrics"""
-        plt.figure(figsize=(12, 4))
-        
-        # Check which metrics are available in the histories
-        sample_history = histories[0].history
-        has_labeled_metrics = 'labeled_accuracy' in sample_history
-        
+        """Plot training histories across all folds with mean and standard deviation"""
         # Find max length of histories
         max_epochs = max(len(h.history['loss']) for h in histories)
-        
-        # Initialize arrays for mean and std calculations
-        losses = np.zeros((len(histories), max_epochs))
-        val_losses = np.zeros((len(histories), max_epochs)) if 'val_loss' in sample_history else None
-        
-        # Initialize accuracy arrays
-        accuracies = np.zeros((len(histories), max_epochs))
-        val_accuracies = np.zeros((len(histories), max_epochs)) if 'val_accuracy' in sample_history else None
-        
-        # Initialize labeled accuracy arrays if available
-        if has_labeled_metrics:
-            labeled_accuracies = np.zeros((len(histories), max_epochs))
-        
-        # Fill arrays with padding
-        for i, h in enumerate(histories):
-            # Pad or truncate loss
-            curr_len = len(h.history['loss'])
-            losses[i, :curr_len] = h.history['loss']
-            losses[i, curr_len:] = h.history['loss'][-1]  # Pad with last value
-            
-            # Pad or truncate val_loss if it exists
-            if 'val_loss' in sample_history and val_losses is not None:
-                val_curr_len = min(len(h.history['val_loss']), max_epochs)
-                val_losses[i, :val_curr_len] = h.history['val_loss'][:val_curr_len]
-                if val_curr_len < max_epochs:
-                    val_losses[i, val_curr_len:] = h.history['val_loss'][-1]
-            
-            # Pad or truncate accuracy metrics
-            curr_len = min(len(h.history['accuracy']), max_epochs)
-            accuracies[i, :curr_len] = h.history['accuracy'][:curr_len]
-            if curr_len < max_epochs:
-                accuracies[i, curr_len:] = h.history['accuracy'][-1]
-            
-            # Pad or truncate validation accuracy if it exists
-            if 'val_accuracy' in sample_history and val_accuracies is not None:
-                val_curr_len = min(len(h.history['val_accuracy']), max_epochs)
-                val_accuracies[i, :val_curr_len] = h.history['val_accuracy'][:val_curr_len]
-                if val_curr_len < max_epochs:
-                    val_accuracies[i, val_curr_len:] = h.history['val_accuracy'][-1]
-            
-            # Pad or truncate labeled accuracy if it exists
-            if has_labeled_metrics:
-                labeled_curr_len = min(len(h.history['labeled_accuracy']), max_epochs)
-                labeled_accuracies[i, :labeled_curr_len] = h.history['labeled_accuracy'][:labeled_curr_len]
-                if labeled_curr_len < max_epochs:
-                    labeled_accuracies[i, labeled_curr_len:] = h.history['labeled_accuracy'][-1]
-        
-        # Plot Loss
-        plt.subplot(1, 2, 1)
         epochs = range(1, max_epochs + 1)
         
-        # Plot individual histories
-        for i in range(len(histories)):
-            curr_len = min(len(histories[i].history['loss']), max_epochs)
-            plt.plot(epochs[:curr_len], 
-                    histories[i].history['loss'][:curr_len], 
-                    'b-', alpha=0.1)
+        # Create figure with two subplots
+        fig, (loss_plt, acc_plt) = plt.subplots(nrows=1, ncols=2, figsize=(12, 4), layout='constrained')
         
-        # Plot mean and std
-        mean_loss = np.mean(losses, axis=0)
-        std_loss = np.std(losses, axis=0)
-        plt.plot(epochs, mean_loss, 'b-', label='Mean Train Loss')
-        plt.fill_between(epochs, mean_loss-std_loss, mean_loss+std_loss, 
-                        color='b', alpha=0.2, label='±1 std')
+        # Metrics to plot in each subplot
+        loss_metrics = [
+            ('loss', 'b', 'Train Loss'),
+            ('val_loss', 'r', 'Val Loss')
+        ]
+
+        acc_metrics = [
+            ('masked_accuracy', 'b', 'Train Accuracy'),
+            ('val_masked_accuracy', 'r', 'Val Accuracy')
+            # ('val_labeled_accuracy', 'r', 'Val Accuracy')
+        ]
         
-        # Plot validation loss if available
-        if val_losses is not None:
-            mean_val_loss = np.mean(val_losses, axis=0)
-            plt.plot(epochs, mean_val_loss, 'r-', label='Mean Val Loss')
-        
-        plt.title('Training Loss')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.legend()
-        
-        # Plot Accuracy
-        plt.subplot(1, 2, 2)
-        
-        # Plot regular accuracy metrics
-        # Plot individual history lines
-        for i in range(len(histories)):
-            curr_len = min(len(histories[i].history['accuracy']), max_epochs)
-            plt.plot(epochs[:curr_len], 
-                    histories[i].history['accuracy'][:curr_len], 
-                    'b-', alpha=0.1 if has_labeled_metrics else 0.3)
-        
-        # Plot mean and std for regular accuracy
-        mean_acc = np.mean(accuracies, axis=0)
-        std_acc = np.std(accuracies, axis=0)
-        
-        if has_labeled_metrics:
-            # Plot regular accuracy with lower emphasis
-            plt.plot(epochs, mean_acc, 'b--', alpha=0.5, label='Mean Raw Accuracy')
+        # Plot individual histories and calculate means/std for loss subplot
+        for loss_key, color, label in loss_metrics:
+            # Initialize array for this metric
+            metric_values = np.zeros((len(histories), max_epochs))
+            # print(loss_key)
+
+            # Plot individual histories with low alpha
+            for i, h in enumerate(histories):
+
+                curr_len = len(h.history[loss_key])
+                loss_plt.plot(epochs[:curr_len], h.history[loss_key][:curr_len],
+                            f'{color}-', alpha=0.1)
+                #
+                # print("Index", i)
+                # print("Values", h.history[loss_key])
+                # print("Length", len(h.history[loss_key]))
+                # print("Last Value", h.history[loss_key][-1])
+                # Fill array for mean/std calculation
+                metric_values[i, :curr_len] = h.history[loss_key][:curr_len]
+                metric_values[i, curr_len:] = h.history[loss_key][-1]  # Pad with last value
             
-            # Plot labeled accuracy with higher emphasis
-            for i in range(len(histories)):
-                curr_len = min(len(histories[i].history.get('labeled_accuracy', [])), max_epochs)
-                if curr_len > 0:
-                    plt.plot(epochs[:curr_len], 
-                            histories[i].history['labeled_accuracy'][:curr_len], 
-                            'g-', alpha=0.2)
+            # Plot mean line
+            mean_values = np.mean(metric_values, axis=0)
+            std_values = np.std(metric_values, axis=0)
+            loss_plt.plot(epochs, mean_values, f'{color}-', label=f'{label}')
             
-            # Plot mean and std for labeled accuracy
-            mean_labeled_acc = np.mean(labeled_accuracies, axis=0)
-            std_labeled_acc = np.std(labeled_accuracies, axis=0)
-            plt.plot(epochs, mean_labeled_acc, 'g-', label='Mean Labeled Accuracy')
-            plt.fill_between(epochs, 
-                            mean_labeled_acc-std_labeled_acc, 
-                            mean_labeled_acc+std_labeled_acc, 
-                            color='g', alpha=0.2, label='±1 std')
-        else:
-            # Plot regular accuracy with full emphasis
-            plt.plot(epochs, mean_acc, 'b-', label='Mean Accuracy')
-            plt.fill_between(epochs, mean_acc-std_acc, mean_acc+std_acc, 
-                            color='b', alpha=0.2, label='±1 std')
+            # Plot standard deviation band
+            loss_plt.fill_between(epochs, mean_values - std_values, mean_values + std_values,
+                                color=color, alpha=0.2)
         
-        # Plot validation accuracy if available
-        if val_accuracies is not None:
-            mean_val_acc = np.mean(val_accuracies, axis=0)
-            plt.plot(epochs, mean_val_acc, 'r-', label='Mean Val Accuracy')
+
+        # print("STARTING ACC")
+        # Plot individual histories and calculate means/std for accuracy subplot
+        for acc_key, color, label in acc_metrics:
+            # Initialize array for this metric
+            metric_values = np.zeros((len(histories), max_epochs))
+            
+            print(acc_key)
+            # Plot individual histories with low alpha
+            for i, h in enumerate(histories):
+
+
+                if acc_key not in h.history:
+                    print(f"Warning: '{acc_key}' missing from history {i}")
+                    continue
+
+
+
+                curr_len = len(h.history[acc_key])
+                acc_plt.plot(epochs[:curr_len], h.history[acc_key][:curr_len],
+                            f'{color}-', alpha=0.1)
+                
+                # Fill array for mean/std calculation
+                metric_values[i, :curr_len] = h.history[acc_key][:curr_len]
+                # print("!!!!!!!!!!!",curr_len, metric_values[i])
+                # print(h.history.keys())
+
+                metric_values[i, curr_len:] = h.history[acc_key][-1]  # Pad with last value
+            
+            # Plot mean line
+            mean_values = np.mean(metric_values, axis=0)
+            std_values = np.std(metric_values, axis=0)
+            acc_plt.plot(epochs, mean_values, f'{color}-', label=f'{label}')
+            
+            # Plot standard deviation band
+            acc_plt.fill_between(epochs, mean_values - std_values, mean_values + std_values,
+                            color=color, alpha=0.2)
         
-        plt.title('Training Accuracy')
-        plt.xlabel('Epoch')
-        plt.ylabel('Accuracy')
-        plt.legend()
+        # Set titles and labels
+        loss_plt.set_title('Training Loss')
+        loss_plt.set_xlabel('Epoch')
+        loss_plt.set_ylabel('Loss')
+        loss_plt.legend()
         
-        plt.tight_layout()
+        acc_plt.set_title('Training Accuracy')
+        acc_plt.set_xlabel('Epoch')
+        acc_plt.set_ylabel('Accuracy')
+        acc_plt.legend()
+        
+        # plt.tight_layout()
         plt.savefig(self.cv_path / "lstm_training_history.png", dpi=300)
         plt.close()

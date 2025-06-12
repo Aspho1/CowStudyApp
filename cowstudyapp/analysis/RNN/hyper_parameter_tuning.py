@@ -40,7 +40,7 @@ class BayesianOptSearch:
 
         ops = 'ops' if self.config.analysis.lstm.ops else 'opo'
 
-        self.output_dir = self.config.analysis.cv_results / 'lstm' / ops / 'v2job'
+        self.output_dir = self.config.analysis.cv_results / 'lstm' / ops / 'v4job'
         # self.output_dir = Path(self.output_dir)
         self.output_dir.mkdir(parents=True,exist_ok=True)
         
@@ -50,8 +50,8 @@ class BayesianOptSearch:
         self.space = [
             Integer(10, 288, name='max_length'),
             Integer(4, 48, name='batch_size'),
-            Real(1e-4, 0.1, name='initial_lr'),
-            Integer(500, 3000, name='decay_steps'),
+            Real(1e-4, 0.5, name='initial_lr'),
+            Integer(50, 3000, name='decay_steps'),
             Real(0.001, 0.95, name='decay_rate'),
             Real(0.1, 2.5, name='clipnorm'),
 
