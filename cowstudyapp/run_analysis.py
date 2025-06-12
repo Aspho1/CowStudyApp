@@ -301,13 +301,26 @@ def run_hmm_analysis(config: ConfigManager, target_data_path: Path, progress_cal
 
     # Ensure R script directory exists
     ########## This needs cleaning
-    try:
-        r_script_dir = Path("src/cowstudyapp/analysis/HMM")
-    except FileNotFoundError:
-        r_script_dir = Path("/SShare/Education/CowStudyApp/src/cowstudyapp/analysis/HMM")
+
+    r_script_dir = None
+    for prefix in [
+        "/SShare/Education/CowStudyApp",
+        "/mnt/SShare/Education/CowStudyApp",
+        "C:/Users/myset/Documents/1.Education/CowStudyApp"
+        ]:
+
+        r_script_dir = Path(prefix) / "cowstudyapp/analysis/HMM"
+        if r_script_dir.exists():
+            continue 
+        # except FileNotFoundError:
+        #     r_script_dir = Path("/SShare/Education/CowStudyApp/src/cowstudyapp/analysis/HMM")
     
-    if not r_script_dir.exists():
-        raise FileNotFoundError(f"R script directory not found: {r_script_dir}")
+    # if not r_script_dir.exists():
+    #     raise FileNotFoundError(f"R script directory not found: {r_script_dir}")
+
+    
+    print(r_script_dir)
+    print(r_script_dir.exists())
 
     # analysis_type = config.mode if hasattr(config, 'mode') else "LOOCV"
     if analysis.hmm is None:

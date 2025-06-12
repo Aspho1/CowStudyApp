@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # First pull to initiate the merge
-git pull || true  # The "|| true" ensures the script continues even if git pull exits with error due to conflicts
+git pull --no-rebase || true  # The "|| true" ensures the script continues even if git pull exits with error due to conflicts
 
 # Files to take from remote
 remote_files=(

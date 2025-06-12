@@ -77,7 +77,14 @@ class ActivityVersusTemperatureNew:
             else:
                 temp_df = pd.read_csv(self.config.analysis.target_dataset)
                 required_cols = ['device_id', 'posix_time', 'temperature_gps']
+                
+                for rc in required_cols:
+                    print(rc, ": ", rc in temp_df.columns)
+
                 if not all(col in temp_df.columns for col in required_cols):
+
+
+                    print(col in temp_df.columns for col in required_cols)
                     raise ValueError(f"Temperature dataset must contain columns: {required_cols}")
                 
                 df = pd.merge(
